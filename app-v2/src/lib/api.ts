@@ -20,11 +20,14 @@ export const api = {
   },
 
   serverGet(payload: { server_id: string; reveal_secrets?: boolean }): Promise<ServerRecord> {
-    return invokeCmd("server_get", payload);
+    return invokeCmd("server_get", {
+      serverId: payload.server_id,
+      revealSecrets: payload.reveal_secrets,
+    });
   },
 
   serverPreviewToggle(payload: { server_id: string; enabled: boolean }): Promise<WritePreview> {
-    return invokeCmd("server_preview_toggle", payload);
+    return invokeCmd("server_preview_toggle", { serverId: payload.server_id, enabled: payload.enabled });
   },
 
   serverApplyToggle(payload: {
@@ -32,7 +35,11 @@ export const api = {
     enabled: boolean;
     expected_files: FilePrecondition[];
   }): Promise<ApplyResult> {
-    return invokeCmd("server_apply_toggle", payload);
+    return invokeCmd("server_apply_toggle", {
+      serverId: payload.server_id,
+      enabled: payload.enabled,
+      expectedFiles: payload.expected_files,
+    });
   },
 
   serverPreviewAdd(payload: {
@@ -51,7 +58,13 @@ export const api = {
     config: Record<string, unknown>;
     expected_files: FilePrecondition[];
   }): Promise<ApplyResult> {
-    return invokeCmd("server_apply_add", payload);
+    return invokeCmd("server_apply_add", {
+      client: payload.client,
+      name: payload.name,
+      transport: payload.transport,
+      config: payload.config,
+      expectedFiles: payload.expected_files,
+    });
   },
 
   profileList(): Promise<Profile[]> {
@@ -67,15 +80,19 @@ export const api = {
     name?: string;
     targets?: Profile["targets"];
   }): Promise<Profile> {
-    return invokeCmd("profile_update", payload);
+    return invokeCmd("profile_update", {
+      profileId: payload.profile_id,
+      name: payload.name,
+      targets: payload.targets,
+    });
   },
 
   profileDelete(payload: { profile_id: string }): Promise<{ ok: true }> {
-    return invokeCmd("profile_delete", payload);
+    return invokeCmd("profile_delete", { profileId: payload.profile_id });
   },
 
   profilePreviewApply(payload: { profile_id: string; client: Client }): Promise<WritePreview> {
-    return invokeCmd("profile_preview_apply", payload);
+    return invokeCmd("profile_preview_apply", { profileId: payload.profile_id, client: payload.client });
   },
 
   profileApply(payload: {
@@ -83,22 +100,28 @@ export const api = {
     client: Client;
     expected_files: FilePrecondition[];
   }): Promise<ApplyResult> {
-    return invokeCmd("profile_apply", payload);
+    return invokeCmd("profile_apply", {
+      profileId: payload.profile_id,
+      client: payload.client,
+      expectedFiles: payload.expected_files,
+    });
   },
 
   backupList(payload?: { target_path?: string }): Promise<BackupRecord[]> {
-    return invokeCmd("backup_list", payload ?? {});
+    return invokeCmd("backup_list", { targetPath: payload?.target_path });
   },
 
   backupPreviewRollback(payload: { backup_id: string }): Promise<WritePreview> {
-    return invokeCmd("backup_preview_rollback", payload);
+    return invokeCmd("backup_preview_rollback", { backupId: payload.backup_id });
   },
 
   backupApplyRollback(payload: {
     backup_id: string;
     expected_files: FilePrecondition[];
   }): Promise<ApplyResult> {
-    return invokeCmd("backup_apply_rollback", payload);
+    return invokeCmd("backup_apply_rollback", {
+      backupId: payload.backup_id,
+      expectedFiles: payload.expected_files,
+    });
   },
 };
-

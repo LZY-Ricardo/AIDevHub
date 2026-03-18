@@ -282,8 +282,10 @@ function TargetSelector({
                 cursor: "pointer",
                 padding: "8px 10px",
                 borderRadius: "12px",
-                border: "1px solid rgba(148, 163, 184, 0.14)",
-                background: checked ? "rgba(34, 197, 94, 0.10)" : "rgba(148, 163, 184, 0.06)",
+                border: "1px solid var(--color-border-subtle)",
+                background: checked
+                  ? "rgba(var(--color-cta-rgb), 0.1)"
+                  : "rgba(var(--color-text-rgb), 0.04)",
               }}
             >
               <input
@@ -314,4 +316,3 @@ function TargetSelector({
 function normalizeServerIds(ids: string[]): string[] {
   return Array.from(new Set(ids.map((s) => s.trim()).filter(Boolean)));
 }
-
