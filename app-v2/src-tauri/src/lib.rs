@@ -12,12 +12,17 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         .map_err(|e| AppError::new("IO_ERROR", format!("home_dir: {e}")))?;
 
     let claude_config_path = home.join(".claude.json");
+    let claude_commands_dir = home.join(".claude").join("commands");
+    let claude_commands_disabled_dir = home.join(".claude").join("commands_disabled");
 
-    let codex_config_path = if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
-        PathBuf::from(codex_home).join("config.toml")
+    let codex_home = if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
+        PathBuf::from(codex_home)
     } else {
-        home.join(".codex").join("config.toml")
+        home.join(".codex")
     };
+    let codex_config_path = codex_home.join("config.toml");
+    let codex_skills_dir = codex_home.join("skills");
+    let codex_skills_disabled_dir = codex_home.join("skills_disabled");
 
     let app_local_data_dir = app
         .path()
@@ -26,7 +31,11 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
 
     Ok(AppPaths {
         claude_config_path,
+        claude_commands_dir,
+        claude_commands_disabled_dir,
         codex_config_path,
+        codex_skills_dir,
+        codex_skills_disabled_dir,
         app_local_data_dir: app_local_data_dir.clone(),
         profiles_path: app_local_data_dir.join("profiles.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
@@ -199,6 +208,71 @@ fn backup_apply_rollback(
     ops::backup_apply_rollback(&paths, &backup_id, expected_files)
 }
 
+#[tauri::command]
+fn skill_list(
+    app: tauri::AppHandle,
+    client: Option<Client>,
+    scope: Option<String>,
+) -> Result<Vec<aidevhub_core::model::SkillRecord>, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_list(&paths, client, scope)
+}
+
+#[tauri::command]
+fn skill_get(
+    app: tauri::AppHandle,
+    skill_id: String,
+) -> Result<aidevhub_core::model::SkillGetResponse, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_get(&paths, &skill_id)
+}
+
+#[tauri::command]
+fn skill_preview_create(
+    app: tauri::AppHandle,
+    client: Client,
+    name: String,
+    description: String,
+    body: Option<String>,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_preview_create(&paths, client, &name, &description, body)
+}
+
+#[tauri::command]
+fn skill_apply_create(
+    app: tauri::AppHandle,
+    client: Client,
+    name: String,
+    description: String,
+    body: Option<String>,
+    expected_files: Vec<FilePrecondition>,
+) -> Result<aidevhub_core::model::ApplyResult, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_apply_create(&paths, client, &name, &description, body, expected_files)
+}
+
+#[tauri::command]
+fn skill_preview_toggle(
+    app: tauri::AppHandle,
+    skill_id: String,
+    enabled: bool,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_preview_toggle(&paths, &skill_id, enabled)
+}
+
+#[tauri::command]
+fn skill_apply_toggle(
+    app: tauri::AppHandle,
+    skill_id: String,
+    enabled: bool,
+    expected_files: Vec<FilePrecondition>,
+) -> Result<aidevhub_core::model::ApplyResult, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::skill_apply_toggle(&paths, &skill_id, enabled, expected_files)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -219,7 +293,13 @@ pub fn run() {
             profile_apply,
             backup_list,
             backup_preview_rollback,
-            backup_apply_rollback
+            backup_apply_rollback,
+            skill_list,
+            skill_get,
+            skill_preview_create,
+            skill_apply_create,
+            skill_preview_toggle,
+            skill_apply_toggle
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -3,6 +3,7 @@ type IconName =
   | "servers"
   | "plus"
   | "profiles"
+  | "skills"
   | "backups"
   | "external"
   | "chevronRight"
@@ -83,6 +84,17 @@ export function Icon({
             d="M5 5h14v14H5V5Z"
             stroke="currentColor"
             strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case "skills":
+      return (
+        <svg {...common}>
+          <path
+            d="M12 2 14.2 7.6 20 8.2 15.6 12 16.9 17.7 12 14.9 7.1 17.7 8.4 12 4 8.2 9.8 7.6 12 2Z"
+            stroke="currentColor"
+            strokeWidth="1.4"
             strokeLinejoin="round"
           />
         </svg>

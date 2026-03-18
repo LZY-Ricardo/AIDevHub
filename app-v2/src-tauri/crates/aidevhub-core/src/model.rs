@@ -15,6 +15,20 @@ pub enum Transport {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillScope {
+    User,
+    System,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillKind {
+    Dir,
+    File,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppError {
     pub code: String,
@@ -59,6 +73,25 @@ pub struct ServerRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillRecord {
+    pub skill_id: String, // "<client>:<name>"
+    pub client: Client,
+    pub name: String,
+    pub description: String,
+    pub scope: SkillScope,
+    pub kind: SkillKind,
+    pub enabled: bool,
+    pub entry_path: String,
+    pub container_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillGetResponse {
+    pub record: SkillRecord,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub profile_id: String,
     pub name: String,
@@ -87,6 +120,13 @@ pub struct FileChangePreview {
     pub diff_unified: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovePreview {
+    pub from: String,
+    pub to: String,
+    pub kind: SkillKind,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WriteSummary {
     pub will_enable: Vec<String>,
@@ -97,6 +137,10 @@ pub struct WriteSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WritePreview {
     pub files: Vec<FileChangePreview>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub moves: Vec<MovePreview>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expected_files: Vec<FilePrecondition>,
     pub summary: WriteSummary,
     pub warnings: Vec<Warning>,
 }
@@ -136,7 +180,11 @@ pub struct RuntimeGetInfoResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimePaths {
     pub claude_config_path: String,
+    pub claude_commands_dir: String,
+    pub claude_commands_disabled_dir: String,
     pub codex_config_path: String,
+    pub codex_skills_dir: String,
+    pub codex_skills_disabled_dir: String,
     pub app_local_data_dir: String,
     pub profiles_path: String,
     pub disabled_pool_path: String,
@@ -149,4 +197,3 @@ pub struct RuntimeExists {
     pub claude_config: bool,
     pub codex_config: bool,
 }
-

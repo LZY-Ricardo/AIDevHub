@@ -5,6 +5,9 @@ import { DiffViewer, type DiffViewMode } from "./DiffViewer";
 import { Icon } from "./Icon";
 
 function expectedFilesFromPreview(preview: WritePreview): FilePrecondition[] {
+  if (preview.expected_files && preview.expected_files.length) {
+    return preview.expected_files;
+  }
   return preview.files.map((f) => ({
     path: f.path,
     expected_before_sha256: f.before_sha256,
@@ -26,12 +29,14 @@ export function WritePreviewDialog({
   onClose: () => void;
   onConfirm: (expectedFiles: FilePrecondition[]) => Promise<void>;
 }) {
-  const [tab, setTab] = useState<"summary" | "diff" | "warnings">("summary");
+  const [tab, setTab] = useState<"summary" | "diff" | "moves" | "warnings">("summary");
 
   const expectedFiles = useMemo(
     () => (preview ? expectedFilesFromPreview(preview) : []),
     [preview],
   );
+
+  const moveCount = preview?.moves?.length ?? 0;
 
   return (
     <Dialog
@@ -85,6 +90,15 @@ export function WritePreviewDialog({
                 type="button"
                 className="ui-tab"
                 role="tab"
+                aria-selected={tab === "moves"}
+                onClick={() => setTab("moves")}
+              >
+                移动 ({moveCount})
+              </button>
+              <button
+                type="button"
+                className="ui-tab"
+                role="tab"
                 aria-selected={tab === "warnings"}
                 onClick={() => setTab("warnings")}
               >
@@ -93,13 +107,14 @@ export function WritePreviewDialog({
             </div>
 
             <div className="ui-help">
-              {preview.files.length} 个文件将被改写
+              {preview.files.length} 个文件将被改写{moveCount ? `，${moveCount} 个路径将被移动` : ""}
             </div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
             {tab === "summary" ? <SummaryView preview={preview} /> : null}
             {tab === "diff" ? <DiffView preview={preview} /> : null}
+            {tab === "moves" ? <MovesView preview={preview} /> : null}
             {tab === "warnings" ? <WarningsView preview={preview} /> : null}
           </div>
         </>
@@ -159,6 +174,9 @@ function ServerListBlock({ title, items }: { title: string; items: string[] }) {
 function DiffView({ preview }: { preview: WritePreview }) {
   const [mode, setMode] = useState<DiffViewMode>("split");
   const [wrap, setWrap] = useState(false);
+  if (preview.files.length === 0) {
+    return <div className="ui-help">无文件差异。</div>;
+  }
 
   return (
     <div style={{ display: "grid", gap: "12px" }}>
@@ -208,6 +226,28 @@ function DiffView({ preview }: { preview: WritePreview }) {
           </div>
           <div style={{ marginTop: "12px" }}>
             <DiffViewer diff={f.diff_unified} mode={mode} wrap={wrap} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MovesView({ preview }: { preview: WritePreview }) {
+  const moves = preview.moves ?? [];
+  if (moves.length === 0) {
+    return <div className="ui-help">无移动操作。</div>;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "12px" }}>
+      {moves.map((m, idx) => (
+        <div key={`${m.from}-${m.to}-${idx}`} className="ui-card" style={{ padding: "16px" }}>
+          <div className="ui-label">移动（{m.kind === "dir" ? "目录" : "文件"}）</div>
+          <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+            <div className="ui-code">{m.from}</div>
+            <div className="ui-help">→</div>
+            <div className="ui-code">{m.to}</div>
           </div>
         </div>
       ))}

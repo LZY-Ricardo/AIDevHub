@@ -51,7 +51,11 @@ impl From<CoreError> for AppError {
 #[derive(Debug, Clone)]
 pub struct AppPaths {
     pub claude_config_path: PathBuf,
+    pub claude_commands_dir: PathBuf,
+    pub claude_commands_disabled_dir: PathBuf,
     pub codex_config_path: PathBuf,
+    pub codex_skills_dir: PathBuf,
+    pub codex_skills_disabled_dir: PathBuf,
     pub app_local_data_dir: PathBuf,
     pub profiles_path: PathBuf,
     pub disabled_pool_path: PathBuf,
@@ -67,8 +71,17 @@ struct PlannedFileWrite {
 }
 
 #[derive(Debug, Clone)]
+struct PlannedMove {
+    from: PathBuf,
+    to: PathBuf,
+    kind: SkillKind,
+}
+
+#[derive(Debug, Clone)]
 struct PlannedWrite {
     files: Vec<PlannedFileWrite>,
+    moves: Vec<PlannedMove>,
+    expected_files: Vec<FilePrecondition>,
     summary: WriteSummary,
     warnings: Vec<Warning>,
     backup_op: BackupOp,
@@ -188,6 +201,102 @@ fn parse_server_id(id: &str) -> Result<(Client, String), CoreError> {
         _ => return Err(CoreError::Validation(format!("invalid server_id client: {id}"))),
     };
     Ok((client, name.to_string()))
+}
+
+fn validate_simple_name(name: &str, label: &str) -> Result<(), CoreError> {
+    if name.trim().is_empty() {
+        return Err(CoreError::Validation(format!("{label} is required")));
+    }
+    if name != name.trim() {
+        return Err(CoreError::Validation(format!("{label} must not have leading/trailing spaces")));
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err(CoreError::Validation(format!("{label} must not contain path separators")));
+    }
+    if name == "." || name == ".." || name.contains("..") {
+        return Err(CoreError::Validation(format!("{label} must not contain '..'")));
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err(CoreError::Validation(format!("{label} must not end with '.' or space")));
+    }
+    let forbidden = ['<', '>', '"', ':', '|', '?', '*'];
+    if name.chars().any(|c| forbidden.contains(&c) || c.is_control()) {
+        return Err(CoreError::Validation(format!("{label} contains invalid characters")));
+    }
+    Ok(())
+}
+
+fn file_precondition_from_disk(path: &Path) -> Result<FilePrecondition, CoreError> {
+    let before = read_to_string_opt(path)?;
+    Ok(FilePrecondition {
+        path: path.to_string_lossy().to_string(),
+        expected_before_sha256: before.as_deref().map(sha256_hex),
+    })
+}
+
+fn strip_quotes(s: &str) -> String {
+    let t = s.trim();
+    if (t.starts_with('"') && t.ends_with('"')) || (t.starts_with('\'') && t.ends_with('\'')) {
+        t[1..t.len().saturating_sub(1)].to_string()
+    } else {
+        t.to_string()
+    }
+}
+
+fn parse_yaml_frontmatter(text: &str) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    let mut lines = text.lines();
+    if lines.next().map(|l| l.trim()) != Some("---") {
+        return out;
+    }
+
+    let mut fm_lines: Vec<String> = Vec::new();
+    for line in lines.by_ref() {
+        if line.trim() == "---" {
+            break;
+        }
+        fm_lines.push(line.to_string());
+    }
+
+    let mut i = 0usize;
+    while i < fm_lines.len() {
+        let line = fm_lines[i].trim_end().to_string();
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            i += 1;
+            continue;
+        }
+
+        let Some((k, v0)) = trimmed.split_once(':') else {
+            i += 1;
+            continue;
+        };
+        let key = k.trim().to_string();
+        let mut val = v0.trim().to_string();
+
+        // Handle simple block scalars: `key: |` or `key: >`
+        if val.starts_with('|') || val.starts_with('>') {
+            let mut block: Vec<String> = Vec::new();
+            i += 1;
+            while i < fm_lines.len() {
+                let l = &fm_lines[i];
+                if l.starts_with(' ') || l.starts_with('\t') {
+                    block.push(l.trim_start().to_string());
+                    i += 1;
+                    continue;
+                }
+                break;
+            }
+            val = block.join("\n").trim().to_string();
+            out.insert(key, val);
+            continue;
+        }
+
+        out.insert(key, strip_quotes(&val));
+        i += 1;
+    }
+
+    out
 }
 
 fn validate_preconditions(expected: &[FilePrecondition]) -> Result<(), CoreError> {
@@ -475,7 +584,14 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
     let resp = RuntimeGetInfoResponse {
         paths: RuntimePaths {
             claude_config_path: paths.claude_config_path.to_string_lossy().to_string(),
+            claude_commands_dir: paths.claude_commands_dir.to_string_lossy().to_string(),
+            claude_commands_disabled_dir: paths
+                .claude_commands_disabled_dir
+                .to_string_lossy()
+                .to_string(),
             codex_config_path: paths.codex_config_path.to_string_lossy().to_string(),
+            codex_skills_dir: paths.codex_skills_dir.to_string_lossy().to_string(),
+            codex_skills_disabled_dir: paths.codex_skills_disabled_dir.to_string_lossy().to_string(),
             app_local_data_dir: paths.app_local_data_dir.to_string_lossy().to_string(),
             profiles_path: paths.profiles_path.to_string_lossy().to_string(),
             disabled_pool_path: paths.disabled_pool_path.to_string_lossy().to_string(),
@@ -581,10 +697,501 @@ pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SkillListFilter {
+    All,
+    User,
+    System,
+    Disabled,
+}
+
+fn parse_skill_list_filter(scope: Option<&str>) -> SkillListFilter {
+    match scope.unwrap_or("all") {
+        "user" => SkillListFilter::User,
+        "system" => SkillListFilter::System,
+        "disabled" => SkillListFilter::Disabled,
+        _ => SkillListFilter::All,
+    }
+}
+
+fn skill_filter_match(filter: SkillListFilter, rec: &SkillRecord) -> bool {
+    match filter {
+        SkillListFilter::All => true,
+        SkillListFilter::User => rec.scope == SkillScope::User,
+        SkillListFilter::System => rec.scope == SkillScope::System,
+        SkillListFilter::Disabled => !rec.enabled,
+    }
+}
+
+fn read_dir_entries(path: &Path) -> Result<Vec<fs::DirEntry>, CoreError> {
+    let rd = match fs::read_dir(path) {
+        Ok(rd) => rd,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(CoreError::Io(format!("read_dir {}: {e}", path.display()))),
+    };
+    let mut out = Vec::new();
+    for ent in rd {
+        let ent = ent.map_err(|e| CoreError::Io(format!("read_dir {}: {e}", path.display())))?;
+        out.push(ent);
+    }
+    Ok(out)
+}
+
+fn build_skill_record_codex(
+    id_name: &str,
+    dir_path: &Path,
+    enabled: bool,
+    scope: SkillScope,
+) -> Result<(SkillRecord, String), CoreError> {
+    let entry_path = dir_path.join("SKILL.md");
+    let Some(content) = read_to_string_opt(&entry_path)? else {
+        return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_path.display())));
+    };
+    let fm = parse_yaml_frontmatter(&content);
+    let fallback = dir_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(id_name)
+        .to_string();
+    let name = fm.get("name").cloned().unwrap_or(fallback);
+    let description = fm.get("description").cloned().unwrap_or_default();
+    Ok((
+        SkillRecord {
+            skill_id: server_id(Client::Codex, id_name),
+            client: Client::Codex,
+            name,
+            description,
+            scope,
+            kind: SkillKind::Dir,
+            enabled,
+            entry_path: entry_path.to_string_lossy().to_string(),
+            container_path: dir_path.to_string_lossy().to_string(),
+        },
+        content,
+    ))
+}
+
+fn build_skill_record_claude(
+    command_name: &str,
+    file_path: &Path,
+    enabled: bool,
+) -> Result<(SkillRecord, String), CoreError> {
+    let Some(content) = read_to_string_opt(file_path)? else {
+        return Err(CoreError::NotFound(format!("missing command file: {}", file_path.display())));
+    };
+    let fm = parse_yaml_frontmatter(&content);
+    let description = fm.get("description").cloned().unwrap_or_default();
+    Ok((
+        SkillRecord {
+            skill_id: server_id(Client::ClaudeCode, command_name),
+            client: Client::ClaudeCode,
+            name: command_name.to_string(),
+            description,
+            scope: SkillScope::User,
+            kind: SkillKind::File,
+            enabled,
+            entry_path: file_path.to_string_lossy().to_string(),
+            container_path: file_path
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+                .to_string_lossy()
+                .to_string(),
+        },
+        content,
+    ))
+}
+
+pub fn skill_list(
+    paths: &AppPaths,
+    client: Option<Client>,
+    scope: Option<String>,
+) -> Result<Vec<SkillRecord>, AppError> {
+    let filter = parse_skill_list_filter(scope.as_deref());
+    let mut out: Vec<SkillRecord> = Vec::new();
+
+    if client.is_none() || client == Some(Client::ClaudeCode) {
+        // enabled personal commands
+        for ent in read_dir_entries(&paths.claude_commands_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_file() {
+                continue;
+            }
+            let p = ent.path();
+            if p.extension().and_then(|s| s.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if let Ok((rec, _content)) = build_skill_record_claude(stem, &p, true) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+
+        // disabled personal commands
+        for ent in read_dir_entries(&paths.claude_commands_disabled_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_file() {
+                continue;
+            }
+            let p = ent.path();
+            if p.extension().and_then(|s| s.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if let Ok((rec, _content)) = build_skill_record_claude(stem, &p, false) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+    }
+
+    if client.is_none() || client == Some(Client::Codex) {
+        // enabled user skills (exclude .system)
+        for ent in read_dir_entries(&paths.codex_skills_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if dir_name == ".system" {
+                continue;
+            }
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_codex(dir_name, &p, true, SkillScope::User) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+
+        // system skills under .system
+        let system_root = paths.codex_skills_dir.join(".system");
+        for ent in read_dir_entries(&system_root).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let id_name = format!(".system/{dir_name}");
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_codex(&id_name, &p, true, SkillScope::System) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+
+        // disabled user skills
+        for ent in read_dir_entries(&paths.codex_skills_disabled_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_codex(dir_name, &p, false, SkillScope::User) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+    }
+
+    out.sort_by(|a, b| {
+        (
+            format!("{:?}", a.client),
+            a.scope as u8,
+            (!a.enabled) as u8,
+            a.skill_id.clone(),
+        )
+            .cmp(&(
+                format!("{:?}", b.client),
+                b.scope as u8,
+                (!b.enabled) as u8,
+                b.skill_id.clone(),
+            ))
+    });
+
+    Ok(out)
+}
+
+pub fn skill_get(paths: &AppPaths, skill_id_str: &str) -> Result<SkillGetResponse, AppError> {
+    let (client, name) = parse_server_id(skill_id_str).map_err(AppError::from)?;
+
+    let (record, content) = match client {
+        Client::ClaudeCode => {
+            let enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
+            let disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            if enabled_path.exists() {
+                build_skill_record_claude(&name, &enabled_path, true).map_err(AppError::from)?
+            } else if disabled_path.exists() {
+                build_skill_record_claude(&name, &disabled_path, false).map_err(AppError::from)?
+            } else {
+                return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+            }
+        }
+        Client::Codex => {
+            if name.starts_with(".system/") {
+                let dir = paths.codex_skills_dir.join(&name);
+                if !dir.exists() {
+                    return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+                }
+                build_skill_record_codex(&name, &dir, true, SkillScope::System).map_err(AppError::from)?
+            } else {
+                let enabled_dir = paths.codex_skills_dir.join(&name);
+                let disabled_dir = paths.codex_skills_disabled_dir.join(&name);
+                if enabled_dir.exists() {
+                    build_skill_record_codex(&name, &enabled_dir, true, SkillScope::User).map_err(AppError::from)?
+                } else if disabled_dir.exists() {
+                    build_skill_record_codex(&name, &disabled_dir, false, SkillScope::User).map_err(AppError::from)?
+                } else {
+                    return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+                }
+            }
+        }
+    };
+
+    Ok(SkillGetResponse { record, content })
+}
+
+fn plan_create_skill(
+    paths: &AppPaths,
+    client: Client,
+    name: &str,
+    description: &str,
+    body: Option<String>,
+) -> Result<PlannedWrite, CoreError> {
+    validate_simple_name(name, "name")?;
+    if description.trim().is_empty() {
+        return Err(CoreError::Validation("description is required".to_string()));
+    }
+
+    let mut planned = PlannedWrite {
+        files: vec![],
+        moves: vec![],
+        expected_files: vec![],
+        summary: WriteSummary::default(),
+        warnings: vec![],
+        backup_op: BackupOp::AddServer, // no backups for skills; value is unused
+    };
+
+    match client {
+        Client::Codex => {
+            if name == ".system" || name.starts_with(".system/") {
+                return Err(CoreError::Validation("'.system' is reserved".to_string()));
+            }
+            let dir_enabled = paths.codex_skills_dir.join(name);
+            let dir_disabled = paths.codex_skills_disabled_dir.join(name);
+            if dir_enabled.exists() || dir_disabled.exists() {
+                return Err(CoreError::Validation(format!("skill already exists: {name}")));
+            }
+            let entry = dir_enabled.join("SKILL.md");
+            let body_text = body.unwrap_or_else(|| {
+                "## Instructions\n\n- 在这里写下该技能的触发条件与执行步骤。\n".to_string()
+            });
+            let content = format!(
+                "---\nname: {name}\ndescription: {desc}\n---\n\n# {name}\n\n{body_text}",
+                desc = description.trim()
+            );
+
+            planned.summary.will_add.push(server_id(client, name));
+            planned.summary.will_enable.push(server_id(client, name));
+            planned.files.push(PlannedFileWrite {
+                path: entry,
+                before: None,
+                after: content,
+            });
+        }
+        Client::ClaudeCode => {
+            let file_enabled = paths.claude_commands_dir.join(format!("{name}.md"));
+            let file_disabled = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            if file_enabled.exists() || file_disabled.exists() {
+                return Err(CoreError::Validation(format!("command already exists: {name}")));
+            }
+
+            let body_text = body.unwrap_or_else(|| {
+                "## Instructions\n\n- 在这里写下该命令要执行的动作、参数说明与注意事项。\n".to_string()
+            });
+            let content = format!(
+                "---\ndescription: \"{desc}\"\n---\n\n# /{name}\n\n{body_text}",
+                desc = description.trim().replace('"', "\\\"")
+            );
+
+            planned.summary.will_add.push(server_id(client, name));
+            planned.summary.will_enable.push(server_id(client, name));
+            planned.files.push(PlannedFileWrite {
+                path: file_enabled,
+                before: None,
+                after: content,
+            });
+        }
+    }
+
+    Ok(planned)
+}
+
+fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Result<PlannedWrite, CoreError> {
+    let (client, name) = parse_server_id(skill_id_str)?;
+    let mut planned = PlannedWrite {
+        files: vec![],
+        moves: vec![],
+        expected_files: vec![],
+        summary: WriteSummary::default(),
+        warnings: vec![],
+        backup_op: BackupOp::Toggle, // no backups for skills; value is unused
+    };
+
+    match client {
+        Client::Codex => {
+            if name == ".system" || name.starts_with(".system/") {
+                return Err(CoreError::Validation("system skills cannot be toggled".to_string()));
+            }
+
+            let enabled_dir = paths.codex_skills_dir.join(&name);
+            let disabled_dir = paths.codex_skills_disabled_dir.join(&name);
+            let exists_enabled = enabled_dir.exists();
+            let exists_disabled = disabled_dir.exists();
+            if exists_enabled && exists_disabled {
+                return Err(CoreError::Validation(format!(
+                    "skill exists in both enabled/disabled locations: {skill_id_str}"
+                )));
+            }
+
+            let currently_enabled = exists_enabled;
+            if currently_enabled == enabled {
+                return Ok(planned);
+            }
+
+            let (from, to) = if enabled {
+                (disabled_dir, enabled_dir)
+            } else {
+                (enabled_dir, disabled_dir)
+            };
+
+            let entry_from = from.join("SKILL.md");
+            if !entry_from.exists() {
+                return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_from.display())));
+            }
+
+            planned.expected_files.push(file_precondition_from_disk(&entry_from)?);
+            planned.moves.push(PlannedMove {
+                from,
+                to,
+                kind: SkillKind::Dir,
+            });
+        }
+        Client::ClaudeCode => {
+            let enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
+            let disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            let exists_enabled = enabled_path.exists();
+            let exists_disabled = disabled_path.exists();
+            if exists_enabled && exists_disabled {
+                return Err(CoreError::Validation(format!(
+                    "command exists in both enabled/disabled locations: {skill_id_str}"
+                )));
+            }
+
+            let currently_enabled = exists_enabled;
+            if currently_enabled == enabled {
+                return Ok(planned);
+            }
+
+            let (from, to) = if enabled {
+                (disabled_path, enabled_path)
+            } else {
+                (enabled_path, disabled_path)
+            };
+
+            if !from.exists() {
+                return Err(CoreError::NotFound(format!("command file missing: {}", from.display())));
+            }
+
+            planned.expected_files.push(file_precondition_from_disk(&from)?);
+            planned.moves.push(PlannedMove {
+                from,
+                to,
+                kind: SkillKind::File,
+            });
+        }
+    }
+
+    if enabled {
+        planned.summary.will_enable.push(skill_id_str.to_string());
+    } else {
+        planned.summary.will_disable.push(skill_id_str.to_string());
+    }
+
+    Ok(planned)
+}
+
+pub fn skill_preview_create(
+    paths: &AppPaths,
+    client: Client,
+    name: &str,
+    description: &str,
+    body: Option<String>,
+) -> Result<WritePreview, AppError> {
+    let planned = plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
+    build_preview(planned).map_err(AppError::from)
+}
+
+pub fn skill_apply_create(
+    paths: &AppPaths,
+    client: Client,
+    name: &str,
+    description: &str,
+    body: Option<String>,
+    expected: Vec<FilePrecondition>,
+) -> Result<ApplyResult, AppError> {
+    let planned = plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
+    apply_planned(paths, planned, &expected).map_err(AppError::from)
+}
+
+pub fn skill_preview_toggle(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Result<WritePreview, AppError> {
+    let planned = plan_toggle_skill(paths, skill_id_str, enabled).map_err(AppError::from)?;
+    build_preview(planned).map_err(AppError::from)
+}
+
+pub fn skill_apply_toggle(
+    paths: &AppPaths,
+    skill_id_str: &str,
+    enabled: bool,
+    expected: Vec<FilePrecondition>,
+) -> Result<ApplyResult, AppError> {
+    let planned = plan_toggle_skill(paths, skill_id_str, enabled).map_err(AppError::from)?;
+    apply_planned(paths, planned, &expected).map_err(AppError::from)
+}
+
 fn plan_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<PlannedWrite, CoreError> {
     let (client, name) = parse_server_id(server_id_str)?;
     let mut planned = PlannedWrite {
         files: vec![],
+        moves: vec![],
+        expected_files: vec![],
         summary: WriteSummary::default(),
         warnings: vec![],
         backup_op: BackupOp::Toggle,
@@ -685,6 +1292,8 @@ fn plan_add_server(
     }
     let mut planned = PlannedWrite {
         files: vec![],
+        moves: vec![],
+        expected_files: vec![],
         summary: WriteSummary::default(),
         warnings: vec![],
         backup_op: BackupOp::AddServer,
@@ -774,6 +1383,11 @@ fn plan_add_server(
 
 fn build_preview(planned: PlannedWrite) -> Result<WritePreview, CoreError> {
     let mut files = Vec::new();
+    let mut expected_map: BTreeMap<String, Option<String>> = BTreeMap::new();
+    for p in &planned.expected_files {
+        expected_map.insert(p.path.clone(), p.expected_before_sha256.clone());
+    }
+
     for f in &planned.files {
         let before = f.before.clone().unwrap_or_default();
         let after = f.after.clone();
@@ -781,16 +1395,39 @@ fn build_preview(planned: PlannedWrite) -> Result<WritePreview, CoreError> {
         let before_sha = f.before.as_deref().map(sha256_hex);
         let after_sha = sha256_hex(&after);
         let diff = unified_diff(&f.path, &before, &after);
+        let path_str = f.path.to_string_lossy().to_string();
+        expected_map.insert(path_str.clone(), before_sha.clone());
         files.push(FileChangePreview {
-            path: f.path.to_string_lossy().to_string(),
+            path: path_str,
             will_create,
             before_sha256: before_sha,
             after_sha256: after_sha,
             diff_unified: diff,
         });
     }
+
+    let moves = planned
+        .moves
+        .iter()
+        .map(|m| MovePreview {
+            from: m.from.to_string_lossy().to_string(),
+            to: m.to.to_string_lossy().to_string(),
+            kind: m.kind,
+        })
+        .collect::<Vec<_>>();
+
+    let expected_files = expected_map
+        .into_iter()
+        .map(|(path, expected_before_sha256)| FilePrecondition {
+            path,
+            expected_before_sha256,
+        })
+        .collect::<Vec<_>>();
+
     Ok(WritePreview {
         files,
+        moves,
+        expected_files,
         summary: planned.summary,
         warnings: planned.warnings,
     })
@@ -807,6 +1444,21 @@ fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecon
             let rec = backup_file(&paths.backups_dir, &f.path, planned.backup_op.clone(), "auto backup")?;
             backups.push(rec);
         }
+    }
+
+    for m in &planned.moves {
+        if !m.from.exists() {
+            return Err(CoreError::NotFound(format!("move source missing: {}", m.from.display())));
+        }
+        if m.to.exists() {
+            return Err(CoreError::Validation(format!(
+                "move destination already exists: {}",
+                m.to.display()
+            )));
+        }
+        ensure_parent_dir(&m.to)?;
+        fs::rename(&m.from, &m.to)
+            .map_err(|e| CoreError::Io(format!("rename {} -> {}: {e}", m.from.display(), m.to.display())))?;
     }
 
     for f in &planned.files {
@@ -933,6 +1585,8 @@ pub fn profile_delete(paths: &AppPaths, profile_id: &str) -> Result<(), AppError
 fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Result<PlannedWrite, CoreError> {
     let mut planned = PlannedWrite {
         files: vec![],
+        moves: vec![],
+        expected_files: vec![],
         summary: WriteSummary::default(),
         warnings: vec![],
         backup_op: BackupOp::ApplyProfile,
@@ -1102,6 +1756,8 @@ pub fn backup_preview_rollback(paths: &AppPaths, backup_id: &str) -> Result<Writ
             before: current,
             after: backup_content,
         }],
+        moves: vec![],
+        expected_files: vec![],
         summary: WriteSummary::default(),
         warnings: vec![],
         backup_op: BackupOp::Rollback,

@@ -1,4 +1,4 @@
-import type { BackupOp, Client, Transport } from "./types";
+import type { BackupOp, Client, SkillKind, SkillScope, Transport } from "./types";
 
 export function clientLabel(c: Client): string {
   return c === "claude_code" ? "Claude Code" : "Codex";
@@ -25,6 +25,14 @@ export function opLabel(op: BackupOp): string {
 
 export function enabledLabel(enabled: boolean): string {
   return enabled ? "已启用" : "已停用";
+}
+
+export function skillScopeLabel(scope: SkillScope): string {
+  return scope === "system" ? "系统" : "用户";
+}
+
+export function skillKindLabel(kind: SkillKind): string {
+  return kind === "dir" ? "目录" : "文件";
 }
 
 export function existsLabel(exists: boolean): string {

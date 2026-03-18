@@ -6,6 +6,8 @@ import type {
   Profile,
   RuntimeInfo,
   ServerRecord,
+  SkillGetResponse,
+  SkillRecord,
   WritePreview,
 } from "./types";
 import { invokeCmd } from "./tauri";
@@ -121,6 +123,58 @@ export const api = {
   }): Promise<ApplyResult> {
     return invokeCmd("backup_apply_rollback", {
       backupId: payload.backup_id,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  skillList(payload?: { client?: Client; scope?: "all" | "user" | "system" | "disabled" }): Promise<SkillRecord[]> {
+    return invokeCmd("skill_list", {
+      client: payload?.client,
+      scope: payload?.scope,
+    });
+  },
+
+  skillGet(payload: { skill_id: string }): Promise<SkillGetResponse> {
+    return invokeCmd("skill_get", { skillId: payload.skill_id });
+  },
+
+  skillPreviewCreate(payload: { client: Client; name: string; description: string; body?: string }): Promise<WritePreview> {
+    return invokeCmd("skill_preview_create", {
+      client: payload.client,
+      name: payload.name,
+      description: payload.description,
+      body: payload.body,
+    });
+  },
+
+  skillApplyCreate(payload: {
+    client: Client;
+    name: string;
+    description: string;
+    body?: string;
+    expected_files: FilePrecondition[];
+  }): Promise<ApplyResult> {
+    return invokeCmd("skill_apply_create", {
+      client: payload.client,
+      name: payload.name,
+      description: payload.description,
+      body: payload.body,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  skillPreviewToggle(payload: { skill_id: string; enabled: boolean }): Promise<WritePreview> {
+    return invokeCmd("skill_preview_toggle", { skillId: payload.skill_id, enabled: payload.enabled });
+  },
+
+  skillApplyToggle(payload: {
+    skill_id: string;
+    enabled: boolean;
+    expected_files: FilePrecondition[];
+  }): Promise<ApplyResult> {
+    return invokeCmd("skill_apply_toggle", {
+      skillId: payload.skill_id,
+      enabled: payload.enabled,
       expectedFiles: payload.expected_files,
     });
   },

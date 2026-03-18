@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 
-export type RouteKey = "overview" | "servers" | "add" | "profiles" | "backups";
+export type RouteKey = "overview" | "servers" | "add" | "profiles" | "skills" | "backups";
 
 const ROUTES: Array<{
   key: RouteKey;
@@ -14,6 +14,7 @@ const ROUTES: Array<{
   { key: "servers", label: "MCP管理", icon: "servers", kicker: "开关、详情与状态" },
   { key: "add", label: "新增MCP", icon: "plus", kicker: "添加并写入配置" },
   { key: "profiles", label: "配置方案", icon: "profiles", kicker: "按方案收敛切换" },
+  { key: "skills", label: "技能管理", icon: "skills", kicker: "Codex skills / Claude 命令" },
   { key: "backups", label: "备份回滚", icon: "backups", kicker: "历史记录与恢复" },
 ];
 
@@ -88,6 +89,8 @@ function pageTitle(route: RouteKey): string {
       return "新增MCP";
     case "profiles":
       return "配置方案";
+    case "skills":
+      return "技能管理";
     case "backups":
       return "备份回滚";
   }

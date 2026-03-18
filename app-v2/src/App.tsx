@@ -4,6 +4,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { ServersPage } from "./pages/ServersPage";
 import { AddServerPage } from "./pages/AddServerPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
+import { SkillsPage } from "./pages/SkillsPage";
 import { BackupsPage } from "./pages/BackupsPage";
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
       {route === "servers" ? <ServersPage /> : null}
       {route === "add" ? <AddServerPage /> : null}
       {route === "profiles" ? <ProfilesPage /> : null}
+      {route === "skills" ? <SkillsPage /> : null}
       {route === "backups" ? <BackupsPage /> : null}
     </AppShell>
   );
@@ -36,10 +38,9 @@ function App() {
 
 function readRouteFromHash(): RouteKey | null {
   const h = window.location.hash || "";
-  const match = h.match(/^#\/(overview|servers|add|profiles|backups)$/);
+  const match = h.match(/^#\/(overview|servers|add|profiles|skills|backups)$/);
   if (!match) return null;
   return match[1] as RouteKey;
 }
 
 export default App;
-

@@ -1,6 +1,9 @@
 export type Client = "claude_code" | "codex";
 export type Transport = "stdio" | "http" | "unknown";
 
+export type SkillScope = "user" | "system";
+export type SkillKind = "dir" | "file";
+
 export interface AppError {
   code:
     | "VALIDATION_ERROR"
@@ -54,6 +57,12 @@ export interface FileChangePreview {
   diff_unified: string;
 }
 
+export interface MovePreview {
+  from: string;
+  to: string;
+  kind: SkillKind;
+}
+
 export interface WriteSummary {
   will_enable: string[];
   will_disable: string[];
@@ -62,6 +71,8 @@ export interface WriteSummary {
 
 export interface WritePreview {
   files: FileChangePreview[];
+  moves?: MovePreview[];
+  expected_files?: FilePrecondition[];
   summary: WriteSummary;
   warnings: Warning[];
 }
@@ -86,7 +97,11 @@ export interface ApplyResult {
 export interface RuntimeInfo {
   paths: {
     claude_config_path: string;
+    claude_commands_dir: string;
+    claude_commands_disabled_dir: string;
     codex_config_path: string;
+    codex_skills_dir: string;
+    codex_skills_disabled_dir: string;
     app_local_data_dir: string;
     profiles_path: string;
     disabled_pool_path: string;
@@ -99,3 +114,19 @@ export interface RuntimeInfo {
   };
 }
 
+export interface SkillRecord {
+  skill_id: string; // "<client>:<name>"
+  client: Client;
+  name: string;
+  description: string;
+  scope: SkillScope;
+  kind: SkillKind;
+  enabled: boolean;
+  entry_path: string;
+  container_path: string;
+}
+
+export interface SkillGetResponse {
+  record: SkillRecord;
+  content: string;
+}
