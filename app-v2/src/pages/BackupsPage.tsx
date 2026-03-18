@@ -3,6 +3,7 @@ import type { AppError, BackupRecord, FilePrecondition, RuntimeInfo, WritePrevie
 import { api } from "../lib/api";
 import { isoToLocal, opLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
+import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
 export function BackupsPage() {
@@ -27,6 +28,13 @@ export function BackupsPage() {
       runtime.paths.backup_index_path,
     ];
   }, [runtime]);
+
+  const targetOptions = useMemo(() => {
+    return [
+      { value: "", label: "全部" },
+      ...targetChoices.map((p) => ({ value: p, label: p })),
+    ] satisfies Array<UiSelectOption<string>>;
+  }, [targetChoices]);
 
   async function load() {
     setError(null);
@@ -62,7 +70,7 @@ export function BackupsPage() {
     setBusy(true);
     setPreview(null);
     setPendingRollback({ backup_id: b.backup_id });
-    setPreviewTitle(`Rollback: ${b.backup_id}`);
+    setPreviewTitle(`回滚预览：${b.backup_id}`);
     try {
       const p = await api.backupPreviewRollback({ backup_id: b.backup_id });
       setPreview(p);
@@ -95,22 +103,22 @@ export function BackupsPage() {
       {error ? (
         <div className="ui-error">
           <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{error.code}</div>
-          <div style={{ marginTop: "8px", color: "rgba(248, 250, 252, 0.86)" }}>{error.message}</div>
+          <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{error.message}</div>
         </div>
       ) : null}
 
       <div className="ui-card" style={{ padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div className="ui-label">Filter by target</div>
-            <select className="ui-select" value={targetPath} onChange={(e) => setTargetPath(e.currentTarget.value)}>
-              <option value="">All</option>
-              {targetChoices.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <div className="ui-label">按目标文件筛选</div>
+            <div style={{ minWidth: 260, maxWidth: 520 }}>
+              <UiSelect<string>
+                ariaLabel="按目标文件筛选"
+                value={targetPath}
+                options={targetOptions}
+                onChange={setTargetPath}
+              />
+            </div>
           </div>
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
@@ -127,12 +135,12 @@ export function BackupsPage() {
         <table className="ui-table" aria-label="备份列表">
           <thead>
             <tr>
-              <th className="ui-th">Created</th>
-              <th className="ui-th">Op</th>
-              <th className="ui-th">Target</th>
-              <th className="ui-th">Summary</th>
+              <th className="ui-th">创建时间</th>
+              <th className="ui-th">操作类型</th>
+              <th className="ui-th">目标文件</th>
+              <th className="ui-th">摘要</th>
               <th className="ui-th" style={{ width: 160 }}>
-                Actions
+                操作
               </th>
             </tr>
           </thead>
@@ -152,7 +160,7 @@ export function BackupsPage() {
                 >
                   {b.target_path}
                 </td>
-                <td className="ui-td" style={{ color: "rgba(248, 250, 252, 0.86)" }}>
+                <td className="ui-td" style={{ color: "var(--color-muted)" }}>
                   {b.summary}
                 </td>
                 <td className="ui-td">
@@ -163,7 +171,7 @@ export function BackupsPage() {
                       onClick={() => previewRollback(b)}
                       disabled={busy}
                     >
-                      Preview
+                      预览回滚
                     </button>
                   </div>
                 </td>

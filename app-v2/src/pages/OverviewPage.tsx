@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RuntimeInfo, ServerRecord } from "../lib/types";
 import { api } from "../lib/api";
-import { clientLabel } from "../lib/format";
+import { clientLabel, existsLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
 
 export function OverviewPage() {
@@ -36,7 +36,7 @@ export function OverviewPage() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
             <div>
               <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>加载失败</div>
-              <div style={{ marginTop: "8px", color: "rgba(248, 250, 252, 0.86)" }}>{error}</div>
+              <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{error}</div>
             </div>
             <button type="button" className="ui-btn" onClick={load}>
               <Icon name="refresh" /> 刷新
@@ -63,7 +63,7 @@ export function OverviewPage() {
             <PathKpi value={runtime?.paths.claude_config_path} />
             <div className="ui-kpi">
               <div className="ui-kpiLabel">是否存在</div>
-              <div className="ui-kpiValue">{runtime ? String(runtime.exists.claude_config) : "—"}</div>
+              <div className="ui-kpiValue">{runtime ? existsLabel(runtime.exists.claude_config) : "—"}</div>
             </div>
             <div className="ui-kpi">
               <div className="ui-kpiLabel">启用数量</div>
@@ -89,7 +89,7 @@ export function OverviewPage() {
             <PathKpi value={runtime?.paths.codex_config_path} />
             <div className="ui-kpi">
               <div className="ui-kpiLabel">是否存在</div>
-              <div className="ui-kpiValue">{runtime ? String(runtime.exists.codex_config) : "—"}</div>
+              <div className="ui-kpiValue">{runtime ? existsLabel(runtime.exists.codex_config) : "—"}</div>
             </div>
             <div className="ui-kpi">
               <div className="ui-kpiLabel">启用数量</div>
@@ -102,10 +102,10 @@ export function OverviewPage() {
       <div className="ui-card" style={{ gridColumn: "1 / -1" }}>
         <div className="ui-cardTitleRow">
           <h3 className="ui-cardTitle">本地数据目录</h3>
-          <span className="ui-badge">Local</span>
+          <span className="ui-badge">本地</span>
         </div>
         <div className="ui-cardBody">
-          Profiles、禁用池与备份索引都存放在 Local data dir。写入前会自动备份，可在 Backups 页面回滚。
+          配置方案、禁用池与备份索引都存放在本地数据目录中。写入前会自动备份，可在备份回滚页面恢复。
         </div>
         <div style={{ marginTop: "14px" }}>
           <pre className="ui-pre">{JSON.stringify(runtime?.paths ?? {}, null, 2)}</pre>
@@ -150,7 +150,7 @@ function PathKpi({ value }: { value: string | undefined }) {
 }
 
 function formatError(e: unknown): string {
-  if (!e) return "Unknown error";
+  if (!e) return "未知错误";
   if (typeof e === "string") return e;
   if (typeof e === "object" && "message" in e) return String((e as any).message);
   return JSON.stringify(e);

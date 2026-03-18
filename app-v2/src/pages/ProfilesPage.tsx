@@ -3,6 +3,7 @@ import type { AppError, Client, FilePrecondition, Profile, ServerRecord, WritePr
 import { api } from "../lib/api";
 import { clientLabel, isoToLocal } from "../lib/format";
 import { Icon } from "../components/Icon";
+import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
 export function ProfilesPage() {
@@ -17,13 +18,19 @@ export function ProfilesPage() {
     [profiles, selectedId],
   );
 
+  const profileOptions = useMemo(() => {
+    return (profiles ?? []).map((p) => ({ value: p.profile_id, label: p.name })) satisfies Array<
+      UiSelectOption<string>
+    >;
+  }, [profiles]);
+
   const [editName, setEditName] = useState("");
   const [editTargetsClaude, setEditTargetsClaude] = useState<string[]>([]);
   const [editTargetsCodex, setEditTargetsCodex] = useState<string[]>([]);
 
   const [preview, setPreview] = useState<WritePreview | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewTitle, setPreviewTitle] = useState("Profile 预览");
+  const [previewTitle, setPreviewTitle] = useState("方案预览");
   const [pendingApply, setPendingApply] = useState<{ profile_id: string; client: Client } | null>(null);
 
   async function load() {
@@ -60,7 +67,7 @@ export function ProfilesPage() {
     setBusy(true);
     try {
       const created = await api.profileCreate({
-        name: `Profile ${new Date().toLocaleDateString()}`,
+        name: `方案 ${new Date().toLocaleDateString("zh-CN")}`,
         targets: { claude_code: [], codex: [] },
       });
       await load();
@@ -93,7 +100,7 @@ export function ProfilesPage() {
 
   async function deleteProfile() {
     if (!selected) return;
-    const ok = window.confirm(`确定删除 Profile "${selected.name}" ?`);
+    const ok = window.confirm(`确定删除方案“${selected.name}”吗？`);
     if (!ok) return;
     setError(null);
     setBusy(true);
@@ -114,7 +121,7 @@ export function ProfilesPage() {
     setBusy(true);
     setPreview(null);
     setPendingApply({ profile_id: selected.profile_id, client });
-    setPreviewTitle(`Apply Profile: ${selected.name} → ${clientLabel(client)}`);
+    setPreviewTitle(`应用方案：${selected.name} → ${clientLabel(client)}`);
     try {
       const p = await api.profilePreviewApply({ profile_id: selected.profile_id, client });
       setPreview(p);
@@ -147,26 +154,23 @@ export function ProfilesPage() {
       {error ? (
         <div className="ui-error">
           <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{error.code}</div>
-          <div style={{ marginTop: "8px", color: "rgba(248, 250, 252, 0.86)" }}>{error.message}</div>
+          <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{error.message}</div>
         </div>
       ) : null}
 
       <div className="ui-card" style={{ padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div className="ui-label">Profiles</div>
-            <select
-              className="ui-select"
-              value={selectedId ?? ""}
-              onChange={(e) => setSelectedId(e.currentTarget.value)}
-              aria-label="选择 Profile"
-            >
-              {(profiles ?? []).map((p) => (
-                <option key={p.profile_id} value={p.profile_id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <div className="ui-label">方案</div>
+            <div style={{ minWidth: 260, maxWidth: 520 }}>
+              <UiSelect<string>
+                ariaLabel="选择方案"
+                value={selectedId ?? ""}
+                options={profileOptions}
+                onChange={(id) => setSelectedId(id)}
+                disabled={busy || profileOptions.length === 0}
+              />
+            </div>
             <button type="button" className="ui-btn" onClick={createProfile} disabled={busy}>
               <Icon name="plus" /> 新建
             </button>
@@ -181,24 +185,24 @@ export function ProfilesPage() {
           </div>
         </div>
         <div style={{ marginTop: "10px" }} className="ui-help">
-          Profile 采用收敛模式：应用后启用集合将精确等于 Profile.targets[client]（缺失 server 会跳过并提示）。
+          方案采用收敛模式：应用后启用集合将精确等于 targets[client]（缺失 MCP 会跳过并提示）。
         </div>
       </div>
 
       {!selected ? (
-        <div className="ui-help">暂无 Profile，先新建一个。</div>
+        <div className="ui-help">暂无方案，先新建一个。</div>
       ) : (
         <div className="ui-card">
           <div className="ui-formGrid">
             <div className="ui-field ui-fieldFull">
-              <div className="ui-label">Name</div>
+              <div className="ui-label">名称</div>
               <input className="ui-input" value={editName} onChange={(e) => setEditName(e.currentTarget.value)} />
               <div className="ui-help">更新时间: {isoToLocal(selected.updated_at)}</div>
             </div>
 
             <div className="ui-field ui-fieldFull">
               <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
-                <div className="ui-label">Targets</div>
+                <div className="ui-label">目标 MCP</div>
                 <div className="ui-btnRow">
                   <button type="button" className="ui-btn" onClick={saveProfile} disabled={busy}>
                     保存
@@ -266,7 +270,7 @@ function TargetSelector({
         <span className="ui-badge">{selected.length}</span>
       </div>
       <div style={{ marginTop: "10px" }} className="ui-help">
-        勾选后将作为收敛启用集合。
+        勾选后将作为该客户端的目标启用集合。
       </div>
 
       <div style={{ marginTop: "12px", display: "grid", gap: "8px" }}>
@@ -302,12 +306,12 @@ function TargetSelector({
                 {s.server_id}
               </span>
               <span className="ui-help" style={{ marginLeft: "auto" }}>
-                {s.enabled ? "enabled" : "disabled"}
+                {s.enabled ? "已启用" : "已停用"}
               </span>
             </label>
           );
         })}
-        {servers.length === 0 ? <div className="ui-help">暂无 servers。</div> : null}
+        {servers.length === 0 ? <div className="ui-help">暂无 MCP。</div> : null}
       </div>
     </div>
   );

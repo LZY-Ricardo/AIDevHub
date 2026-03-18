@@ -11,10 +11,10 @@ const ROUTES: Array<{
   kicker: string;
 }> = [
   { key: "overview", label: "总览", icon: "dashboard", kicker: "路径与状态概览" },
-  { key: "servers", label: "Servers", icon: "servers", kicker: "开关与详情" },
-  { key: "add", label: "Add Server", icon: "plus", kicker: "新增并启用" },
-  { key: "profiles", label: "Profiles", icon: "profiles", kicker: "收敛式切换" },
-  { key: "backups", label: "Backups", icon: "backups", kicker: "回滚历史" },
+  { key: "servers", label: "MCP管理", icon: "servers", kicker: "开关、详情与状态" },
+  { key: "add", label: "新增MCP", icon: "plus", kicker: "添加并写入配置" },
+  { key: "profiles", label: "配置方案", icon: "profiles", kicker: "按方案收敛切换" },
+  { key: "backups", label: "备份回滚", icon: "backups", kicker: "历史记录与恢复" },
 ];
 
 export function AppShell({
@@ -46,10 +46,10 @@ export function AppShell({
             <button
               key={r.key}
               type="button"
-              className="ui-navItem"
+              className="ui-navItem ui-tooltipHost"
               aria-current={r.key === route ? "page" : undefined}
               onClick={() => onNavigate(r.key)}
-              title={r.label}
+              data-tooltip={r.label}
             >
               <Icon name={r.icon} />
               <span className="ui-navLabel">{r.label}</span>
@@ -60,7 +60,7 @@ export function AppShell({
 
         <div style={{ marginTop: "auto", paddingTop: "16px" }}>
           <div className="ui-help">
-            所有写入操作都将先 preview diff，再 apply 并备份。
+            所有写入都会先生成差异预览，再写入并自动备份。
           </div>
         </div>
       </aside>
@@ -83,12 +83,12 @@ function pageTitle(route: RouteKey): string {
     case "overview":
       return "总览";
     case "servers":
-      return "Servers";
+      return "MCP管理";
     case "add":
-      return "Add Server";
+      return "新增MCP";
     case "profiles":
-      return "Profiles";
+      return "配置方案";
     case "backups":
-      return "Backups / Rollback";
+      return "备份回滚";
   }
 }

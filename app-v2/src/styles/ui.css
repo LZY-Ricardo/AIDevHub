@@ -49,6 +49,7 @@
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: rgb(var(--color-cta-rgb));
 }
 
 .ui-brandSub {
@@ -87,8 +88,12 @@
 }
 
 .ui-navItem[aria-current="page"] {
-  background: rgba(var(--color-cta-rgb), 0.14);
-  border-color: rgba(var(--color-cta-rgb), 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--color-cta-rgb), 0.14),
+    rgba(var(--color-ink-rgb), 0.72)
+  );
+  border-color: rgba(var(--color-cta-rgb), 0.26);
 }
 
 .ui-navLabel {
@@ -144,8 +149,8 @@
   grid-column: 1 / -1;
   background: linear-gradient(
     180deg,
-    rgba(var(--color-primary-rgb), 0.38),
-    rgba(var(--color-background-rgb), 0.88)
+    rgba(var(--color-primary-rgb), 0.22),
+    rgba(var(--color-ink-rgb), 0.92)
   );
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -254,6 +259,25 @@
   transform: translateY(0);
 }
 
+/* Sidebar nav uses a custom tooltip to avoid OS/native title tooltips (which may lack CJK fonts). */
+.ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]::after {
+  left: calc(100% + 12px);
+  right: auto;
+  bottom: auto;
+  top: 50%;
+  width: max-content;
+  max-width: 240px;
+  font-family: var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
+  transform: translateY(calc(-50% + 4px));
+}
+
+.ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:hover::after,
+.ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:focus-within::after {
+  transform: translateY(-50%);
+}
+
 .ui-btnRow {
   display: flex;
   align-items: center;
@@ -284,7 +308,7 @@
     rgba(var(--color-cta-rgb), 0.96),
     rgba(var(--color-cta-rgb), 0.62)
   );
-  color: rgba(var(--color-text-rgb), 0.98);
+  color: rgba(255, 255, 255, 0.98);
   font-weight: 700;
 }
 
@@ -422,16 +446,87 @@
     background var(--dur-fast) var(--ease-out);
 }
 
-/* Select popups are OS-rendered; help Tauri/WebView choose a dark scheme and
-   prevent unreadable option text/background in the dropdown list. */
+/* Select popups are OS-rendered; keep scheme explicit for Tauri/WebView. */
 .ui-select {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .ui-select option,
 .ui-select optgroup {
   background: rgb(var(--color-ink-rgb));
   color: rgba(var(--color-text-rgb), 0.92);
+}
+
+.ui-selectRoot {
+  position: relative;
+}
+
+.ui-selectBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ui-selectChevron {
+  display: inline-flex;
+  opacity: 0.72;
+}
+
+.ui-selectMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: rgba(var(--color-ink-rgb), 0.98);
+  box-shadow: var(--shadow-md);
+  z-index: 70;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.ui-selectOption {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 12px;
+  padding: 10px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(var(--color-text-rgb), 0.92);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ui-selectOption:hover {
+  background: rgba(var(--color-cta-rgb), 0.08);
+}
+
+.ui-selectOption[aria-selected="true"] {
+  background: rgba(var(--color-cta-rgb), 0.12);
+}
+
+.ui-selectOption:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.ui-selectOption:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(var(--color-cta-rgb), 0.18);
+}
+
+.ui-selectSpacer {
+  width: 18px;
+  height: 18px;
 }
 
 .ui-input:focus,
@@ -452,7 +547,7 @@
   background: rgba(239, 68, 68, 0.08);
   border-radius: var(--radius-md);
   padding: 12px 12px;
-  color: rgba(248, 250, 252, 0.92);
+  color: rgba(var(--color-text-rgb), 0.92);
 }
 
 .ui-dialogOverlay {
@@ -550,6 +645,102 @@
   white-space: pre;
 }
 
+/* Split diff viewer (VSCode-ish) */
+.ui-diff {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(var(--color-ink-rgb), 0.18);
+  overflow: hidden;
+}
+
+.ui-diffScroll {
+  overflow: auto;
+}
+
+.ui-diffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ui-diffColTitle {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-text-rgb), 0.62);
+  background: rgba(var(--color-text-rgb), 0.04);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ui-diffColTitleRight {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.ui-diffHunk {
+  padding: 8px 10px;
+  color: rgba(var(--color-text-rgb), 0.68);
+  background: rgba(var(--color-text-rgb), 0.03);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ui-diffGutter {
+  width: 58px;
+  padding: 2px 10px;
+  text-align: right;
+  vertical-align: top;
+  color: rgba(var(--color-text-rgb), 0.44);
+  user-select: none;
+  background: rgba(var(--color-ink-rgb), 0.18);
+  border-bottom: 1px solid rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-diffGutterRight {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.ui-diffCell {
+  padding: 2px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-diffCellRight {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.ui-diffText {
+  white-space: pre;
+  font-variant-ligatures: none;
+}
+
+.ui-diffWrap .ui-diffText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ui-diffAdd {
+  background: rgba(34, 197, 94, 0.14);
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.52);
+}
+
+.ui-diffDel {
+  background: rgba(239, 68, 68, 0.12);
+  box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.48);
+}
+
+.ui-diffEmpty {
+  background: rgba(var(--color-ink-rgb), 0.14);
+}
+
+.ui-diffMeta {
+  color: rgba(var(--color-text-rgb), 0.6);
+  background: rgba(var(--color-text-rgb), 0.02);
+}
+
 @media (max-width: 920px) {
   .ui-shell {
     grid-template-columns: 1fr;
@@ -568,5 +759,21 @@
   }
   .ui-field {
     grid-column: 1 / -1;
+  }
+
+  /* On small screens the sidebar becomes top-aligned; keep tooltips within viewport. */
+  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]::after {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: calc(100% + 10px);
+    width: auto;
+    max-width: none;
+    transform: translateY(4px);
+  }
+
+  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:hover::after,
+  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:focus-within::after {
+    transform: translateY(0);
   }
 }

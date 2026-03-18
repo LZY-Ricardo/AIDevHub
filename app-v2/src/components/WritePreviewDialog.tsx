@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FilePrecondition, WritePreview } from "../lib/types";
 import { Dialog } from "./Dialog";
+import { DiffViewer, type DiffViewMode } from "./DiffViewer";
 import { Icon } from "./Icon";
 
 function expectedFilesFromPreview(preview: WritePreview): FilePrecondition[] {
@@ -78,7 +79,7 @@ export function WritePreviewDialog({
                 aria-selected={tab === "diff"}
                 onClick={() => setTab("diff")}
               >
-                Diff
+                差异
               </button>
               <button
                 type="button"
@@ -87,7 +88,7 @@ export function WritePreviewDialog({
                 aria-selected={tab === "warnings"}
                 onClick={() => setTab("warnings")}
               >
-                Warnings ({preview.warnings.length})
+                风险提示 ({preview.warnings.length})
               </button>
             </div>
 
@@ -127,9 +128,9 @@ function SummaryView({ preview }: { preview: WritePreview }) {
       </div>
 
       <div style={{ marginTop: "14px", display: "grid", gap: "12px" }}>
-        <ServerListBlock title="Will Add" items={will_add} />
-        <ServerListBlock title="Will Enable" items={will_enable} />
-        <ServerListBlock title="Will Disable" items={will_disable} />
+        <ServerListBlock title="将新增" items={will_add} />
+        <ServerListBlock title="将启用" items={will_enable} />
+        <ServerListBlock title="将停用" items={will_disable} />
       </div>
     </div>
   );
@@ -156,8 +157,45 @@ function ServerListBlock({ title, items }: { title: string; items: string[] }) {
 }
 
 function DiffView({ preview }: { preview: WritePreview }) {
+  const [mode, setMode] = useState<DiffViewMode>("split");
+  const [wrap, setWrap] = useState(false);
+
   return (
     <div style={{ display: "grid", gap: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
+        <div className="ui-tabs" role="tablist" aria-label="差异视图">
+          <button
+            type="button"
+            className="ui-tab"
+            role="tab"
+            aria-selected={mode === "split"}
+            onClick={() => setMode("split")}
+          >
+            对比视图
+          </button>
+          <button
+            type="button"
+            className="ui-tab"
+            role="tab"
+            aria-selected={mode === "unified"}
+            onClick={() => setMode("unified")}
+          >
+            统一视图
+          </button>
+          <button
+            type="button"
+            className="ui-tab"
+            role="tab"
+            aria-selected={wrap}
+            onClick={() => setWrap((v) => !v)}
+          >
+            自动换行
+          </button>
+        </div>
+
+        <div className="ui-help">左右对比基于统一差异（unified diff）的分块（hunk），上下文 3 行。</div>
+      </div>
+
       {preview.files.map((f) => (
         <div key={f.path} className="ui-card" style={{ padding: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
@@ -165,11 +203,11 @@ function DiffView({ preview }: { preview: WritePreview }) {
               {f.path}
             </div>
             <div className="ui-help">
-              {f.will_create ? "Create" : "Update"} • after {f.after_sha256.slice(0, 8)}
+              {f.will_create ? "新建" : "更新"} • 变更后 {f.after_sha256.slice(0, 8)}
             </div>
           </div>
           <div style={{ marginTop: "12px" }}>
-            <pre className="ui-pre">{f.diff_unified}</pre>
+            <DiffViewer diff={f.diff_unified} mode={mode} wrap={wrap} />
           </div>
         </div>
       ))}
@@ -179,7 +217,7 @@ function DiffView({ preview }: { preview: WritePreview }) {
 
 function WarningsView({ preview }: { preview: WritePreview }) {
   if (preview.warnings.length === 0) {
-    return <div className="ui-help">无 warnings。</div>;
+    return <div className="ui-help">无风险提示。</div>;
   }
 
   return (
@@ -196,7 +234,7 @@ function WarningsView({ preview }: { preview: WritePreview }) {
             </span>
             <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{w.code}</div>
           </div>
-          <div style={{ marginTop: "10px", color: "rgba(248, 250, 252, 0.86)" }}>{w.message}</div>
+          <div style={{ marginTop: "10px", color: "var(--color-muted)" }}>{w.message}</div>
           {w.details ? (
             <div style={{ marginTop: "10px" }}>
               <pre className="ui-pre">{JSON.stringify(w.details, null, 2)}</pre>

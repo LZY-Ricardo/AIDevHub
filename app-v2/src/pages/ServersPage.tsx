@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { AppError, Client, FilePrecondition, ServerRecord, WritePreview } from "../lib/types";
 import { api } from "../lib/api";
-import { clientLabel, transportLabel } from "../lib/format";
+import { clientLabel, enabledLabel, transportLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
+import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
 export function ServersPage() {
@@ -21,6 +22,12 @@ export function ServersPage() {
   const [pendingToggle, setPendingToggle] = useState<{ server_id: string; enabled: boolean } | null>(
     null,
   );
+
+  const clientOptions = [
+    { value: "all", label: "全部" },
+    { value: "claude_code", label: clientLabel("claude_code") },
+    { value: "codex", label: clientLabel("codex") },
+  ] satisfies Array<UiSelectOption<Client | "all">>;
 
   async function load() {
     setError(null);
@@ -52,7 +59,7 @@ export function ServersPage() {
     setBusy(true);
     setPreview(null);
     setPendingToggle({ server_id: s.server_id, enabled });
-    setPreviewTitle(`Toggle: ${s.server_id} → ${enabled ? "ON" : "OFF"}`);
+    setPreviewTitle(`切换MCP：${s.server_id} → ${enabled ? "启用" : "停用"}`);
     try {
       const p = await api.serverPreviewToggle({ server_id: s.server_id, enabled });
       setPreview(p);
@@ -84,17 +91,15 @@ export function ServersPage() {
       <div className="ui-card" style={{ padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div className="ui-label">Client</div>
-            <select
-              className="ui-select"
-              value={client}
-              onChange={(e) => setClient(e.currentTarget.value as any)}
-              aria-label="选择客户端"
-            >
-              <option value="all">All</option>
-              <option value="claude_code">{clientLabel("claude_code")}</option>
-              <option value="codex">{clientLabel("codex")}</option>
-            </select>
+            <div className="ui-label">客户端</div>
+            <div style={{ minWidth: 180 }}>
+              <UiSelect<Client | "all">
+                ariaLabel="选择客户端"
+                value={client}
+                options={clientOptions}
+                onChange={setClient}
+              />
+            </div>
           </div>
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
@@ -103,28 +108,28 @@ export function ServersPage() {
           </div>
         </div>
         <div style={{ marginTop: "10px" }} className="ui-help">
-          点击行可查看详情。开关操作会先生成 diff 预览，确认后才会写入并备份。
+          点击行可查看详情。开关操作会先生成差异预览，确认后才会写入并备份。
         </div>
       </div>
 
       {error ? (
         <div className="ui-error">
           <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{error.code}</div>
-          <div style={{ marginTop: "8px", color: "rgba(248, 250, 252, 0.86)" }}>{error.message}</div>
+          <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{error.message}</div>
         </div>
       ) : null}
 
       <div className="ui-tableWrap">
-        <table className="ui-table" aria-label="Servers 列表">
+        <table className="ui-table" aria-label="MCP列表">
           <thead>
             <tr>
-              <th className="ui-th">Server ID</th>
-              <th className="ui-th">Client</th>
-              <th className="ui-th">Transport</th>
-              <th className="ui-th">Enabled</th>
-              <th className="ui-th">Identity</th>
+              <th className="ui-th">MCP ID</th>
+              <th className="ui-th">客户端</th>
+              <th className="ui-th">传输方式</th>
+              <th className="ui-th">启用状态</th>
+              <th className="ui-th">标识</th>
               <th className="ui-th" style={{ width: 160 }}>
-                Actions
+                操作
               </th>
             </tr>
           </thead>
@@ -147,7 +152,7 @@ export function ServersPage() {
                 <td className="ui-td">
                   <span className="ui-pill">
                     <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-                    <span className="ui-code">{String(s.enabled)}</span>
+                    <span className="ui-code">{enabledLabel(s.enabled)}</span>
                   </span>
                 </td>
                 <td
@@ -163,9 +168,9 @@ export function ServersPage() {
                       className="ui-btn"
                       disabled={busy}
                       onClick={() => requestToggle(s, !s.enabled)}
-                      title="切换开关"
+                      title="切换启用状态"
                     >
-                      {s.enabled ? "Disable" : "Enable"}
+                      {s.enabled ? "停用" : "启用"}
                     </button>
                     <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
                       详情 <Icon name="chevronRight" />
@@ -177,7 +182,7 @@ export function ServersPage() {
             {servers && servers.length === 0 ? (
               <tr>
                 <td className="ui-td" colSpan={6}>
-                  <div className="ui-help">暂无 servers。</div>
+                  <div className="ui-help">暂无 MCP。</div>
                 </td>
               </tr>
             ) : null}
@@ -261,7 +266,7 @@ function DetailsDrawer({
       className="ui-dialogOverlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Server 详情"
+      aria-label="MCP详情"
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) onClose();
       }}
@@ -278,7 +283,7 @@ function DetailsDrawer({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="ui-dialogHeader">
-          <div className="ui-dialogTitle">Server 详情</div>
+          <div className="ui-dialogTitle">MCP详情</div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
           </button>
@@ -289,57 +294,57 @@ function DetailsDrawer({
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">Server ID</div>
+                <div className="ui-label">MCP ID</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
-	                  {shown!.server_id}
+                  {shown!.server_id}
                 </div>
                 <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <span className="ui-pill">
-	                    <span className={`ui-pillDot ${shown!.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-	                    <span className="ui-code">{shown!.enabled ? "enabled" : "disabled"}</span>
-	                  </span>
-	                  <span className="ui-pill">
-	                    <span className="ui-pillDot" />
-	                    <span className="ui-code">{clientLabel(shown!.client)}</span>
-	                  </span>
-	                  <span className="ui-pill">
-	                    <span className="ui-pillDot" />
-	                    <span className="ui-code">{transportLabel(shown!.transport)}</span>
-	                  </span>
+                    <span className={`ui-pillDot ${shown!.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
+                    <span className="ui-code">{enabledLabel(shown!.enabled)}</span>
+                  </span>
+                  <span className="ui-pill">
+                    <span className="ui-pillDot" />
+                    <span className="ui-code">{clientLabel(shown!.client)}</span>
+                  </span>
+                  <span className="ui-pill">
+                    <span className="ui-pillDot" />
+                    <span className="ui-code">{transportLabel(shown!.transport)}</span>
+                  </span>
                 </div>
                 <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
                   <div className="ui-help">
-                    {reveal ? "secrets 已尝试揭示（可能被后端掩码/拒绝）" : "默认只展示掩码后的 payload"}
+                    {reveal ? "已尝试显示敏感值（后端可能仍会脱敏或拒绝）" : "默认仅展示脱敏后的配置载荷"}
                   </div>
                   <button
                     type="button"
                     className="ui-btn"
                     disabled={!canReveal || revealBusy}
                     onClick={() => toggleReveal(!reveal)}
-                    title="揭示敏感值（若后端允许）"
+                    title="显示敏感值（若后端允许）"
                   >
-                    {revealBusy ? "加载中..." : reveal ? "Hide" : "Reveal"}
+                    {revealBusy ? "加载中..." : reveal ? "隐藏敏感值" : "显示敏感值"}
                   </button>
                 </div>
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">Source File</div>
+                <div className="ui-label">来源文件</div>
                 <div className="ui-code" style={{ marginTop: "8px" }}>
-	                  {shown!.source_file}
+                  {shown!.source_file}
                 </div>
                 <div className="ui-label" style={{ marginTop: "14px" }}>
-                  Identity
+                  标识
                 </div>
                 <div className="ui-code" style={{ marginTop: "8px" }}>
-	                  {shown!.identity}
+                  {shown!.identity}
                 </div>
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">Payload (masked by default)</div>
+                <div className="ui-label">配置载荷（默认脱敏）</div>
                 <div style={{ marginTop: "10px" }}>
-	                  <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
+                  <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
                 </div>
               </div>
             </div>

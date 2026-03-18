@@ -6,6 +6,7 @@ type IconName =
   | "backups"
   | "external"
   | "chevronRight"
+  | "chevronDown"
   | "x"
   | "warning"
   | "info"
@@ -148,6 +149,18 @@ export function Icon({
           />
         </svg>
       );
+    case "chevronDown":
+      return (
+        <svg {...common}>
+          <path
+            d="m6 9 6 6 6-6"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     case "x":
       return (
         <svg {...common}>
@@ -236,4 +249,3 @@ export function Icon({
       );
   }
 }
-

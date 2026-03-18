@@ -23,6 +23,5 @@ function normalizeInvokeError(err: unknown): AppError {
   if (typeof err === "string") {
     return { code: "INTERNAL_ERROR", message: err };
   }
-  return { code: "INTERNAL_ERROR", message: "Unknown error", details: err };
+  return { code: "INTERNAL_ERROR", message: "未知错误", details: err };
 }
-
