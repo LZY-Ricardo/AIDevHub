@@ -1,206 +1,117 @@
 # Design System Master File
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+> **LOGIC:** When building a specific page, first check `design-system/aidevhub/pages/<page-name>.md`.
+> If that file exists, its rules override this Master file.
+> If not, follow the rules below.
 
 ---
 
-**Project:** AIDevHub
-**Generated:** 2026-03-18 15:54:31
-**Category:** Developer Tool / IDE
+**Project:** AIDevHub  
+**Last synced:** 2026-03-18  
+**Source of truth:** `app-v2/src/styles/theme.css` + `app-v2/src/styles/ui.css`
 
 ---
 
-## Global Rules
+## Direction
 
-### Color Palette
+- Light-first, glassy surfaces, technical (developer tool) feel.
+- Airy blue accents with a strong CTA blue; avoid flat pure-white panels.
+- Dense information layout is OK, but keep typography crisp and scannable.
+
+## Global Tokens
+
+### Colors (CSS Variables)
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#300A24` | `--color-primary` |
-| Secondary | `#5F1046` | `--color-secondary` |
-| CTA/Accent | `#C53950` | `--color-cta` |
-| Background | `#20080F` | `--color-background` |
-| Text | `#F8FAFC` | `--color-text` |
+| Primary | `#B8DDFF` | `--color-primary` |
+| Secondary | `#E6F3FF` | `--color-secondary` |
+| CTA/Accent | `#2F6FED` | `--color-cta` |
+| Background | `#F4F8FF` | `--color-background` |
+| Text | `#0B1220` | `--color-text` |
+| Danger | `#EF4444` | `--color-danger` |
+| Warning | `#F59E0B` | `--color-warning` |
 
-**Color Notes:** Dark wine base + crimson CTA accents
+Additional tokens (derived / translucent):
+
+- `--color-surface-0`, `--color-surface-1` (panels)
+- `--color-border`, `--color-border-subtle`, `--color-border-strong`
+- `--color-muted` (secondary text)
 
 ### Typography
 
-- **Heading Font:** JetBrains Mono
-- **Body Font:** IBM Plex Sans
-- **Mood:** code, developer, technical, precise, functional, hacker
-- **Google Fonts:** [JetBrains Mono + IBM Plex Sans](https://fonts.google.com/share?selection.family=IBM+Plex+Sans:wght@300;400;500;600;700|JetBrains+Mono:wght@400;500;600;700)
+- **Body:** IBM Plex Sans (with `Noto Sans SC` CJK fallback)
+- **Mono / Headings:** JetBrains Mono
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-```
-
-### Spacing Variables
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
-
-### Shadow Depths
-
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
-
----
-
-## Component Specs
-
-### Buttons
+**CSS Import (keep consistent with `theme.css`):**
 
 ```css
-/* Primary Button */
-.btn-primary {
-  background: #C53950;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #300A24;
-  border: 2px solid #300A24;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap");
 ```
 
-### Cards
+### Spacing / Radius / Shadow / Motion
 
-```css
-.card {
-  background: #20080F;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+Tokens are defined in `theme.css`:
 
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
+- Spacing: `--space-xs` / `--space-sm` / `--space-md` / `--space-lg` / `--space-xl` / `--space-2xl`
+- Radius: `--radius-sm` / `--radius-md` / `--radius-lg`
+- Shadows: `--shadow-sm` / `--shadow-md` / `--shadow-lg`
+- Motion: `--dur-fast` / `--dur` / `--dur-slow` + `--ease-out` (respect `prefers-reduced-motion`)
 
-### Inputs
+## Component Contracts (CSS Classes)
 
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
+The UI is built with "utility-ish" component classes (not a design library). Prefer reusing these classes.
 
-.input:focus {
-  border-color: #C53950;
-  outline: none;
-  box-shadow: 0 0 0 3px #C5395020;
-}
-```
+Layout:
 
-### Modals
+- Shell: `.ui-shell` (sidebar + main)
+- Sidebar: `.ui-sidebar`, `.ui-nav`, `.ui-navItem`
+- Main: `.ui-main`, `.ui-pageHeader`, `.ui-pageTitle`, `.ui-pageKicker`
 
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
+Cards:
 
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
+- `.ui-card` (default panel)
+- `.ui-cardGrid` (12-col layout; cards span 6 columns by default)
+- `.ui-kpiRow`, `.ui-kpi` (overview stats)
 
----
+Buttons:
 
-## Style Guidelines
+- Base: `.ui-btn`
+- Primary: `.ui-btnPrimary`
+- Danger: `.ui-btnDanger`
+- Row layout: `.ui-btnRow`
 
-**Style:** Vibrant & Block-based
+Forms:
 
-**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
+- Layout: `.ui-formGrid`, `.ui-field`, `.ui-fieldFull`
+- Inputs: `.ui-input`, `.ui-textarea`, `.ui-select`
+- Helper / errors: `.ui-help`, `.ui-error`
+- Custom select: `.ui-selectRoot`, `.ui-selectBtn`, `.ui-selectMenu`, `.ui-selectOption`
 
-**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
+Tables:
 
-**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
+- Wrapper: `.ui-tableWrap`
+- Table: `.ui-table`, `.ui-th`, `.ui-td`, `.ui-tr`
 
-### Page Pattern
+Dialogs:
 
-**Pattern Name:** Horizontal Scroll Journey
+- Overlay: `.ui-dialogOverlay`
+- Dialog: `.ui-dialog`, `.ui-dialogHeader`, `.ui-dialogBody`, `.ui-dialogFooter`
 
-- **Conversion Strategy:** Immersive product discovery. High engagement. Keep navigation visible.
-28,Bento Grid Showcase,bento,  grid,  features,  modular,  apple-style,  showcase", 1. Hero, 2. Bento Grid (Key Features), 3. Detail Cards, 4. Tech Specs, 5. CTA, Floating Action Button or Bottom of Grid, Card backgrounds: #F5F5F7 or Glass. Icons: Vibrant brand colors. Text: Dark., Hover card scale (1.02), video inside cards, tilt effect, staggered reveal, Scannable value props. High information density without clutter. Mobile stack.
-29,Interactive 3D Configurator,3d,  configurator,  customizer,  interactive,  product", 1. Hero (Configurator), 2. Feature Highlight (synced), 3. Price/Specs, 4. Purchase, Inside Configurator UI + Sticky Bottom Bar, Neutral studio background. Product: Realistic materials. UI: Minimal overlay., Real-time rendering, material swap animation, camera rotate/zoom, light reflection, Increases ownership feeling. 360 view reduces return rates. Direct add-to-cart.
-30,AI-Driven Dynamic Landing,ai,  dynamic,  personalized,  adaptive,  generative", 1. Prompt/Input Hero, 2. Generated Result Preview, 3. How it Works, 4. Value Prop, Input Field (Hero) + 'Try it' Buttons, Adaptive to user input. Dark mode for compute feel. Neon accents., Typing text effects, shimmering generation loaders, morphing layouts, Immediate value demonstration. 'Show, don't tell'. Low friction start.
-- **CTA Placement:** Floating Sticky CTA or End of Horizontal Track
-- **Section Order:** 1. Intro (Vertical), 2. The Journey (Horizontal Track), 3. Detail Reveal, 4. Vertical Footer
+Micro components:
 
----
+- Pills: `.ui-pill`, `.ui-pillDot`, `.ui-pillDotOn`, `.ui-pillDotOff`
+- Monospace: `.ui-code`
 
-## Anti-Patterns (Do NOT Use)
+## Interaction Guidelines
 
-- ❌ Flat design without depth
-- ❌ Text-heavy pages
+- All file writes must follow `preview -> apply` (diff preview + explicit confirm) to keep trust high.
+- Focus states must be visible (`:focus-visible` patterns are already in `ui.css`).
+- Avoid layout-shifting hover effects; use subtle translate/opacity instead.
 
-### Additional Forbidden Patterns
+## Anti-Patterns
 
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+- Hidden focus states / keyboard traps
+- Flat white screens without depth (use the translucent surfaces and borders)
+- Overly decorative animations; keep motion purposeful and short
+- Inconsistent icon sets (stick to the existing icon component)
