@@ -23,3 +23,8 @@ test('MCP 详情抽屉展示配置说明区块', () => {
 test('MCP 详情抽屉保留原始配置折叠区', () => {
   assert.match(source, /原始配置/);
 });
+
+test('MCP 详情抽屉中的编辑按钮文案使用编辑', () => {
+  assert.doesNotMatch(source, /编辑说明/);
+  assert.match(source, /编辑/);
+});

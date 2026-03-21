@@ -65,12 +65,13 @@ function explainFieldHint(key: string): string {
 }
 
 export function explainServerDetails(server: ServerRecord, notes: ServerNotes): ExplainedServerDetails {
-  const description = notes.description.trim() || explainDescription(server);
+  const description = (notes.description ?? "").trim() || explainDescription(server);
+  const fieldHints = notes.field_hints ?? {};
   const fields = Object.entries(server.payload).map(([key, value]) => ({
     key,
     value,
     display_value: formatScalar(value),
-    hint: notes.field_hints[key]?.trim() || explainFieldHint(key),
+    hint: fieldHints[key]?.trim() || explainFieldHint(key),
   }));
 
   return {

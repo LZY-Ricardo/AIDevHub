@@ -455,7 +455,7 @@ function DetailsDrawer({
                   <div className="ui-label">功能作用</div>
                   {!editingDescription ? (
                     <button type="button" className="ui-btn" disabled={notesBusy} onClick={startDescriptionEdit}>
-                      编辑说明
+                      编辑
                     </button>
                   ) : null}
                 </div>
@@ -541,7 +541,7 @@ function DetailsDrawer({
                               disabled={notesBusy}
                               onClick={() => startFieldEdit(field.key, field.hint)}
                             >
-                              编辑说明
+                              编辑
                             </button>
                           ) : null}
                         </div>

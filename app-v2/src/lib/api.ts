@@ -13,6 +13,13 @@ import type {
 } from "./types";
 import { invokeCmd } from "./tauri";
 
+function normalizeServerNotes(notes: Partial<ServerNotes> | null | undefined): ServerNotes {
+  return {
+    description: notes?.description ?? "",
+    field_hints: notes?.field_hints ?? {},
+  };
+}
+
 export const api = {
   runtimeGetInfo(): Promise<RuntimeInfo> {
     return invokeCmd("runtime_get_info");
@@ -30,16 +37,16 @@ export const api = {
   },
 
   serverNotesGet(payload: { server_id: string }): Promise<ServerNotes> {
-    return invokeCmd("server_notes_get", {
+    return invokeCmd<Partial<ServerNotes>>("server_notes_get", {
       serverId: payload.server_id,
-    });
+    }).then(normalizeServerNotes);
   },
 
   serverNotesPut(payload: { server_id: string; notes: ServerNotes }): Promise<ServerNotes> {
-    return invokeCmd("server_notes_put", {
+    return invokeCmd<Partial<ServerNotes>>("server_notes_put", {
       serverId: payload.server_id,
       notes: payload.notes,
-    });
+    }).then(normalizeServerNotes);
   },
 
   serverPreviewToggle(payload: { server_id: string; enabled: boolean }): Promise<WritePreview> {
