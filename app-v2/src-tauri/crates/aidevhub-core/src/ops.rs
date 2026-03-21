@@ -701,7 +701,7 @@ pub fn server_list(paths: &AppPaths, client: Option<Client>) -> Result<Vec<Serve
                 out.push(to_server_record_claude(
                     &name,
                     false,
-                    &paths.claude_config_path,
+                    &paths.disabled_pool_path,
                     cfg.clone(),
                     false,
                 ));
@@ -742,7 +742,7 @@ pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result
                 Ok(to_server_record_claude(
                     &name,
                     false,
-                    &paths.claude_config_path,
+                    &paths.disabled_pool_path,
                     cfg.clone(),
                     reveal,
                 ))
