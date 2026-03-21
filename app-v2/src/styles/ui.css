@@ -13,39 +13,8 @@
   background: #ffffff;
 }
 
-.ui-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  border-radius: var(--radius-md);
-  user-select: none;
-}
-
-.ui-brandMark {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  background: #1e293b;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.ui-brandTitle {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-text);
-}
-
-.ui-brandSub {
-  font-size: 12px;
-  color: var(--color-muted);
-  margin-top: 2px;
-}
-
 .ui-nav {
-  margin-top: var(--space-lg);
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -356,12 +325,47 @@
   width: 10rem;
 }
 
+.ui-tableSkills {
+  width: auto;
+  min-width: 0;
+}
+
+.ui-tableSkills col.ui-colSkillName {
+  width: 14rem;
+}
+
+.ui-tableSkills col.ui-colSkillClient {
+  width: 8.5rem;
+}
+
+.ui-tableSkills col.ui-colSkillScope,
+.ui-tableSkills col.ui-colSkillKind,
+.ui-tableSkills col.ui-colSkillStatus {
+  width: 8.5rem;
+}
+
+.ui-tableSkills col.ui-colSkillAction {
+  width: 10rem;
+}
+
 .ui-serverNameText {
   max-width: clamp(7.5rem, 14vw, 11rem);
 }
 
+.ui-skillNameText {
+  max-width: 13rem;
+}
+
+.ui-skillClientText {
+  max-width: 8rem;
+}
+
 .ui-serverMetaPill {
   max-width: clamp(6rem, 12vw, 9rem);
+}
+
+.ui-skillMetaPill {
+  max-width: 8rem;
 }
 
 .ui-pillText {

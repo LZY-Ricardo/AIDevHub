@@ -313,7 +313,15 @@ export function SkillsPage() {
       ) : null}
 
       <div className="ui-tableWrap">
-        <table className="ui-table" aria-label="Skills列表">
+        <table className="ui-table ui-tableSkills ui-tableNoStickyLastCol" aria-label="Skills列表">
+          <colgroup>
+            <col className="ui-colSkillName" />
+            <col className="ui-colSkillClient" />
+            <col className="ui-colSkillScope" />
+            <col className="ui-colSkillKind" />
+            <col className="ui-colSkillStatus" />
+            <col className="ui-colSkillAction" />
+          </colgroup>
           <thead>
             <tr>
               <th className="ui-th">名称</th>
@@ -327,51 +335,67 @@ export function SkillsPage() {
             </tr>
           </thead>
           <tbody>
-            {(filtered ?? []).map((s) => (
-              <tr
-                key={s.skill_id}
-                className="ui-tr"
-                onClick={() => openDetails(s)}
-                style={{ cursor: "pointer" }}
-              >
-                <td className="ui-td ui-code">{formatSkillName(s.skill_id)}</td>
-                <td className="ui-td">{clientLabel(s.client)}</td>
-                <td className="ui-td">
-                  <span className="ui-pill">
-                    <span className="ui-pillDot" />
-                    <span className="ui-code">{skillScopeLabel(s.scope)}</span>
-                  </span>
-                </td>
-                <td className="ui-td">
-                  <span className="ui-pill">
-                    <span className="ui-pillDot" />
-                    <span className="ui-code">{skillKindLabel(s.kind)}</span>
-                  </span>
-                </td>
-                <td className="ui-td">
-                  <span className="ui-pill">
-                    <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-                    <span className="ui-code">{enabledLabel(s.enabled)}</span>
-                  </span>
-                </td>
-                <td className="ui-td" onClick={(e) => e.stopPropagation()}>
-                  <div className="ui-btnRow">
-                    <button
-                      type="button"
-                      className="ui-btn"
-                      disabled={busy || s.scope === "system"}
-                      onClick={() => requestToggle(s, !s.enabled)}
-                      title={s.scope === "system" ? "系统 Skill 不支持开关" : "切换启用状态"}
-                    >
-                      {s.enabled ? "停用" : "启用"}
-                    </button>
-                    <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
-                      详情 <Icon name="chevronRight" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {(filtered ?? []).map((s) => {
+              const displayName = formatSkillName(s.skill_id);
+              const clientText = clientLabel(s.client);
+              const scopeText = skillScopeLabel(s.scope);
+              const kindText = skillKindLabel(s.kind);
+              const statusText = enabledLabel(s.enabled);
+
+              return (
+                <tr
+                  key={s.skill_id}
+                  className="ui-tr"
+                  onClick={() => openDetails(s)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <td className="ui-td">
+                    <div className="ui-code ui-ellipsis ui-skillNameText" title={displayName}>
+                      {displayName}
+                    </div>
+                  </td>
+                  <td className="ui-td">
+                    <div className="ui-ellipsis ui-skillClientText" title={clientText}>
+                      {clientText}
+                    </div>
+                  </td>
+                  <td className="ui-td">
+                    <span className="ui-pill ui-skillMetaPill" title={scopeText}>
+                      <span className="ui-pillDot" />
+                      <span className="ui-code ui-ellipsis ui-pillText">{scopeText}</span>
+                    </span>
+                  </td>
+                  <td className="ui-td">
+                    <span className="ui-pill ui-skillMetaPill" title={kindText}>
+                      <span className="ui-pillDot" />
+                      <span className="ui-code ui-ellipsis ui-pillText">{kindText}</span>
+                    </span>
+                  </td>
+                  <td className="ui-td">
+                    <span className="ui-pill ui-skillMetaPill" title={statusText}>
+                      <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
+                      <span className="ui-code ui-ellipsis ui-pillText">{statusText}</span>
+                    </span>
+                  </td>
+                  <td className="ui-td ui-tableColAction" onClick={(e) => e.stopPropagation()}>
+                    <div className="ui-btnRow ui-tableActionRow">
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy || s.scope === "system"}
+                        onClick={() => requestToggle(s, !s.enabled)}
+                        title={s.scope === "system" ? "系统 Skill 不支持开关" : "切换启用状态"}
+                      >
+                        {s.enabled ? "停用" : "启用"}
+                      </button>
+                      <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
+                        详情 <Icon name="chevronRight" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {skills && filtered.length === 0 ? (
               <tr>
                 <td className="ui-td" colSpan={6}>

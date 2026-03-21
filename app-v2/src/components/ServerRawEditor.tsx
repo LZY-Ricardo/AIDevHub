@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+function payloadSignature(payload: Record<string, unknown>) {
+  return JSON.stringify(payload);
+}
 
 export function ServerRawEditor({
   payload,
@@ -11,8 +15,14 @@ export function ServerRawEditor({
 }) {
   const [text, setText] = useState(() => JSON.stringify(payload, null, 2));
   const [error, setError] = useState<string | null>(null);
+  const lastAppliedPayloadRef = useRef(payloadSignature(payload));
 
   useEffect(() => {
+    const nextSignature = payloadSignature(payload);
+    if (nextSignature === lastAppliedPayloadRef.current) {
+      return;
+    }
+    lastAppliedPayloadRef.current = nextSignature;
     setText(JSON.stringify(payload, null, 2));
     setError(null);
     onValidityChange(null);
@@ -28,6 +38,7 @@ export function ServerRawEditor({
         onValidityChange(nextError);
         return;
       }
+      lastAppliedPayloadRef.current = payloadSignature(parsed as Record<string, unknown>);
       setError(null);
       onValidityChange(null);
       onChange(parsed as Record<string, unknown>);
