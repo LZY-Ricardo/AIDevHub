@@ -1,5 +1,7 @@
 # MCP编辑功能 Implementation Plan
 
+> 归档说明：本实施计划对应的 MCP 编辑能力已完成开发并进入当前实现。本文保留为历史执行记录，现状请以 `README.md`、`docs/技术实现方案文档.md`、`docs/接口文档.md` 与代码为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 为现有 MCP server 增加详情抽屉内编辑能力，支持结构化表单与高级 JSON 片段双模式，并继续沿用 `preview -> apply -> backup` 安全写入流。

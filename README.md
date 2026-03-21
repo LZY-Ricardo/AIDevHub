@@ -6,7 +6,7 @@ AIDevHub 是一个本地桌面应用（Tauri v2 + Rust + React），用于集中
 
 已实现（P0）：
 
-- Servers 列表（Claude Code + Codex）
+- Servers 列表与详情抽屉（Claude Code + Codex；支持敏感值按需揭示、自动说明与人工说明）
 - 单个 server 启用/禁用：`preview -> apply`，写入前 unified diff 预览；写入前自动备份
 - 新增 server（`stdio` / `http`）：`preview -> apply`
 - 编辑已有 server（结构化表单 + 高级 JSON 片段）：`preview -> apply`
@@ -46,7 +46,7 @@ pnpm dev
 
 - `app-v2/`：桌面应用（Vite + React 前端 + Tauri 后端）
 - `app-v2/src-tauri/src/lib.rs`：Tauri commands（IPC）注册入口
-- `app-v2/src-tauri/crates/aidevhub-core/`：核心逻辑（解析/写回、diff、备份、Profiles）
+- `app-v2/src-tauri/crates/aidevhub-core/`：核心逻辑（解析/写回、diff、备份、Profiles、Skills、MCP 说明）
 - `docs/`：需求、技术方案、接口文档
 - `design-system/`：设计系统（与 `app-v2/src/styles/*.css` 同步）
 
@@ -60,13 +60,14 @@ pnpm dev
 应用本地数据目录（Tauri `app_local_data_dir()`，Local 语义）下文件：
 
 - `profiles.json`
+- `mcp_notes.json`（MCP 人工说明与字段提示）
 - `disabled_pool.json`（Claude 的“禁用池”）
 - `backups/`（用户配置文件备份）
 - `backup_index.json`（备份索引，best-effort 更新）
 
 备注：
 
-- 备份只针对用户配置文件（`~/.claude.json`、`~/.codex/config.toml`）；应用自身的 `profiles.json` 等不做备份。
+- 备份只针对用户配置文件（`~/.claude.json`、`~/.codex/config.toml`）；应用自身的 `profiles.json` / `mcp_notes.json` 等不做备份。
 
 ## 文档索引
 
