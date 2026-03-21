@@ -1,33 +1,33 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap");
 
 :root {
-  /* ui-ux-pro-max design system (design-system/aidevhub/MASTER.md) */
-  /* Base palette (airy blue / glass) */
-  --color-primary: #b8ddff; /* soft sky */
-  --color-secondary: #e6f3ff; /* mist */
-  --color-cta: #2f6fed; /* action blue */
-  --color-background: #f4f8ff; /* paper blue */
-  --color-text: #0b1220; /* ink */
+  /* 简约配色方案 - 中性灰 */
+  /* Base palette */
+  --color-primary: #64748b; /* 中性灰 */
+  --color-secondary: #f1f5f9; /* 浅灰 */
+  --color-cta: #475569; /* 深灰 */
+  --color-background: #ffffff; /* 纯白 */
+  --color-text: #1e293b; /* 深灰 */
   color-scheme: light;
 
   /* RGB helpers for consistent translucency in ui.css */
-  --color-primary-rgb: 184, 221, 255;
-  --color-secondary-rgb: 230, 243, 255;
-  --color-cta-rgb: 47, 111, 237;
-  --color-background-rgb: 244, 248, 255;
-  --color-text-rgb: 11, 18, 32;
+  --color-primary-rgb: 100, 116, 139;
+  --color-secondary-rgb: 241, 245, 249;
+  --color-cta-rgb: 71, 85, 105;
+  --color-background-rgb: 255, 255, 255;
+  --color-text-rgb: 30, 41, 59;
 
-  /* Paper tone for translucent panels (avoid flat #fff, keep a hint of depth). */
+  /* Surface colors */
   --color-ink-rgb: 255, 255, 255;
 
-  --color-surface-0: rgba(var(--color-ink-rgb), 0.65);
-  --color-surface-1: rgba(var(--color-ink-rgb), 0.92);
+  --color-surface-0: rgba(255, 255, 255, 0.8);
+  --color-surface-1: rgba(255, 255, 255, 0.95);
 
-  --color-border: rgba(var(--color-text-rgb), 0.12);
-  --color-border-subtle: rgba(var(--color-text-rgb), 0.08);
-  --color-border-strong: rgba(var(--color-text-rgb), 0.16);
+  --color-border: rgba(30, 41, 59, 0.1);
+  --color-border-subtle: rgba(30, 41, 59, 0.06);
+  --color-border-strong: rgba(30, 41, 59, 0.15);
 
-  --color-muted: rgba(var(--color-text-rgb), 0.64);
+  --color-muted: rgba(30, 41, 59, 0.6);
   --color-danger: #ef4444;
   --color-warning: #f59e0b;
 
@@ -69,23 +69,7 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--color-text);
-  background: radial-gradient(
-      1100px 700px at 18% 12%,
-      rgba(var(--color-cta-rgb), 0.12),
-      transparent 60%
-    ),
-    radial-gradient(
-      900px 600px at 86% 18%,
-      rgba(var(--color-primary-rgb), 0.28),
-      transparent 55%
-    ),
-    linear-gradient(
-      180deg,
-      rgb(var(--color-ink-rgb)),
-      var(--color-background) 45%,
-      rgb(var(--color-ink-rgb))
-    );
-  background-attachment: fixed;
+  background: #ffffff;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

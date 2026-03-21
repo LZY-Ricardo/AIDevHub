@@ -6,8 +6,18 @@ import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
+// 去掉 MCP ID 前缀，只显示名称
+function formatMcpName(serverId: string): string {
+  // 处理 "claude_code:xxx" 或 "codex:xxx" 格式
+  if (serverId.includes(":")) {
+    return serverId.split(":").slice(1).join(":");
+  }
+  // 处理其他前缀格式
+  return serverId.replace(/^(mcp__|claudecode__|codex__|claude_code__)/, "");
+}
+
 export function ServersPage() {
-  const [client, setClient] = useState<Client | "all">("all");
+  const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,15 +34,14 @@ export function ServersPage() {
   );
 
   const clientOptions = [
-    { value: "all", label: "全部" },
     { value: "claude_code", label: clientLabel("claude_code") },
     { value: "codex", label: clientLabel("codex") },
-  ] satisfies Array<UiSelectOption<Client | "all">>;
+  ] satisfies Array<UiSelectOption<Client>>;
 
   async function load() {
     setError(null);
     try {
-      const list = await api.serverList(client === "all" ? {} : { client });
+      const list = await api.serverList({ client });
       setServers(list);
     } catch (e) {
       setError(e as AppError);
@@ -93,7 +102,7 @@ export function ServersPage() {
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <div className="ui-label">客户端</div>
             <div style={{ minWidth: 180 }}>
-              <UiSelect<Client | "all">
+              <UiSelect<Client>
                 ariaLabel="选择客户端"
                 value={client}
                 options={clientOptions}
@@ -123,8 +132,7 @@ export function ServersPage() {
         <table className="ui-table" aria-label="MCP列表">
           <thead>
             <tr>
-              <th className="ui-th">MCP ID</th>
-              <th className="ui-th">客户端</th>
+              <th className="ui-th">名称</th>
               <th className="ui-th">传输方式</th>
               <th className="ui-th">启用状态</th>
               <th className="ui-th">标识</th>
@@ -141,8 +149,7 @@ export function ServersPage() {
                 onClick={() => openDetails(s)}
                 style={{ cursor: "pointer" }}
               >
-                <td className="ui-td ui-code">{s.server_id}</td>
-                <td className="ui-td">{clientLabel(s.client)}</td>
+                <td className="ui-td ui-code">{formatMcpName(s.server_id)}</td>
                 <td className="ui-td">
                   <span className="ui-pill">
                     <span className="ui-pillDot" />
@@ -181,14 +188,14 @@ export function ServersPage() {
             ))}
             {servers && servers.length === 0 ? (
               <tr>
-                <td className="ui-td" colSpan={6}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">暂无 MCP。</div>
                 </td>
               </tr>
             ) : null}
             {!servers ? (
               <tr>
-                <td className="ui-td" colSpan={6}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">加载中...</div>
                 </td>
               </tr>
@@ -294,9 +301,9 @@ function DetailsDrawer({
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">MCP ID</div>
+                <div className="ui-label">名称</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
-                  {shown!.server_id}
+                  {formatMcpName(shown!.server_id)}
                 </div>
                 <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <span className="ui-pill">
