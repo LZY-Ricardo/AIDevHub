@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import type { AppError, Client, FilePrecondition, ServerRecord, WritePreview } from "../lib/types";
+import type { AppError, Client, FilePrecondition, ServerNotes, ServerRecord, WritePreview } from "../lib/types";
 import { api } from "../lib/api";
 import { clientLabel, enabledLabel, transportLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
+import { explainServerDetails } from "../lib/serverExplain";
 
 // 去掉 MCP ID 前缀，只显示名称
 function formatMcpName(serverId: string): string {
@@ -15,6 +16,11 @@ function formatMcpName(serverId: string): string {
   // 处理其他前缀格式
   return serverId.replace(/^(mcp__|claudecode__|codex__|claude_code__)/, "");
 }
+
+const EMPTY_SERVER_NOTES: ServerNotes = {
+  description: "",
+  field_hints: {},
+};
 
 export function ServersPage() {
   const [client, setClient] = useState<Client>("claude_code");
@@ -129,73 +135,82 @@ export function ServersPage() {
       ) : null}
 
       <div className="ui-tableWrap">
-        <table className="ui-table" aria-label="MCP列表">
+        <table className="ui-table ui-tableMcp ui-tableNoStickyLastCol" aria-label="MCP列表">
+          <colgroup>
+            <col className="ui-colName" />
+            <col className="ui-colTransport" />
+            <col className="ui-colStatus" />
+            <col className="ui-colAction" />
+          </colgroup>
           <thead>
             <tr>
               <th className="ui-th">名称</th>
               <th className="ui-th">传输方式</th>
               <th className="ui-th">启用状态</th>
-              <th className="ui-th">标识</th>
-              <th className="ui-th" style={{ width: 160 }}>
+              <th className="ui-th ui-tableColAction">
                 操作
               </th>
             </tr>
           </thead>
           <tbody>
-            {(servers ?? []).map((s) => (
-              <tr
-                key={s.server_id}
-                className="ui-tr"
-                onClick={() => openDetails(s)}
-                style={{ cursor: "pointer" }}
-              >
-                <td className="ui-td ui-code">{formatMcpName(s.server_id)}</td>
-                <td className="ui-td">
-                  <span className="ui-pill">
-                    <span className="ui-pillDot" />
-                    <span className="ui-code">{transportLabel(s.transport)}</span>
-                  </span>
-                </td>
-                <td className="ui-td">
-                  <span className="ui-pill">
-                    <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-                    <span className="ui-code">{enabledLabel(s.enabled)}</span>
-                  </span>
-                </td>
-                <td
-                  className="ui-td ui-code"
-                  style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}
+            {(servers ?? []).map((s) => {
+              const displayName = formatMcpName(s.server_id);
+              const transportText = transportLabel(s.transport);
+              const statusText = enabledLabel(s.enabled);
+
+              return (
+                <tr
+                  key={s.server_id}
+                  className="ui-tr"
+                  onClick={() => openDetails(s)}
+                  style={{ cursor: "pointer" }}
                 >
-                  {s.identity}
-                </td>
-                <td className="ui-td" onClick={(e) => e.stopPropagation()}>
-                  <div className="ui-btnRow">
-                    <button
-                      type="button"
-                      className="ui-btn"
-                      disabled={busy}
-                      onClick={() => requestToggle(s, !s.enabled)}
-                      title="切换启用状态"
-                    >
-                      {s.enabled ? "停用" : "启用"}
-                    </button>
-                    <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
-                      详情 <Icon name="chevronRight" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  <td className="ui-td">
+                    <div className="ui-code ui-ellipsis ui-serverNameText" title={displayName}>
+                      {displayName}
+                    </div>
+                  </td>
+                  <td className="ui-td">
+                    <span className="ui-pill ui-serverMetaPill" title={transportText}>
+                      <span className="ui-pillDot" />
+                      <span className="ui-code ui-ellipsis ui-pillText">{transportText}</span>
+                    </span>
+                  </td>
+                  <td className="ui-td">
+                    <span className="ui-pill ui-serverMetaPill" title={statusText}>
+                      <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
+                      <span className="ui-code ui-ellipsis ui-pillText">{statusText}</span>
+                    </span>
+                  </td>
+                  <td className="ui-td ui-tableColAction" onClick={(e) => e.stopPropagation()}>
+                    <div className="ui-btnRow ui-tableActionRow">
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy}
+                        onClick={() => requestToggle(s, !s.enabled)}
+                        title="切换启用状态"
+                      >
+                        {s.enabled ? "停用" : "启用"}
+                      </button>
+                      <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
+                        详情 <Icon name="chevronRight" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {servers && servers.length === 0 ? (
               <tr>
-                <td className="ui-td" colSpan={5}>
+                <td className="ui-td" colSpan={4}>
                   <div className="ui-help">暂无 MCP。</div>
                 </td>
               </tr>
             ) : null}
             {!servers ? (
               <tr>
-                <td className="ui-td" colSpan={5}>
+                <td className="ui-td" colSpan={4}>
                   <div className="ui-help">加载中...</div>
                 </td>
               </tr>
@@ -242,12 +257,52 @@ function DetailsDrawer({
   const [reveal, setReveal] = useState(false);
   const [revealBusy, setRevealBusy] = useState(false);
   const [revealed, setRevealed] = useState<ServerRecord | null>(null);
+  const [notes, setNotes] = useState<ServerNotes>(EMPTY_SERVER_NOTES);
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null);
+  const [fieldDraft, setFieldDraft] = useState("");
 
   useEffect(() => {
     setReveal(false);
     setRevealed(null);
     setRevealBusy(false);
+    setNotes(EMPTY_SERVER_NOTES);
+    setNotesBusy(false);
+    setNotesError(null);
+    setEditingDescription(false);
+    setDescriptionDraft("");
+    setEditingFieldKey(null);
+    setFieldDraft("");
   }, [s?.server_id, open]);
+
+  useEffect(() => {
+    if (!open || !s) return;
+
+    let cancelled = false;
+    setNotesBusy(true);
+    setNotesError(null);
+    void api
+      .serverNotesGet({ server_id: s.server_id })
+      .then((loaded) => {
+        if (cancelled) return;
+        setNotes(loaded);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNotesError("人工说明加载失败，当前展示的是自动生成说明。");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setNotesBusy(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, s]);
 
   async function toggleReveal(next: boolean) {
     if (!s) return;
@@ -267,6 +322,66 @@ function DetailsDrawer({
   }
 
   const shown = revealed ?? s;
+  const explanation = shown ? explainServerDetails(shown, notes) : null;
+
+  async function persistNotes(nextNotes: ServerNotes) {
+    if (!s) return null;
+    setNotesBusy(true);
+    setNotesError(null);
+    try {
+      const saved = await api.serverNotesPut({ server_id: s.server_id, notes: nextNotes });
+      setNotes(saved);
+      return saved;
+    } catch {
+      setNotesError("人工说明保存失败，请稍后重试。");
+      return null;
+    } finally {
+      setNotesBusy(false);
+    }
+  }
+
+  function startDescriptionEdit() {
+    if (!explanation) return;
+    setEditingFieldKey(null);
+    setFieldDraft("");
+    setDescriptionDraft(notes.description || explanation.description);
+    setEditingDescription(true);
+  }
+
+  async function saveDescription() {
+    const saved = await persistNotes({
+      ...notes,
+      description: descriptionDraft,
+    });
+    if (!saved) return;
+    setEditingDescription(false);
+    setDescriptionDraft(saved.description);
+  }
+
+  function startFieldEdit(key: string, fallbackHint: string) {
+    setEditingDescription(false);
+    setDescriptionDraft("");
+    setEditingFieldKey(key);
+    setFieldDraft(notes.field_hints[key] || fallbackHint);
+  }
+
+  async function saveFieldHint(key: string) {
+    const nextFieldHints = { ...notes.field_hints };
+    if (fieldDraft.trim()) {
+      nextFieldHints[key] = fieldDraft.trim();
+    } else {
+      delete nextFieldHints[key];
+    }
+
+    const saved = await persistNotes({
+      ...notes,
+      field_hints: nextFieldHints,
+    });
+    if (!saved) return;
+    setEditingFieldKey(null);
+    setFieldDraft("");
+  }
+
   if (!open) return null;
   return (
     <div
@@ -321,7 +436,7 @@ function DetailsDrawer({
                 </div>
                 <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
                   <div className="ui-help">
-                    {reveal ? "已尝试显示敏感值（后端可能仍会脱敏或拒绝）" : "默认仅展示脱敏后的配置载荷"}
+                    {reveal ? "已尝试显示敏感值；原始配置中仍可能继续脱敏或被拒绝展示。" : "默认先展示说明化内容，原始配置可按需展开查看。"}
                   </div>
                   <button
                     type="button"
@@ -336,23 +451,160 @@ function DetailsDrawer({
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+                  <div className="ui-label">功能作用</div>
+                  {!editingDescription ? (
+                    <button type="button" className="ui-btn" disabled={notesBusy} onClick={startDescriptionEdit}>
+                      编辑说明
+                    </button>
+                  ) : null}
+                </div>
+                {editingDescription ? (
+                  <div style={{ marginTop: "10px", display: "grid", gap: "10px" }}>
+                    <textarea
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                      rows={4}
+                      style={{
+                        width: "100%",
+                        resize: "vertical",
+                        borderRadius: 12,
+                        border: "1px solid var(--color-border)",
+                        padding: "10px 12px",
+                        font: "inherit",
+                        background: "var(--color-panel)",
+                        color: "var(--color-text)",
+                      }}
+                    />
+                    <div className="ui-btnRow">
+                      <button type="button" className="ui-btn" disabled={notesBusy} onClick={saveDescription}>
+                        保存
+                      </button>
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={notesBusy}
+                        onClick={() => {
+                          setEditingDescription(false);
+                          setDescriptionDraft("");
+                        }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "10px", lineHeight: 1.7 }}>{explanation?.description}</div>
+                )}
+                {notesError ? (
+                  <div className="ui-help" style={{ marginTop: "10px" }}>
+                    {notesError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="ui-card" style={{ padding: "16px" }}>
                 <div className="ui-label">来源文件</div>
                 <div className="ui-code" style={{ marginTop: "8px" }}>
                   {shown!.source_file}
                 </div>
-                <div className="ui-label" style={{ marginTop: "14px" }}>
-                  标识
-                </div>
-                <div className="ui-code" style={{ marginTop: "8px" }}>
-                  {shown!.identity}
-                </div>
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">配置载荷（默认脱敏）</div>
-                <div style={{ marginTop: "10px" }}>
-                  <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
+                <div className="ui-label">配置说明</div>
+                <div style={{ marginTop: "10px", display: "grid", gap: "10px" }}>
+                  {(explanation?.fields ?? []).length > 0 ? (
+                    explanation?.fields.map((field) => (
+                      <div
+                        key={field.key}
+                        style={{
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 12,
+                          padding: "12px",
+                          display: "grid",
+                          gap: "8px",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "start" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="ui-code" style={{ fontWeight: 700 }}>
+                              {field.key}
+                            </div>
+                            <div className="ui-code" style={{ marginTop: "6px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {field.display_value}
+                            </div>
+                          </div>
+                          {editingFieldKey !== field.key ? (
+                            <button
+                              type="button"
+                              className="ui-btn"
+                              disabled={notesBusy}
+                              onClick={() => startFieldEdit(field.key, field.hint)}
+                            >
+                              编辑说明
+                            </button>
+                          ) : null}
+                        </div>
+                        {editingFieldKey === field.key ? (
+                          <div style={{ display: "grid", gap: "10px" }}>
+                            <textarea
+                              value={fieldDraft}
+                              onChange={(e) => setFieldDraft(e.target.value)}
+                              rows={3}
+                              style={{
+                                width: "100%",
+                                resize: "vertical",
+                                borderRadius: 12,
+                                border: "1px solid var(--color-border)",
+                                padding: "10px 12px",
+                                font: "inherit",
+                                background: "var(--color-panel)",
+                                color: "var(--color-text)",
+                              }}
+                            />
+                            <div className="ui-btnRow">
+                              <button
+                                type="button"
+                                className="ui-btn"
+                                disabled={notesBusy}
+                                onClick={() => saveFieldHint(field.key)}
+                              >
+                                保存
+                              </button>
+                              <button
+                                type="button"
+                                className="ui-btn"
+                                disabled={notesBusy}
+                                onClick={() => {
+                                  setEditingFieldKey(null);
+                                  setFieldDraft("");
+                                }}
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="ui-help">{field.hint}</div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="ui-help">暂无可解释的配置项。</div>
+                  )}
                 </div>
+                <details style={{ marginTop: "14px" }}>
+                  <summary className="ui-label" style={{ cursor: "pointer" }}>
+                    原始配置
+                  </summary>
+                  <div style={{ marginTop: "10px" }}>
+                    <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
+                  </div>
+                </details>
+              </div>
+
+              <div className="ui-help" style={{ marginTop: "-2px" }}>
+                说明支持人工编辑，默认会先展示自动生成结果。
               </div>
             </div>
           )}

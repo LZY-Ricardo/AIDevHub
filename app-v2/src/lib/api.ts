@@ -5,6 +5,7 @@ import type {
   FilePrecondition,
   Profile,
   RuntimeInfo,
+  ServerNotes,
   ServerRecord,
   SkillGetResponse,
   SkillRecord,
@@ -25,6 +26,19 @@ export const api = {
     return invokeCmd("server_get", {
       serverId: payload.server_id,
       revealSecrets: payload.reveal_secrets,
+    });
+  },
+
+  serverNotesGet(payload: { server_id: string }): Promise<ServerNotes> {
+    return invokeCmd("server_notes_get", {
+      serverId: payload.server_id,
+    });
+  },
+
+  serverNotesPut(payload: { server_id: string; notes: ServerNotes }): Promise<ServerNotes> {
+    return invokeCmd("server_notes_put", {
+      serverId: payload.server_id,
+      notes: payload.notes,
     });
   },
 

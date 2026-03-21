@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use aidevhub_core::model::{AppError, Client, FilePrecondition, ProfileTargets, RuntimeGetInfoResponse, Transport};
+use aidevhub_core::model::{AppError, Client, FilePrecondition, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, Transport};
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
 use tauri::Manager;
@@ -38,6 +38,7 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         codex_skills_disabled_dir,
         app_local_data_dir: app_local_data_dir.clone(),
         profiles_path: app_local_data_dir.join("profiles.json"),
+        mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),
         backup_index_path: app_local_data_dir.join("backup_index.json"),
@@ -69,6 +70,25 @@ fn server_get(
 ) -> Result<aidevhub_core::model::ServerRecord, AppError> {
     let paths = resolve_paths(&app)?;
     ops::server_get(&paths, &server_id, reveal_secrets.unwrap_or(false))
+}
+
+#[tauri::command]
+fn server_notes_get(
+    app: tauri::AppHandle,
+    server_id: String,
+) -> Result<aidevhub_core::model::ServerNotes, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::mcp_notes_get(&paths, &server_id)
+}
+
+#[tauri::command]
+fn server_notes_put(
+    app: tauri::AppHandle,
+    server_id: String,
+    notes: ServerNotes,
+) -> Result<aidevhub_core::model::ServerNotes, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::mcp_notes_put(&paths, &server_id, notes)
 }
 
 #[tauri::command]
@@ -281,6 +301,8 @@ pub fn run() {
             runtime_get_info,
             server_list,
             server_get,
+            server_notes_get,
+            server_notes_put,
             server_preview_toggle,
             server_apply_toggle,
             server_preview_add,

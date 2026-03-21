@@ -13,15 +13,22 @@ import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
-type ScopeFilter = "all" | "user" | "system" | "disabled";
+type ScopeFilter = "user" | "system" | "disabled";
 
 type PendingAction =
   | { type: "toggle"; skill_id: string; enabled: boolean }
   | { type: "create"; client: Client; name: string; description: string; body?: string };
 
+function formatSkillName(skillId: string): string {
+  if (skillId.includes(":")) {
+    return skillId.split(":").slice(1).join(":");
+  }
+  return skillId.replace(/^(mcp__|claudecode__|codex__|claude_code__)/, "");
+}
+
 export function SkillsPage() {
-  const [client, setClient] = useState<Client | "all">("all");
-  const [scope, setScope] = useState<ScopeFilter>("all");
+  const [client, setClient] = useState<Client>("claude_code");
+  const [scope, setScope] = useState<ScopeFilter>("user");
   const [skills, setSkills] = useState<SkillRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,13 +50,11 @@ export function SkillsPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
 
   const clientOptions = [
-    { value: "all", label: "全部" },
     { value: "claude_code", label: clientLabel("claude_code") },
     { value: "codex", label: clientLabel("codex") },
-  ] satisfies Array<UiSelectOption<Client | "all">>;
+  ] satisfies Array<UiSelectOption<Client>>;
 
   const scopeOptions = [
-    { value: "all", label: "全部" },
     { value: "user", label: "用户" },
     { value: "system", label: "系统" },
     { value: "disabled", label: "已禁用" },
@@ -58,10 +63,7 @@ export function SkillsPage() {
   async function load() {
     setError(null);
     try {
-      const list = await api.skillList({
-        client: client === "all" ? undefined : client,
-        scope,
-      });
+      const list = await api.skillList({ client, scope });
       setSkills(list);
     } catch (e) {
       setError(e as AppError);
@@ -99,7 +101,7 @@ export function SkillsPage() {
     setError(null);
     setPreview(null);
     setPending({ type: "toggle", skill_id: s.skill_id, enabled });
-    setPreviewTitle(`切换Skill：${s.skill_id} → ${enabled ? "启用" : "停用"}`);
+    setPreviewTitle(`切换Skill：${formatSkillName(s.skill_id)} → ${enabled ? "启用" : "停用"}`);
     try {
       const p = await api.skillPreviewToggle({ skill_id: s.skill_id, enabled });
       setPreview(p);
@@ -172,7 +174,7 @@ export function SkillsPage() {
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <div className="ui-label">客户端</div>
               <div style={{ minWidth: 180 }}>
-                <UiSelect<Client | "all">
+                <UiSelect<Client>
                   ariaLabel="选择客户端"
                   value={client}
                   options={clientOptions}
@@ -314,13 +316,11 @@ export function SkillsPage() {
         <table className="ui-table" aria-label="Skills列表">
           <thead>
             <tr>
-              <th className="ui-th">Skill ID</th>
+              <th className="ui-th">名称</th>
               <th className="ui-th">客户端</th>
               <th className="ui-th">范围</th>
               <th className="ui-th">类型</th>
               <th className="ui-th">状态</th>
-              <th className="ui-th">描述</th>
-              <th className="ui-th">入口路径</th>
               <th className="ui-th" style={{ width: 160 }}>
                 操作
               </th>
@@ -334,7 +334,7 @@ export function SkillsPage() {
                 onClick={() => openDetails(s)}
                 style={{ cursor: "pointer" }}
               >
-                <td className="ui-td ui-code">{s.skill_id}</td>
+                <td className="ui-td ui-code">{formatSkillName(s.skill_id)}</td>
                 <td className="ui-td">{clientLabel(s.client)}</td>
                 <td className="ui-td">
                   <span className="ui-pill">
@@ -353,12 +353,6 @@ export function SkillsPage() {
                     <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
                     <span className="ui-code">{enabledLabel(s.enabled)}</span>
                   </span>
-                </td>
-                <td className="ui-td" style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.description || <span className="ui-help">（无）</span>}
-                </td>
-                <td className="ui-td ui-code" style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.entry_path}
                 </td>
                 <td className="ui-td" onClick={(e) => e.stopPropagation()}>
                   <div className="ui-btnRow">
@@ -380,14 +374,14 @@ export function SkillsPage() {
             ))}
             {skills && filtered.length === 0 ? (
               <tr>
-                <td className="ui-td" colSpan={8}>
+                <td className="ui-td" colSpan={6}>
                   <div className="ui-help">暂无 Skill。</div>
                 </td>
               </tr>
             ) : null}
             {!skills ? (
               <tr>
-                <td className="ui-td" colSpan={8}>
+                <td className="ui-td" colSpan={6}>
                   <div className="ui-help">加载中...</div>
                 </td>
               </tr>
@@ -465,9 +459,9 @@ function DetailsDrawer({
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">Skill ID</div>
+                <div className="ui-label">名称</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
-                  {rec.skill_id}
+                  {formatSkillName(rec.skill_id)}
                 </div>
                 <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <span className="ui-pill">
@@ -521,4 +515,3 @@ function DetailsDrawer({
     </div>
   );
 }
-

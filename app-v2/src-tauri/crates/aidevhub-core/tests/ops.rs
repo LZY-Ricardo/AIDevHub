@@ -1,12 +1,12 @@
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
 use aidevhub_core::{
-    model::{Client, FilePrecondition, ProfileTargets, Transport},
+    model::{Client, FilePrecondition, ProfileTargets, ServerNotes, Transport},
     ops::{
         backup_apply_rollback, backup_list, backup_preview_rollback, profile_apply,
         profile_create, profile_delete, profile_list, profile_preview_apply, profile_update,
-        runtime_get_info, server_apply_add, server_apply_toggle, server_get, server_list,
-        server_preview_add, server_preview_toggle, AppPaths,
+        mcp_notes_get, mcp_notes_put, runtime_get_info, server_apply_add, server_apply_toggle,
+        server_get, server_list, server_preview_add, server_preview_toggle, AppPaths,
     },
 };
 
@@ -26,9 +26,14 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
     let app_local_data_dir = base.join("appdata");
     AppPaths {
         claude_config_path: base.join("claude.json"),
+        claude_commands_dir: base.join(".claude").join("commands"),
+        claude_commands_disabled_dir: base.join(".claude").join("commands_disabled"),
         codex_config_path: base.join("codex.toml"),
+        codex_skills_dir: base.join(".codex").join("skills"),
+        codex_skills_disabled_dir: base.join(".codex").join("skills_disabled"),
         app_local_data_dir: app_local_data_dir.clone(),
         profiles_path: app_local_data_dir.join("profiles.json"),
+        mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),
         backup_index_path: app_local_data_dir.join("backup_index.json"),
@@ -40,6 +45,95 @@ fn write(path: &PathBuf, content: &str) {
         fs::create_dir_all(p).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+#[test]
+fn mcp_notes_missing_returns_empty_notes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    let notes = mcp_notes_get(&paths, "codex:playwright").unwrap();
+    assert_eq!(notes.description, "");
+    assert!(notes.field_hints.is_empty());
+}
+
+#[test]
+fn mcp_notes_roundtrip_persists_description_and_field_hints() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    let mut field_hints = BTreeMap::new();
+    field_hints.insert("command".to_string(), "用于启动本地 MCP 服务".to_string());
+    field_hints.insert("args".to_string(), "传给启动命令的参数".to_string());
+
+    mcp_notes_put(
+        &paths,
+        "codex:playwright",
+        ServerNotes {
+            description: "用于浏览器自动化和页面交互".to_string(),
+            field_hints,
+        },
+    )
+    .unwrap();
+
+    let notes = mcp_notes_get(&paths, "codex:playwright").unwrap();
+    assert_eq!(notes.description, "用于浏览器自动化和页面交互");
+    assert_eq!(
+        notes.field_hints.get("command").map(String::as_str),
+        Some("用于启动本地 MCP 服务")
+    );
+    assert_eq!(
+        notes.field_hints.get("args").map(String::as_str),
+        Some("传给启动命令的参数")
+    );
+}
+
+#[test]
+fn mcp_notes_update_does_not_clobber_other_servers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    mcp_notes_put(
+        &paths,
+        "codex:playwright",
+        ServerNotes {
+            description: "浏览器自动化".to_string(),
+            field_hints: BTreeMap::from([("command".to_string(), "启动命令".to_string())]),
+        },
+    )
+    .unwrap();
+    mcp_notes_put(
+        &paths,
+        "codex:neon",
+        ServerNotes {
+            description: "数据库操作".to_string(),
+            field_hints: BTreeMap::from([("url".to_string(), "远程 MCP 地址".to_string())]),
+        },
+    )
+    .unwrap();
+    mcp_notes_put(
+        &paths,
+        "codex:playwright",
+        ServerNotes {
+            description: "浏览器自动化与截图".to_string(),
+            field_hints: BTreeMap::from([("args".to_string(), "命令参数".to_string())]),
+        },
+    )
+    .unwrap();
+
+    let playwright = mcp_notes_get(&paths, "codex:playwright").unwrap();
+    let neon = mcp_notes_get(&paths, "codex:neon").unwrap();
+
+    assert_eq!(playwright.description, "浏览器自动化与截图");
+    assert_eq!(
+        playwright.field_hints.get("args").map(String::as_str),
+        Some("命令参数")
+    );
+    assert_eq!(neon.description, "数据库操作");
+    assert_eq!(
+        neon.field_hints.get("url").map(String::as_str),
+        Some("远程 MCP 地址")
+    );
 }
 
 #[test]

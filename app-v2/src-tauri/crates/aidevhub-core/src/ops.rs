@@ -58,6 +58,7 @@ pub struct AppPaths {
     pub codex_skills_disabled_dir: PathBuf,
     pub app_local_data_dir: PathBuf,
     pub profiles_path: PathBuf,
+    pub mcp_notes_path: PathBuf,
     pub disabled_pool_path: PathBuf,
     pub backups_dir: PathBuf,
     pub backup_index_path: PathBuf,
@@ -346,6 +347,18 @@ fn save_profiles(v: &[Profile]) -> Result<String, CoreError> {
     serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize profiles: {e}")))
 }
 
+fn load_mcp_notes(path: &Path) -> Result<BTreeMap<String, ServerNotes>, CoreError> {
+    let s = read_to_string_opt(path)?;
+    let Some(s) = s else {
+        return Ok(BTreeMap::new());
+    };
+    serde_json::from_str(&s).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))
+}
+
+fn save_mcp_notes(v: &BTreeMap<String, ServerNotes>) -> Result<String, CoreError> {
+    serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize mcp_notes: {e}")))
+}
+
 fn load_backup_index(path: &Path) -> Result<Vec<BackupRecord>, CoreError> {
     let s = read_to_string_opt(path)?;
     let Some(s) = s else { return Ok(vec![]); };
@@ -406,6 +419,28 @@ fn write_claude_config(mut root: Value, servers: serde_json::Map<String, Value>)
         return Err(CoreError::Parse("claude config root is not JSON object".to_string()));
     }
     serde_json::to_string_pretty(&root).map_err(|e| CoreError::Internal(format!("serialize claude config: {e}")))
+}
+
+fn normalize_server_notes(notes: ServerNotes) -> ServerNotes {
+    let description = notes.description.trim().to_string();
+    let field_hints = notes
+        .field_hints
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let key = key.trim();
+            let value = value.trim();
+            if key.is_empty() || value.is_empty() {
+                None
+            } else {
+                Some((key.to_string(), value.to_string()))
+            }
+        })
+        .collect();
+
+    ServerNotes {
+        description,
+        field_hints,
+    }
 }
 
 fn parse_codex_doc(path: &Path) -> Result<DocumentMut, CoreError> {
@@ -695,6 +730,28 @@ pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result
             Ok(to_server_record_codex(&name, enabled, &paths.codex_config_path, st, reveal))
         }
     }
+}
+
+pub fn mcp_notes_get(paths: &AppPaths, server_id_str: &str) -> Result<ServerNotes, AppError> {
+    parse_server_id(server_id_str).map_err(AppError::from)?;
+    let all = load_mcp_notes(&paths.mcp_notes_path).map_err(AppError::from)?;
+    Ok(all.get(server_id_str).cloned().unwrap_or_default())
+}
+
+pub fn mcp_notes_put(paths: &AppPaths, server_id_str: &str, notes: ServerNotes) -> Result<ServerNotes, AppError> {
+    parse_server_id(server_id_str).map_err(AppError::from)?;
+    let mut all = load_mcp_notes(&paths.mcp_notes_path).map_err(AppError::from)?;
+    let normalized = normalize_server_notes(notes);
+
+    if normalized.description.is_empty() && normalized.field_hints.is_empty() {
+        all.remove(server_id_str);
+    } else {
+        all.insert(server_id_str.to_string(), normalized.clone());
+    }
+
+    let serialized = save_mcp_notes(&all).map_err(AppError::from)?;
+    write_atomic(&paths.mcp_notes_path, &serialized).map_err(AppError::from)?;
+    Ok(normalized)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

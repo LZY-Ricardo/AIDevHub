@@ -14,7 +14,7 @@ const ROUTES: Array<{
   { key: "servers", label: "MCP管理", icon: "servers", kicker: "开关、详情与状态" },
   { key: "add", label: "新增MCP", icon: "plus", kicker: "添加并写入配置" },
   { key: "profiles", label: "配置方案", icon: "profiles", kicker: "按方案收敛切换" },
-  { key: "skills", label: "技能管理", icon: "skills", kicker: "Codex skills / Claude 命令" },
+  { key: "skills", label: "skill管理", icon: "skills", kicker: "Codex skills / Claude 命令" },
   { key: "backups", label: "备份回滚", icon: "backups", kicker: "历史记录与恢复" },
 ];
 
@@ -90,7 +90,7 @@ function pageTitle(route: RouteKey): string {
     case "profiles":
       return "配置方案";
     case "skills":
-      return "技能管理";
+      return "skill管理";
     case "backups":
       return "备份回滚";
   }

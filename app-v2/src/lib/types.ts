@@ -34,6 +34,11 @@ export interface ServerRecord {
   payload: Record<string, unknown>;
 }
 
+export interface ServerNotes {
+  description: string;
+  field_hints: Record<string, string>;
+}
+
 export interface Profile {
   profile_id: string;
   name: string;

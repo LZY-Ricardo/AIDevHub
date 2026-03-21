@@ -331,6 +331,53 @@
   background: rgba(var(--color-background-rgb), 0.72);
 }
 
+.ui-tableColAutoFit {
+  width: 1%;
+}
+
+.ui-tableMcp {
+  width: auto;
+  min-width: 0;
+}
+
+.ui-tableMcp col.ui-colName {
+  width: 12rem;
+}
+
+.ui-tableMcp col.ui-colTransport {
+  width: 8.5rem;
+}
+
+.ui-tableMcp col.ui-colStatus {
+  width: 8.5rem;
+}
+
+.ui-tableMcp col.ui-colAction {
+  width: 10rem;
+}
+
+.ui-serverNameText {
+  max-width: clamp(7.5rem, 14vw, 11rem);
+}
+
+.ui-serverMetaPill {
+  max-width: clamp(6rem, 12vw, 9rem);
+}
+
+.ui-pillText {
+  min-width: 0;
+}
+
+.ui-tableColAction {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.ui-tableActionRow {
+  display: inline-flex;
+  width: max-content;
+}
+
 .ui-table th:last-child,
 .ui-table td:last-child {
   position: sticky;
@@ -343,6 +390,22 @@
 .ui-table th:last-child {
   z-index: 3;
   background: rgba(var(--color-background-rgb), 0.72);
+}
+
+.ui-tableNoStickyLastCol th:last-child,
+.ui-tableNoStickyLastCol td:last-child {
+  position: static;
+  right: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+
+.ui-tableNoStickyLastCol th:last-child {
+  background: rgba(var(--color-background-rgb), 0.72);
+}
+
+.ui-tableNoStickyLastCol td:last-child {
+  background: transparent;
 }
 
 .ui-tr:hover .ui-td {
