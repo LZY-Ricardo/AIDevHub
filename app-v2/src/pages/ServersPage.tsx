@@ -1,11 +1,22 @@
 import { useEffect, useState } from "react";
-import type { AppError, Client, FilePrecondition, ServerNotes, ServerRecord, WritePreview } from "../lib/types";
+import type {
+  AppError,
+  Client,
+  FilePrecondition,
+  ServerEditDraft,
+  ServerEditSession,
+  ServerNotes,
+  ServerRecord,
+  WritePreview,
+} from "../lib/types";
 import { api } from "../lib/api";
 import { clientLabel, enabledLabel, transportLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 import { explainServerDetails } from "../lib/serverExplain";
+import { ServerEditForm } from "../components/ServerEditForm";
+import { ServerRawEditor } from "../components/ServerRawEditor";
 
 // 去掉 MCP ID 前缀，只显示名称
 function formatMcpName(serverId: string): string {
@@ -36,6 +47,9 @@ export function ServersPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState("变更预览");
   const [pendingToggle, setPendingToggle] = useState<{ server_id: string; enabled: boolean } | null>(
+    null,
+  );
+  const [pendingEdit, setPendingEdit] = useState<{ server_id: string; draft: ServerEditDraft } | null>(
     null,
   );
 
@@ -74,6 +88,7 @@ export function ServersPage() {
     setBusy(true);
     setPreview(null);
     setPendingToggle({ server_id: s.server_id, enabled });
+    setPendingEdit(null);
     setPreviewTitle(`切换MCP：${s.server_id} → ${enabled ? "启用" : "停用"}`);
     try {
       const p = await api.serverPreviewToggle({ server_id: s.server_id, enabled });
@@ -86,13 +101,41 @@ export function ServersPage() {
     }
   }
 
-  async function applyToggle(expected_files: FilePrecondition[]) {
-    if (!pendingToggle) return;
+  async function requestEditPreview(server_id: string, draft: ServerEditDraft) {
     setBusy(true);
     try {
-      await api.serverApplyToggle({ ...pendingToggle, expected_files });
+      setPreview(null);
+      setPendingToggle(null);
+      setPendingEdit({ server_id, draft });
+      setPreviewTitle(`编辑MCP：${server_id}`);
+      const p = await api.serverPreviewEdit({ server_id, draft });
+      setPreview(p);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyPreview(expected_files: FilePrecondition[]) {
+    if (!pendingToggle && !pendingEdit) return;
+    setBusy(true);
+    try {
+      if (pendingToggle) {
+        await api.serverApplyToggle({ ...pendingToggle, expected_files });
+      } else if (pendingEdit) {
+        await api.serverApplyEdit({
+          ...pendingEdit,
+          expected_files,
+        });
+        setDetailsOpen(false);
+        setSelected(null);
+        setSelectedDetails(null);
+      }
       setPreviewOpen(false);
       setPendingToggle(null);
+      setPendingEdit(null);
       await load();
     } catch (e) {
       setError(e as AppError);
@@ -224,6 +267,8 @@ export function ServersPage() {
         onClose={() => setDetailsOpen(false)}
         basic={selected}
         full={selectedDetails}
+        busy={busy}
+        onRequestEditPreview={requestEditPreview}
       />
 
       <WritePreviewDialog
@@ -235,7 +280,7 @@ export function ServersPage() {
           if (busy) return;
           setPreviewOpen(false);
         }}
-        onConfirm={applyToggle}
+        onConfirm={applyPreview}
       />
     </div>
   );
@@ -246,17 +291,28 @@ function DetailsDrawer({
   onClose,
   basic,
   full,
+  busy,
+  onRequestEditPreview,
 }: {
   open: boolean;
   onClose: () => void;
   basic: ServerRecord | null;
   full: ServerRecord | null;
+  busy: boolean;
+  onRequestEditPreview: (server_id: string, draft: ServerEditDraft) => Promise<void>;
 }) {
   const s = full ?? basic;
   const canReveal = Boolean(s);
   const [reveal, setReveal] = useState(false);
   const [revealBusy, setRevealBusy] = useState(false);
   const [revealed, setRevealed] = useState<ServerRecord | null>(null);
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [editorTab, setEditorTab] = useState<"form" | "raw">("form");
+  const [editSession, setEditSession] = useState<ServerEditSession | null>(null);
+  const [workingDraft, setWorkingDraft] = useState<ServerEditDraft | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
   const [notes, setNotes] = useState<ServerNotes>(EMPTY_SERVER_NOTES);
   const [notesBusy, setNotesBusy] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
@@ -276,6 +332,13 @@ function DetailsDrawer({
     setDescriptionDraft("");
     setEditingFieldKey(null);
     setFieldDraft("");
+    setMode("view");
+    setEditorTab("form");
+    setEditSession(null);
+    setWorkingDraft(null);
+    setEditBusy(false);
+    setEditError(null);
+    setRawError(null);
   }, [s?.server_id, open]);
 
   useEffect(() => {
@@ -323,6 +386,10 @@ function DetailsDrawer({
 
   const shown = revealed ?? s;
   const explanation = shown ? explainServerDetails(shown, notes) : null;
+  const unknownFields =
+    editSession && workingDraft
+      ? Object.keys(workingDraft.payload).filter((key) => !editSession.field_meta.known_fields.includes(key)).sort()
+      : [];
 
   async function persistNotes(nextNotes: ServerNotes) {
     if (!s) return null;
@@ -382,6 +449,41 @@ function DetailsDrawer({
     setFieldDraft("");
   }
 
+  async function startEdit() {
+    if (!s) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const session = await api.serverGetEditSession({ server_id: s.server_id });
+      setEditSession(session);
+      setWorkingDraft({
+        transport: session.transport,
+        payload: session.raw_fragment_json,
+      });
+      setMode("edit");
+      setEditorTab("form");
+    } catch {
+      setEditError("配置编辑会话加载失败，请稍后重试。");
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  function updateDraftPayload(nextPayload: Record<string, unknown>) {
+    setWorkingDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        payload: nextPayload,
+      };
+    });
+  }
+
+  async function requestConfigPreview() {
+    if (!s || !workingDraft || rawError) return;
+    await onRequestEditPreview(s.server_id, workingDraft);
+  }
+
   if (!open) return null;
   return (
     <div
@@ -413,6 +515,101 @@ function DetailsDrawer({
         <div className="ui-dialogBody">
           {!s ? (
             <div className="ui-help">无内容</div>
+          ) : mode === "edit" && workingDraft && editSession ? (
+            <div style={{ display: "grid", gap: "12px" }}>
+              <div className="ui-card" style={{ padding: "16px" }}>
+                <div className="ui-label">名称</div>
+                <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
+                  {formatMcpName(s.server_id)}
+                </div>
+                <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <span className="ui-pill">
+                    <span className={`ui-pillDot ${s.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
+                    <span className="ui-code">{enabledLabel(s.enabled)}</span>
+                  </span>
+                  <span className="ui-pill">
+                    <span className="ui-pillDot" />
+                    <span className="ui-code">{clientLabel(s.client)}</span>
+                  </span>
+                  <span className="ui-pill">
+                    <span className="ui-pillDot" />
+                    <span className="ui-code">{transportLabel(workingDraft.transport)}</span>
+                  </span>
+                </div>
+                <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                  <div className="ui-help">编辑仅作用于当前 MCP 片段，保存前会先生成差异预览。</div>
+                  <div className="ui-btnRow">
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || editBusy}
+                      onClick={() => {
+                        setMode("view");
+                        setEditError(null);
+                        setRawError(null);
+                      }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || editBusy || Boolean(rawError)}
+                      onClick={requestConfigPreview}
+                    >
+                      生成预览
+                    </button>
+                  </div>
+                </div>
+                {editError ? (
+                  <div className="ui-help" style={{ marginTop: "10px" }}>
+                    {editError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="ui-card" style={{ padding: "16px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+                  <button
+                    type="button"
+                    className="ui-btn"
+                    disabled={busy || editBusy}
+                    onClick={() => setEditorTab("form")}
+                  >
+                    基础编辑
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn"
+                    disabled={busy || editBusy}
+                    onClick={() => setEditorTab("raw")}
+                  >
+                    高级编辑
+                  </button>
+                </div>
+
+                {editorTab === "form" ? (
+                  <ServerEditForm
+                    client={s.client}
+                    transport={workingDraft.transport}
+                    payload={workingDraft.payload}
+                    unknownFields={unknownFields}
+                    onChange={updateDraftPayload}
+                  />
+                ) : (
+                  <ServerRawEditor
+                    payload={workingDraft.payload}
+                    onChange={updateDraftPayload}
+                    onValidityChange={setRawError}
+                  />
+                )}
+              </div>
+
+              <div className="ui-card" style={{ padding: "16px" }}>
+                <div className="ui-label">来源文件</div>
+                <div className="ui-code" style={{ marginTop: "8px" }}>{editSession.source_file}</div>
+              </div>
+            </div>
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
               <div className="ui-card" style={{ padding: "16px" }}>
@@ -438,16 +635,31 @@ function DetailsDrawer({
                   <div className="ui-help">
                     {reveal ? "已尝试显示敏感值；原始配置中仍可能继续脱敏或被拒绝展示。" : "默认先展示说明化内容，原始配置可按需展开查看。"}
                   </div>
-                  <button
-                    type="button"
-                    className="ui-btn"
-                    disabled={!canReveal || revealBusy}
-                    onClick={() => toggleReveal(!reveal)}
-                    title="显示敏感值（若后端允许）"
-                  >
-                    {revealBusy ? "加载中..." : reveal ? "隐藏敏感值" : "显示敏感值"}
-                  </button>
+                  <div className="ui-btnRow">
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || editBusy}
+                      onClick={startEdit}
+                    >
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={!canReveal || revealBusy || busy}
+                      onClick={() => toggleReveal(!reveal)}
+                      title="显示敏感值（若后端允许）"
+                    >
+                      {revealBusy ? "加载中..." : reveal ? "隐藏敏感值" : "显示敏感值"}
+                    </button>
+                  </div>
                 </div>
+                {editError ? (
+                  <div className="ui-help" style={{ marginTop: "10px" }}>
+                    {editError}
+                  </div>
+                ) : null}
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>

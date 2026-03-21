@@ -74,6 +74,32 @@ pub struct ServerRecord {
     pub payload: serde_json::Map<String, serde_json::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerFieldMeta {
+    pub known_fields: Vec<String>,
+    pub secret_fields: Vec<String>,
+    pub readonly_fields: Vec<String>,
+    pub available_fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerEditSession {
+    pub server_id: String,
+    pub client: Client,
+    pub transport: Transport,
+    pub source_file: String,
+    pub editable_payload: serde_json::Map<String, serde_json::Value>,
+    pub raw_fragment_json: serde_json::Map<String, serde_json::Value>,
+    pub unknown_fields: Vec<String>,
+    pub field_meta: ServerFieldMeta,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerEditDraft {
+    pub transport: Transport,
+    pub payload: serde_json::Map<String, serde_json::Value>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ServerNotes {
     #[serde(default)]
@@ -160,6 +186,7 @@ pub struct WritePreview {
 pub enum BackupOp {
     Toggle,
     AddServer,
+    EditServer,
     ApplyProfile,
     Rollback,
 }

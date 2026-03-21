@@ -1,14 +1,15 @@
 # AIDevHub (MVP)
 
-AIDevHub 是一个本地桌面应用（Tauri v2 + Rust + React），用于集中管理 **Claude Code** 与 **OpenAI Codex** 的 MCP server 配置：查看、启用/禁用、新增、Profile 切换，并提供写入前 diff 预览与自动备份/回滚。
+AIDevHub 是一个本地桌面应用（Tauri v2 + Rust + React），用于集中管理 **Claude Code** 与 **OpenAI Codex** 的 MCP server 配置：查看、启用/禁用、新增、编辑、Profile 切换，并提供写入前 diff 预览与自动备份/回滚。
 
-## 当前实现范围（截至 2026-03-18）
+## 当前实现范围（截至 2026-03-21）
 
 已实现（P0）：
 
 - Servers 列表（Claude Code + Codex）
 - 单个 server 启用/禁用：`preview -> apply`，写入前 unified diff 预览；写入前自动备份
 - 新增 server（`stdio` / `http`）：`preview -> apply`
+- 编辑已有 server（结构化表单 + 高级 JSON 片段）：`preview -> apply`
 - Profiles：CRUD；按客户端收敛式 apply（启用集合精确等于 profile）
 - Skills：Codex skills + Claude commands（列表/详情/创建/启用禁用，写入前预览）
 - Backups：备份记录列表；回滚 `preview -> apply`

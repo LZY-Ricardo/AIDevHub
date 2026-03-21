@@ -6,7 +6,8 @@ use aidevhub_core::{
         backup_apply_rollback, backup_list, backup_preview_rollback, profile_apply,
         profile_create, profile_delete, profile_list, profile_preview_apply, profile_update,
         mcp_notes_get, mcp_notes_put, runtime_get_info, server_apply_add, server_apply_toggle,
-        server_get, server_list, server_preview_add, server_preview_toggle, AppPaths,
+        server_apply_edit, server_get, server_get_edit_session, server_list,
+        server_preview_add, server_preview_edit, server_preview_toggle, AppPaths,
     },
 };
 
@@ -399,4 +400,143 @@ fn add_server_preview_and_apply_for_codex_and_claude() {
     let got2 = server_get(&paths, "claude_code:s1", false).unwrap();
     assert!(got2.enabled);
     assert_eq!(got2.transport, Transport::Http);
+}
+
+#[test]
+fn server_get_edit_session_returns_editable_payload_for_claude() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write(
+        &paths.claude_config_path,
+        r#"{
+  "mcpServers": {
+    "demo": {
+      "command": "npx",
+      "args": ["-y", "@demo/server"],
+      "env": {"API_KEY": "secret"},
+      "x_extra": "keep-me"
+    }
+  }
+}"#,
+    );
+
+    let session = server_get_edit_session(&paths, "claude_code:demo").unwrap();
+    assert_eq!(session.server_id, "claude_code:demo");
+    assert!(session.unknown_fields.contains(&"x_extra".to_string()));
+    assert_eq!(
+        session
+            .raw_fragment_json
+            .get("command")
+            .and_then(|value| value.as_str()),
+        Some("npx")
+    );
+}
+
+#[test]
+fn claude_edit_preview_and_apply_updates_only_target_server() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write(
+        &paths.claude_config_path,
+        r#"{
+  "theme": "dark",
+  "mcpServers": {
+    "demo": {
+      "command": "old",
+      "args": ["a"],
+      "x_extra": "keep"
+    },
+    "other": {
+      "command": "stay"
+    }
+  }
+}"#,
+    );
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("command".into(), serde_json::json!("new"));
+    payload.insert("args".into(), serde_json::json!(["b"]));
+    payload.insert("x_extra".into(), serde_json::json!("keep"));
+
+    let preview = server_preview_edit(&paths, "claude_code:demo", Transport::Stdio, payload.clone()).unwrap();
+    assert!(preview.files[0].diff_unified.contains("\"command\": \"new\""));
+
+    server_apply_edit(
+        &paths,
+        "claude_code:demo",
+        Transport::Stdio,
+        payload,
+        preconditions_from_preview(&preview),
+    )
+    .unwrap();
+
+    let cfg = fs::read_to_string(&paths.claude_config_path).unwrap();
+    assert!(cfg.contains("\"theme\": \"dark\""));
+    assert!(cfg.contains("\"command\": \"new\""));
+    assert!(cfg.contains("\"other\""));
+    assert!(cfg.contains("\"stay\""));
+}
+
+#[test]
+fn codex_edit_updates_only_target_table_and_preserves_neighbors() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write(
+        &paths.codex_config_path,
+        r#"
+[mcp_servers.alpha]
+command = "old"
+args = ["a"]
+enabled = true
+
+[mcp_servers.beta]
+url = "https://keep.example.com/mcp"
+enabled = false
+"#,
+    );
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("command".into(), serde_json::json!("new"));
+    payload.insert("args".into(), serde_json::json!(["b"]));
+    payload.insert("enabled".into(), serde_json::json!(false));
+
+    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    server_apply_edit(
+        &paths,
+        "codex:alpha",
+        Transport::Stdio,
+        payload,
+        preconditions_from_preview(&preview),
+    )
+    .unwrap();
+
+    let cfg = fs::read_to_string(&paths.codex_config_path).unwrap();
+    assert!(cfg.contains("command = \"new\""));
+    assert!(cfg.contains("[mcp_servers.beta]"));
+    assert!(cfg.contains("url = \"https://keep.example.com/mcp\""));
+}
+
+#[test]
+fn codex_edit_rejects_nested_object_values() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write(
+        &paths.codex_config_path,
+        r#"
+[mcp_servers.alpha]
+command = "old"
+enabled = true
+"#,
+    );
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("command".into(), serde_json::json!("new"));
+    payload.insert("nested".into(), serde_json::json!({"bad": true}));
+
+    let err = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload).unwrap_err();
+    assert_eq!(err.code, "VALIDATION_ERROR");
 }

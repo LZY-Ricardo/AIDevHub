@@ -16,6 +16,8 @@ export function opLabel(op: BackupOp): string {
       return "开关切换";
     case "add_server":
       return "新增MCP";
+    case "edit_server":
+      return "编辑MCP";
     case "apply_profile":
       return "应用方案";
     case "rollback":

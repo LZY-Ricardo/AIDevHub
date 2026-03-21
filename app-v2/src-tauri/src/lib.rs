@@ -73,6 +73,15 @@ fn server_get(
 }
 
 #[tauri::command]
+fn server_get_edit_session(
+    app: tauri::AppHandle,
+    server_id: String,
+) -> Result<aidevhub_core::model::ServerEditSession, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::server_get_edit_session(&paths, &server_id)
+}
+
+#[tauri::command]
 fn server_notes_get(
     app: tauri::AppHandle,
     server_id: String,
@@ -143,6 +152,37 @@ fn server_apply_add(
         .cloned()
         .ok_or_else(|| AppError::new("VALIDATION_ERROR", "config must be an object"))?;
     ops::server_apply_add(&paths, client, &name, transport, cfg, expected_files)
+}
+
+#[tauri::command]
+fn server_preview_edit(
+    app: tauri::AppHandle,
+    server_id: String,
+    transport: Transport,
+    payload: serde_json::Value,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    let cfg = payload
+        .as_object()
+        .cloned()
+        .ok_or_else(|| AppError::new("VALIDATION_ERROR", "payload must be an object"))?;
+    ops::server_preview_edit(&paths, &server_id, transport, cfg)
+}
+
+#[tauri::command]
+fn server_apply_edit(
+    app: tauri::AppHandle,
+    server_id: String,
+    transport: Transport,
+    payload: serde_json::Value,
+    expected_files: Vec<FilePrecondition>,
+) -> Result<aidevhub_core::model::ApplyResult, AppError> {
+    let paths = resolve_paths(&app)?;
+    let cfg = payload
+        .as_object()
+        .cloned()
+        .ok_or_else(|| AppError::new("VALIDATION_ERROR", "payload must be an object"))?;
+    ops::server_apply_edit(&paths, &server_id, transport, cfg, expected_files)
 }
 
 #[tauri::command]
@@ -301,12 +341,15 @@ pub fn run() {
             runtime_get_info,
             server_list,
             server_get,
+            server_get_edit_session,
             server_notes_get,
             server_notes_put,
             server_preview_toggle,
             server_apply_toggle,
             server_preview_add,
             server_apply_add,
+            server_preview_edit,
+            server_apply_edit,
             profile_list,
             profile_create,
             profile_update,

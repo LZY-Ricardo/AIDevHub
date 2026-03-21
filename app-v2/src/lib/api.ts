@@ -5,6 +5,8 @@ import type {
   FilePrecondition,
   Profile,
   RuntimeInfo,
+  ServerEditDraft,
+  ServerEditSession,
   ServerNotes,
   ServerRecord,
   SkillGetResponse,
@@ -33,6 +35,12 @@ export const api = {
     return invokeCmd("server_get", {
       serverId: payload.server_id,
       revealSecrets: payload.reveal_secrets,
+    });
+  },
+
+  serverGetEditSession(payload: { server_id: string }): Promise<ServerEditSession> {
+    return invokeCmd("server_get_edit_session", {
+      serverId: payload.server_id,
     });
   },
 
@@ -86,6 +94,30 @@ export const api = {
       name: payload.name,
       transport: payload.transport,
       config: payload.config,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  serverPreviewEdit(payload: {
+    server_id: string;
+    draft: ServerEditDraft;
+  }): Promise<WritePreview> {
+    return invokeCmd("server_preview_edit", {
+      serverId: payload.server_id,
+      transport: payload.draft.transport,
+      payload: payload.draft.payload,
+    });
+  },
+
+  serverApplyEdit(payload: {
+    server_id: string;
+    draft: ServerEditDraft;
+    expected_files: FilePrecondition[];
+  }): Promise<ApplyResult> {
+    return invokeCmd("server_apply_edit", {
+      serverId: payload.server_id,
+      transport: payload.draft.transport,
+      payload: payload.draft.payload,
       expectedFiles: payload.expected_files,
     });
   },

@@ -34,6 +34,29 @@ export interface ServerRecord {
   payload: Record<string, unknown>;
 }
 
+export interface ServerFieldMeta {
+  known_fields: string[];
+  secret_fields: string[];
+  readonly_fields: string[];
+  available_fields: string[];
+}
+
+export interface ServerEditSession {
+  server_id: string;
+  client: Client;
+  transport: "stdio" | "http";
+  source_file: string;
+  editable_payload: Record<string, unknown>;
+  raw_fragment_json: Record<string, unknown>;
+  unknown_fields: string[];
+  field_meta: ServerFieldMeta;
+}
+
+export interface ServerEditDraft {
+  transport: "stdio" | "http";
+  payload: Record<string, unknown>;
+}
+
 export interface ServerNotes {
   description: string;
   field_hints: Record<string, string>;
@@ -82,7 +105,7 @@ export interface WritePreview {
   warnings: Warning[];
 }
 
-export type BackupOp = "toggle" | "add_server" | "apply_profile" | "rollback";
+export type BackupOp = "toggle" | "add_server" | "edit_server" | "apply_profile" | "rollback";
 
 export interface BackupRecord {
   backup_id: string;

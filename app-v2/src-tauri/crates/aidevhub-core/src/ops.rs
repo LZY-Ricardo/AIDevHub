@@ -611,6 +611,41 @@ fn to_server_record_codex(
     }
 }
 
+fn server_field_meta(client: Client, transport: Transport) -> ServerFieldMeta {
+    let (known_fields, readonly_fields) = match (client, transport) {
+        (Client::ClaudeCode, Transport::Stdio) => (
+            vec!["command", "args", "env"],
+            Vec::<&str>::new(),
+        ),
+        (Client::ClaudeCode, Transport::Http) => (
+            vec!["type", "url", "headers"],
+            vec!["type"],
+        ),
+        (Client::Codex, Transport::Stdio) => (
+            vec!["command", "args", "enabled"],
+            Vec::<&str>::new(),
+        ),
+        (Client::Codex, Transport::Http) => (
+            vec!["url", "bearer_token_env_var", "enabled"],
+            Vec::<&str>::new(),
+        ),
+        (_, Transport::Unknown) => (Vec::<&str>::new(), Vec::<&str>::new()),
+    };
+
+    ServerFieldMeta {
+        known_fields: known_fields.iter().map(|field| (*field).to_string()).collect(),
+        secret_fields: ["env", "headers"]
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect(),
+        readonly_fields: readonly_fields
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect(),
+        available_fields: known_fields.iter().map(|field| (*field).to_string()).collect(),
+    }
+}
+
 pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppError> {
     let exists = RuntimeExists {
         claude_config: paths.claude_config_path.exists(),
@@ -730,6 +765,29 @@ pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result
             Ok(to_server_record_codex(&name, enabled, &paths.codex_config_path, st, reveal))
         }
     }
+}
+
+pub fn server_get_edit_session(paths: &AppPaths, server_id_str: &str) -> Result<ServerEditSession, AppError> {
+    let record = server_get(paths, server_id_str, true)?;
+    let field_meta = server_field_meta(record.client, record.transport);
+    let mut unknown_fields = record
+        .payload
+        .keys()
+        .filter(|key| !field_meta.known_fields.iter().any(|known| known == *key))
+        .cloned()
+        .collect::<Vec<_>>();
+    unknown_fields.sort();
+
+    Ok(ServerEditSession {
+        server_id: record.server_id,
+        client: record.client,
+        transport: record.transport,
+        source_file: record.source_file,
+        editable_payload: record.payload.clone(),
+        raw_fragment_json: record.payload,
+        unknown_fields,
+        field_meta,
+    })
 }
 
 pub fn mcp_notes_get(paths: &AppPaths, server_id_str: &str) -> Result<ServerNotes, AppError> {
@@ -1438,6 +1496,213 @@ fn plan_add_server(
     Ok(planned)
 }
 
+fn ensure_string_array(payload: &serde_json::Map<String, Value>, key: &str) -> Result<(), CoreError> {
+    let Some(value) = payload.get(key) else {
+        return Ok(());
+    };
+    let Some(items) = value.as_array() else {
+        return Err(CoreError::Validation(format!("{key} must be an array of strings")));
+    };
+    if items.iter().all(|item| item.as_str().is_some()) {
+        Ok(())
+    } else {
+        Err(CoreError::Validation(format!("{key} must be an array of strings")))
+    }
+}
+
+fn ensure_string_map(payload: &serde_json::Map<String, Value>, key: &str) -> Result<(), CoreError> {
+    let Some(value) = payload.get(key) else {
+        return Ok(());
+    };
+    let Some(map) = value.as_object() else {
+        return Err(CoreError::Validation(format!("{key} must be an object of strings")));
+    };
+    if map.values().all(|item| item.as_str().is_some()) {
+        Ok(())
+    } else {
+        Err(CoreError::Validation(format!("{key} must be an object of strings")))
+    }
+}
+
+fn require_non_empty_string(payload: &serde_json::Map<String, Value>, key: &str) -> Result<(), CoreError> {
+    let value = payload
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if value.is_some() {
+        Ok(())
+    } else {
+        Err(CoreError::Validation(format!("{key} is required")))
+    }
+}
+
+fn normalize_server_payload(
+    client: Client,
+    transport: Transport,
+    mut payload: serde_json::Map<String, Value>,
+) -> Result<serde_json::Map<String, Value>, CoreError> {
+    match transport {
+        Transport::Stdio => {
+            require_non_empty_string(&payload, "command")?;
+            ensure_string_array(&payload, "args")?;
+            ensure_string_map(&payload, "env")?;
+            if let Some(Value::String(command)) = payload.get_mut("command") {
+                *command = command.trim().to_string();
+            }
+        }
+        Transport::Http => {
+            require_non_empty_string(&payload, "url")?;
+            if let Some(Value::String(url)) = payload.get_mut("url") {
+                *url = url.trim().to_string();
+            }
+            match client {
+                Client::ClaudeCode => {
+                    ensure_string_map(&payload, "headers")?;
+                    payload.insert("type".to_string(), Value::String("http".to_string()));
+                }
+                Client::Codex => {
+                    if let Some(value) = payload.get("bearer_token_env_var") {
+                        if value.as_str().map(str::trim).filter(|value| !value.is_empty()).is_none() {
+                            return Err(CoreError::Validation(
+                                "bearer_token_env_var must be a non-empty string".to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Transport::Unknown => {
+            return Err(CoreError::Validation("transport cannot be unknown".to_string()));
+        }
+    }
+
+    if client == Client::ClaudeCode {
+        payload.remove("enabled");
+    }
+
+    Ok(payload)
+}
+
+fn apply_codex_payload_to_table(
+    table: &mut Table,
+    payload: &serde_json::Map<String, Value>,
+) -> Result<(), CoreError> {
+    let existing_keys = table.iter().map(|(key, _)| key.to_string()).collect::<Vec<_>>();
+    for key in existing_keys {
+        if !payload.contains_key(&key) {
+            table.remove(&key);
+        }
+    }
+
+    for (key, value) in payload {
+        match value {
+            Value::String(v) => {
+                table[key] = toml_edit::value(v.clone());
+            }
+            Value::Bool(v) => {
+                table[key] = toml_edit::value(*v);
+            }
+            Value::Number(v) => {
+                if let Some(i) = v.as_i64() {
+                    table[key] = toml_edit::value(i);
+                } else if let Some(f) = v.as_f64() {
+                    table[key] = toml_edit::value(f);
+                } else {
+                    return Err(CoreError::Validation(format!("unsupported codex value type: {key}")));
+                }
+            }
+            Value::Array(items) if items.iter().all(|item| item.as_str().is_some()) => {
+                let mut arr = toml_edit::Array::new();
+                for item in items {
+                    arr.push(item.as_str().unwrap());
+                }
+                table[key] = Item::Value(TomlValue::Array(arr));
+            }
+            _ => {
+                return Err(CoreError::Validation(format!("unsupported codex value type: {key}")));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraft) -> Result<PlannedWrite, CoreError> {
+    let (client, name) = parse_server_id(server_id_str)?;
+    let mut planned = PlannedWrite {
+        files: vec![],
+        moves: vec![],
+        expected_files: vec![],
+        summary: WriteSummary::default(),
+        warnings: vec![],
+        backup_op: BackupOp::EditServer,
+    };
+
+    match client {
+        Client::ClaudeCode => {
+            let (root, mut servers) = parse_claude_config(&paths.claude_config_path)?;
+            let mut pool = load_disabled_pool(&paths.disabled_pool_path)?;
+            let normalized = normalize_server_payload(client, draft.transport, draft.payload)?;
+
+            if let Some(existing) = servers.get(&name) {
+                if claude_transport(existing) != draft.transport {
+                    return Err(CoreError::Validation("transport cannot change".to_string()));
+                }
+                servers.insert(name, Value::Object(normalized));
+                let before_cfg = read_to_string_opt(&paths.claude_config_path)?;
+                let after_cfg = write_claude_config(root, servers)?;
+                planned.files.push(PlannedFileWrite {
+                    path: paths.claude_config_path.clone(),
+                    before: before_cfg,
+                    after: after_cfg,
+                });
+                return Ok(planned);
+            }
+
+            if let Some(existing) = pool.get(&name) {
+                if claude_transport(existing) != draft.transport {
+                    return Err(CoreError::Validation("transport cannot change".to_string()));
+                }
+                pool.insert(name, Value::Object(normalized));
+                let before_pool = read_to_string_opt(&paths.disabled_pool_path)?;
+                let after_pool = save_disabled_pool(&pool)?;
+                planned.files.push(PlannedFileWrite {
+                    path: paths.disabled_pool_path.clone(),
+                    before: before_pool,
+                    after: after_pool,
+                });
+                return Ok(planned);
+            }
+
+            Err(CoreError::NotFound(format!("server not found: {server_id_str}")))
+        }
+        Client::Codex => {
+            let mut doc = parse_codex_doc(&paths.codex_config_path)?;
+            let before = read_to_string_opt(&paths.codex_config_path)?;
+            let normalized = normalize_server_payload(client, draft.transport, draft.payload)?;
+            let servers = codex_mcp_servers_table_mut(&mut doc);
+            let Some(item) = servers.get_mut(&name) else {
+                return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
+            };
+            let Some(table) = item.as_table_mut() else {
+                return Err(CoreError::Parse(format!("invalid codex server table: {server_id_str}")));
+            };
+            if codex_get_transport(table) != draft.transport {
+                return Err(CoreError::Validation("transport cannot change".to_string()));
+            }
+
+            apply_codex_payload_to_table(table, &normalized)?;
+            planned.files.push(PlannedFileWrite {
+                path: paths.codex_config_path.clone(),
+                before,
+                after: doc.to_string(),
+            });
+            Ok(planned)
+        }
+    }
+}
+
 fn build_preview(planned: PlannedWrite) -> Result<WritePreview, CoreError> {
     let mut files = Vec::new();
     let mut expected_map: BTreeMap<String, Option<String>> = BTreeMap::new();
@@ -1572,6 +1837,37 @@ pub fn server_apply_add(
     expected: Vec<FilePrecondition>,
 ) -> Result<ApplyResult, AppError> {
     let planned = plan_add_server(paths, client, name, transport, config).map_err(AppError::from)?;
+    apply_planned(paths, planned, &expected).map_err(AppError::from)
+}
+
+pub fn server_preview_edit(
+    paths: &AppPaths,
+    server_id_str: &str,
+    transport: Transport,
+    payload: serde_json::Map<String, Value>,
+) -> Result<WritePreview, AppError> {
+    let planned = plan_edit_server(
+        paths,
+        server_id_str,
+        ServerEditDraft { transport, payload },
+    )
+    .map_err(AppError::from)?;
+    build_preview(planned).map_err(AppError::from)
+}
+
+pub fn server_apply_edit(
+    paths: &AppPaths,
+    server_id_str: &str,
+    transport: Transport,
+    payload: serde_json::Map<String, Value>,
+    expected: Vec<FilePrecondition>,
+) -> Result<ApplyResult, AppError> {
+    let planned = plan_edit_server(
+        paths,
+        server_id_str,
+        ServerEditDraft { transport, payload },
+    )
+    .map_err(AppError::from)?;
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
