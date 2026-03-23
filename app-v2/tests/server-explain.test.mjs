@@ -58,3 +58,27 @@ test("缺少 field_hints 时仍能回退到自动说明", () => {
     "启动本地 MCP 服务的命令。",
   );
 });
+
+test("配置说明返回默认摘要字段并统计剩余数量", () => {
+  const result = explainServerDetails(
+    {
+      ...baseServer,
+      server_id: "codex:neon",
+      name: "neon",
+      transport: "http",
+      payload: {
+        headers: { Authorization: "***" },
+        type: "http",
+        url: "https://mcp.neon.tech/mcp",
+        timeout_ms: 5000,
+      },
+    },
+    { description: "", field_hints: {} },
+  );
+
+  assert.deepEqual(
+    result.summary_fields?.map((field) => field.key),
+    ["type", "url", "headers"],
+  );
+  assert.equal(result.hidden_field_count, 1);
+});

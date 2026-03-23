@@ -10,6 +10,8 @@ export interface ExplainedServerField {
 export interface ExplainedServerDetails {
   description: string;
   fields: ExplainedServerField[];
+  summary_fields: ExplainedServerField[];
+  hidden_field_count: number;
 }
 
 const KNOWN_SERVER_DESCRIPTIONS: Record<string, string> = {
@@ -29,6 +31,9 @@ const KNOWN_FIELD_HINTS: Record<string, string> = {
   enabled: "标记当前 MCP 是否启用。",
   type: "声明 MCP 的连接方式或服务类型。",
 };
+
+const SUMMARY_FIELD_PRIORITY = ["type", "url", "command", "args", "headers", "env", "enabled"];
+const DEFAULT_SUMMARY_FIELD_LIMIT = 3;
 
 function normalizeKey(value: string): string {
   return value.trim().toLowerCase();
@@ -64,6 +69,23 @@ function explainFieldHint(key: string): string {
   return KNOWN_FIELD_HINTS[normalizeKey(key)] ?? "该项来自 MCP 原始配置，当前暂无内置说明。";
 }
 
+function sortSummaryFields(fields: ExplainedServerField[]): ExplainedServerField[] {
+  return fields
+    .map((field, index) => ({ field, index }))
+    .sort((left, right) => {
+      const leftRank = SUMMARY_FIELD_PRIORITY.indexOf(normalizeKey(left.field.key));
+      const rightRank = SUMMARY_FIELD_PRIORITY.indexOf(normalizeKey(right.field.key));
+      const normalizedLeftRank = leftRank === -1 ? SUMMARY_FIELD_PRIORITY.length : leftRank;
+      const normalizedRightRank = rightRank === -1 ? SUMMARY_FIELD_PRIORITY.length : rightRank;
+
+      if (normalizedLeftRank !== normalizedRightRank) {
+        return normalizedLeftRank - normalizedRightRank;
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.field);
+}
+
 export function explainServerDetails(server: ServerRecord, notes: ServerNotes): ExplainedServerDetails {
   const description = (notes.description ?? "").trim() || explainDescription(server);
   const fieldHints = notes.field_hints ?? {};
@@ -73,9 +95,13 @@ export function explainServerDetails(server: ServerRecord, notes: ServerNotes): 
     display_value: formatScalar(value),
     hint: fieldHints[key]?.trim() || explainFieldHint(key),
   }));
+  const summary_fields = sortSummaryFields(fields).slice(0, DEFAULT_SUMMARY_FIELD_LIMIT);
+  const hidden_field_count = Math.max(fields.length - summary_fields.length, 0);
 
   return {
     description,
     fields,
+    summary_fields,
+    hidden_field_count,
   };
 }

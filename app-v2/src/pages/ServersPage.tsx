@@ -14,7 +14,7 @@ import { clientLabel, enabledLabel, transportLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
-import { explainServerDetails } from "../lib/serverExplain";
+import { explainServerDetails, type ExplainedServerField } from "../lib/serverExplain";
 import { ServerEditForm } from "../components/ServerEditForm";
 import { ServerRawEditor } from "../components/ServerRawEditor";
 
@@ -32,6 +32,9 @@ const EMPTY_SERVER_NOTES: ServerNotes = {
   description: "",
   field_hints: {},
 };
+
+const DETAIL_CARD_PADDING = "12px";
+const DETAIL_STACK_GAP = "10px";
 
 export function ServersPage() {
   const [client, setClient] = useState<Client>("claude_code");
@@ -320,6 +323,9 @@ function DetailsDrawer({
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null);
   const [fieldDraft, setFieldDraft] = useState("");
+  const [configPanelOpen, setConfigPanelOpen] = useState(false);
+  const [configViewMode, setConfigViewMode] = useState<"summary" | "raw">("summary");
+  const [detailPanel, setDetailPanel] = useState<"none" | "fields" | "raw">("none");
 
   useEffect(() => {
     setReveal(false);
@@ -332,6 +338,9 @@ function DetailsDrawer({
     setDescriptionDraft("");
     setEditingFieldKey(null);
     setFieldDraft("");
+    setConfigPanelOpen(false);
+    setConfigViewMode("summary");
+    setDetailPanel("none");
     setMode("view");
     setEditorTab("form");
     setEditSession(null);
@@ -386,6 +395,10 @@ function DetailsDrawer({
 
   const shown = revealed ?? s;
   const explanation = shown ? explainServerDetails(shown, notes) : null;
+  const summaryFields = explanation?.summary_fields ?? [];
+  const remainingFields = (explanation?.fields ?? []).filter(
+    (field) => !summaryFields.some((summaryField) => summaryField.key === field.key),
+  );
   const unknownFields =
     editSession && workingDraft
       ? Object.keys(workingDraft.payload).filter((key) => !editSession.field_meta.known_fields.includes(key)).sort()
@@ -447,6 +460,109 @@ function DetailsDrawer({
     if (!saved) return;
     setEditingFieldKey(null);
     setFieldDraft("");
+  }
+
+  function toggleDetailPanel(nextPanel: "fields" | "raw") {
+    setEditingFieldKey(null);
+    setFieldDraft("");
+    setDetailPanel((current) => (current === nextPanel ? "none" : nextPanel));
+  }
+
+  function toggleConfigPanel() {
+    setEditingFieldKey(null);
+    setFieldDraft("");
+    setConfigPanelOpen((current) => {
+      if (current) {
+        setDetailPanel("none");
+        setConfigViewMode("summary");
+      }
+      return !current;
+    });
+  }
+
+  function switchConfigViewMode(nextMode: "summary" | "raw") {
+    setConfigViewMode(nextMode);
+    if (nextMode === "raw") {
+      setDetailPanel("none");
+    }
+  }
+
+  function renderFieldCard(field: ExplainedServerField, compact = false) {
+    return (
+      <div
+        key={field.key}
+        style={{
+          border: "1px solid var(--color-border)",
+          borderRadius: 12,
+          padding: compact ? "10px 12px" : "12px",
+          display: "grid",
+          gap: "8px",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "start" }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="ui-code" style={{ fontWeight: 700 }}>
+              {field.key}
+            </div>
+            <div className="ui-code" style={{ marginTop: "6px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {field.display_value}
+            </div>
+          </div>
+          {editingFieldKey !== field.key ? (
+            <button
+              type="button"
+              className="ui-btn"
+              disabled={notesBusy}
+              onClick={() => startFieldEdit(field.key, field.hint)}
+            >
+              编辑字段说明
+            </button>
+          ) : null}
+        </div>
+        {editingFieldKey === field.key ? (
+          <div style={{ display: "grid", gap: "10px" }}>
+            <textarea
+              value={fieldDraft}
+              onChange={(e) => setFieldDraft(e.target.value)}
+              rows={3}
+              style={{
+                width: "100%",
+                resize: "vertical",
+                borderRadius: 12,
+                border: "1px solid var(--color-border)",
+                padding: "10px 12px",
+                font: "inherit",
+                background: "var(--color-panel)",
+                color: "var(--color-text)",
+              }}
+            />
+            <div className="ui-btnRow">
+              <button
+                type="button"
+                className="ui-btn"
+                disabled={notesBusy}
+                onClick={() => saveFieldHint(field.key)}
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                className="ui-btn"
+                disabled={notesBusy}
+                onClick={() => {
+                  setEditingFieldKey(null);
+                  setFieldDraft("");
+                }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="ui-help">{field.hint}</div>
+        )}
+      </div>
+    );
   }
 
   async function startEdit() {
@@ -516,8 +632,8 @@ function DetailsDrawer({
           {!s ? (
             <div className="ui-help">无内容</div>
           ) : mode === "edit" && workingDraft && editSession ? (
-            <div style={{ display: "grid", gap: "12px" }}>
-              <div className="ui-card" style={{ padding: "16px" }}>
+            <div style={{ display: "grid", gap: DETAIL_STACK_GAP }}>
+              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div className="ui-label">名称</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
                   {formatMcpName(s.server_id)}
@@ -536,8 +652,10 @@ function DetailsDrawer({
                     <span className="ui-code">{transportLabel(workingDraft.transport)}</span>
                   </span>
                 </div>
-                <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                  <div className="ui-help">编辑仅作用于当前 MCP 片段，保存前会先生成差异预览。</div>
+                <div style={{ marginTop: "8px" }} className="ui-code">
+                  来源文件：{editSession.source_file}
+                </div>
+                <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", gap: "10px" }}>
                   <div className="ui-btnRow">
                     <button
                       type="button"
@@ -568,7 +686,7 @@ function DetailsDrawer({
                 ) : null}
               </div>
 
-              <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
                   <button
                     type="button"
@@ -605,19 +723,15 @@ function DetailsDrawer({
                 )}
               </div>
 
-              <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">来源文件</div>
-                <div className="ui-code" style={{ marginTop: "8px" }}>{editSession.source_file}</div>
-              </div>
             </div>
           ) : (
-            <div style={{ display: "grid", gap: "12px" }}>
-              <div className="ui-card" style={{ padding: "16px" }}>
+            <div style={{ display: "grid", gap: DETAIL_STACK_GAP }}>
+              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div className="ui-label">名称</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
                   {formatMcpName(shown!.server_id)}
                 </div>
-                <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <span className="ui-pill">
                     <span className={`ui-pillDot ${shown!.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
                     <span className="ui-code">{enabledLabel(shown!.enabled)}</span>
@@ -631,10 +745,10 @@ function DetailsDrawer({
                     <span className="ui-code">{transportLabel(shown!.transport)}</span>
                   </span>
                 </div>
-                <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                  <div className="ui-help">
-                    {reveal ? "已尝试显示敏感值；原始配置中仍可能继续脱敏或被拒绝展示。" : "默认先展示说明化内容，原始配置可按需展开查看。"}
-                  </div>
+                <div style={{ marginTop: "8px" }} className="ui-code">
+                  来源文件：{shown!.source_file}
+                </div>
+                <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                   <div className="ui-btnRow">
                     <button
                       type="button"
@@ -642,32 +756,32 @@ function DetailsDrawer({
                       disabled={busy || editBusy}
                       onClick={startEdit}
                     >
-                      编辑
+                      编辑配置
                     </button>
                     <button
                       type="button"
                       className="ui-btn"
                       disabled={!canReveal || revealBusy || busy}
                       onClick={() => toggleReveal(!reveal)}
-                      title="显示敏感值（若后端允许）"
+                      title="显示敏感信息（若后端允许）"
                     >
-                      {revealBusy ? "加载中..." : reveal ? "隐藏敏感值" : "显示敏感值"}
+                      {revealBusy ? "加载中..." : reveal ? "隐藏敏感信息" : "显示敏感信息"}
                     </button>
                   </div>
                 </div>
                 {editError ? (
-                  <div className="ui-help" style={{ marginTop: "10px" }}>
+                  <div className="ui-help" style={{ marginTop: "8px" }}>
                     {editError}
                   </div>
                 ) : null}
               </div>
 
-              <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
                   <div className="ui-label">功能作用</div>
                   {!editingDescription ? (
                     <button type="button" className="ui-btn" disabled={notesBusy} onClick={startDescriptionEdit}>
-                      编辑
+                      编辑功能说明
                     </button>
                   ) : null}
                 </div>
@@ -706,117 +820,77 @@ function DetailsDrawer({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ marginTop: "10px", lineHeight: 1.7 }}>{explanation?.description}</div>
+                  <div style={{ marginTop: "8px", lineHeight: 1.6 }}>{explanation?.description}</div>
                 )}
                 {notesError ? (
-                  <div className="ui-help" style={{ marginTop: "10px" }}>
+                  <div className="ui-help" style={{ marginTop: "8px" }}>
                     {notesError}
                   </div>
                 ) : null}
               </div>
 
-              <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">来源文件</div>
-                <div className="ui-code" style={{ marginTop: "8px" }}>
-                  {shown!.source_file}
-                </div>
-              </div>
-
-              <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">配置说明</div>
-                <div style={{ marginTop: "10px", display: "grid", gap: "10px" }}>
-                  {(explanation?.fields ?? []).length > 0 ? (
-                    explanation?.fields.map((field) => (
-                      <div
-                        key={field.key}
-                        style={{
-                          border: "1px solid var(--color-border)",
-                          borderRadius: 12,
-                          padding: "12px",
-                          display: "grid",
-                          gap: "8px",
-                        }}
+              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="ui-label">配置说明</div>
+                  <div className="ui-btnRow">
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={notesBusy}
+                      onClick={toggleConfigPanel}
+                    >
+                      {configPanelOpen ? "收起配置说明" : "展开配置说明"}
+                    </button>
+                    {configPanelOpen && configViewMode === "summary" && remainingFields.length > 0 ? (
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={notesBusy}
+                        onClick={() => toggleDetailPanel("fields")}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "start" }}>
-                          <div style={{ minWidth: 0 }}>
-                            <div className="ui-code" style={{ fontWeight: 700 }}>
-                              {field.key}
-                            </div>
-                            <div className="ui-code" style={{ marginTop: "6px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                              {field.display_value}
-                            </div>
-                          </div>
-                          {editingFieldKey !== field.key ? (
-                            <button
-                              type="button"
-                              className="ui-btn"
-                              disabled={notesBusy}
-                              onClick={() => startFieldEdit(field.key, field.hint)}
-                            >
-                              编辑
-                            </button>
-                          ) : null}
-                        </div>
-                        {editingFieldKey === field.key ? (
-                          <div style={{ display: "grid", gap: "10px" }}>
-                            <textarea
-                              value={fieldDraft}
-                              onChange={(e) => setFieldDraft(e.target.value)}
-                              rows={3}
-                              style={{
-                                width: "100%",
-                                resize: "vertical",
-                                borderRadius: 12,
-                                border: "1px solid var(--color-border)",
-                                padding: "10px 12px",
-                                font: "inherit",
-                                background: "var(--color-panel)",
-                                color: "var(--color-text)",
-                              }}
-                            />
-                            <div className="ui-btnRow">
-                              <button
-                                type="button"
-                                className="ui-btn"
-                                disabled={notesBusy}
-                                onClick={() => saveFieldHint(field.key)}
-                              >
-                                保存
-                              </button>
-                              <button
-                                type="button"
-                                className="ui-btn"
-                                disabled={notesBusy}
-                                onClick={() => {
-                                  setEditingFieldKey(null);
-                                  setFieldDraft("");
-                                }}
-                              >
-                                取消
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="ui-help">{field.hint}</div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="ui-help">暂无可解释的配置项。</div>
-                  )}
-                </div>
-                <details style={{ marginTop: "14px" }}>
-                  <summary className="ui-label" style={{ cursor: "pointer" }}>
-                    原始配置
-                  </summary>
-                  <div style={{ marginTop: "10px" }}>
-                    <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
+                        {detailPanel === "fields" ? "收起其余说明" : `展开其余 ${remainingFields.length} 项`}
+                      </button>
+                    ) : null}
+                    {configPanelOpen ? (
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={notesBusy}
+                        onClick={() => switchConfigViewMode(configViewMode === "summary" ? "raw" : "summary")}
+                      >
+                        {configViewMode === "summary" ? "切换到原始配置" : "切换到配置摘要"}
+                      </button>
+                    ) : null}
                   </div>
-                </details>
-              </div>
-
-              <div className="ui-help" style={{ marginTop: "-2px" }}>
-                说明支持人工编辑，默认会先展示自动生成结果。
+                </div>
+                {configPanelOpen && configViewMode === "summary" ? (
+                  <>
+                    <div className="ui-label" style={{ marginTop: "8px" }}>配置摘要</div>
+                    <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                      {summaryFields.length > 0 ? (
+                        summaryFields.map((field) => renderFieldCard(field, true))
+                      ) : (
+                        <div className="ui-help">暂无可解释的配置项。</div>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+                {configPanelOpen && configViewMode === "summary" && detailPanel === "fields" && remainingFields.length > 0 ? (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--color-border)" }}>
+                    <div className="ui-label">其余配置说明</div>
+                    <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                      {remainingFields.map((field) => renderFieldCard(field))}
+                    </div>
+                  </div>
+                ) : null}
+                {configPanelOpen && configViewMode === "raw" ? (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--color-border)" }}>
+                    <div className="ui-label">原始配置</div>
+                    <div style={{ marginTop: "8px" }}>
+                      <pre className="ui-pre">{JSON.stringify(shown!.payload, null, 2)}</pre>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
