@@ -132,14 +132,21 @@ export function BackupsPage() {
       </div>
 
       <div className="ui-tableWrap">
-        <table className="ui-table" aria-label="备份列表">
+        <table className="ui-table ui-tableBackups ui-tableNoStickyLastCol" aria-label="备份列表">
+          <colgroup>
+            <col className="ui-colBackupCreatedAt" />
+            <col className="ui-colBackupOp" />
+            <col className="ui-colBackupTarget" />
+            <col className="ui-colBackupSummary" />
+            <col className="ui-colBackupAction" />
+          </colgroup>
           <thead>
             <tr>
               <th className="ui-th">创建时间</th>
               <th className="ui-th">操作类型</th>
               <th className="ui-th">目标文件</th>
               <th className="ui-th">摘要</th>
-              <th className="ui-th" style={{ width: 160 }}>
+              <th className="ui-th ui-tableColAction">
                 操作
               </th>
             </tr>
@@ -154,17 +161,18 @@ export function BackupsPage() {
                     <span className="ui-code">{opLabel(b.op)}</span>
                   </span>
                 </td>
-                <td
-                  className="ui-td ui-code"
-                  style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}
-                >
-                  {b.target_path}
-                </td>
-                <td className="ui-td" style={{ color: "var(--color-muted)" }}>
-                  {b.summary}
+                <td className="ui-td">
+                  <div className="ui-code ui-ellipsis ui-backupTargetText" title={b.target_path}>
+                    {b.target_path}
+                  </div>
                 </td>
                 <td className="ui-td">
-                  <div className="ui-btnRow">
+                  <div className="ui-ellipsis ui-backupSummaryText" title={b.summary}>
+                    {b.summary}
+                  </div>
+                </td>
+                <td className="ui-td ui-tableColAction">
+                  <div className="ui-btnRow ui-tableActionRow">
                     <button
                       type="button"
                       className="ui-btn ui-btnPrimary"

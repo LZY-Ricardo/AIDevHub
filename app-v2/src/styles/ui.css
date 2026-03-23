@@ -325,6 +325,27 @@
   width: 10rem;
 }
 
+.ui-tableBackups {
+  width: auto;
+  min-width: 0;
+}
+
+.ui-tableBackups col.ui-colBackupCreatedAt {
+  width: 13rem;
+}
+
+.ui-tableBackups col.ui-colBackupOp {
+  width: 8rem;
+}
+
+.ui-tableBackups col.ui-colBackupSummary {
+  width: 10rem;
+}
+
+.ui-tableBackups col.ui-colBackupAction {
+  width: 10rem;
+}
+
 .ui-tableSkills {
   width: auto;
   min-width: 0;
@@ -366,6 +387,15 @@
 
 .ui-skillMetaPill {
   max-width: 8rem;
+}
+
+.ui-backupTargetText {
+  max-width: clamp(15rem, 34vw, 28rem);
+}
+
+.ui-backupSummaryText {
+  max-width: clamp(7rem, 12vw, 10rem);
+  color: var(--color-muted);
 }
 
 .ui-pillText {
