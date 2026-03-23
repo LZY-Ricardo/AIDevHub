@@ -14,3 +14,11 @@ test("高级编辑不会在 payload 变化时无条件重置文本", () => {
 test("高级编辑会跟踪最近一次本地提交的 payload", () => {
   assert.match(source, /lastAppliedPayloadRef/);
 });
+
+test("高级编辑提供格式化按钮", () => {
+  assert.match(source, /格式化/);
+});
+
+test("高级编辑具备独立的格式化处理逻辑", () => {
+  assert.match(source, /function handleFormat\(\)/);
+});

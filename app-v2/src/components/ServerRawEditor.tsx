@@ -49,9 +49,38 @@ export function ServerRawEditor({
     }
   }
 
+  function handleFormat() {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        const nextError = "高级编辑只支持 JSON 对象片段。";
+        setError(nextError);
+        onValidityChange(nextError);
+        return;
+      }
+
+      const nextPayload = parsed as Record<string, unknown>;
+      const formatted = JSON.stringify(nextPayload, null, 2);
+      lastAppliedPayloadRef.current = payloadSignature(nextPayload);
+      setText(formatted);
+      setError(null);
+      onValidityChange(null);
+      onChange(nextPayload);
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "JSON 解析失败";
+      setError(nextError);
+      onValidityChange(nextError);
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: "10px" }}>
-      <div className="ui-label">高级编辑</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+        <div className="ui-label">高级编辑</div>
+        <button type="button" className="ui-btn" onClick={handleFormat}>
+          格式化
+        </button>
+      </div>
       <textarea
         className="ui-textarea ui-code"
         rows={18}
