@@ -56,7 +56,13 @@ const DETAIL_ACTION_BUTTON_STYLE = {
   whiteSpace: "nowrap",
 } as const;
 
-export function ServersPage() {
+export function ServersPage({
+  onCheckConfigUpdates,
+  configCheckBusy,
+}: {
+  onCheckConfigUpdates: () => Promise<void>;
+  configCheckBusy: boolean;
+}) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
@@ -185,6 +191,9 @@ export function ServersPage() {
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
               <Icon name="refresh" /> 刷新
+            </button>
+            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy}>
+              <Icon name="refresh" /> 手动检查更新
             </button>
           </div>
         </div>
@@ -676,7 +685,7 @@ function DetailsDrawer({
                   </span>
                 </div>
                 <div style={{ marginTop: "8px" }} className="ui-code">
-                  来源文件：{editSession.source_file}
+                  当前来源：{editSession.source_file}
                 </div>
                 <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", gap: "10px" }}>
                   <div className="ui-btnRow">
@@ -771,7 +780,7 @@ function DetailsDrawer({
                       </span>
                     </div>
                     <div style={{ marginTop: "8px" }} className="ui-code">
-                      来源文件：{shown!.source_file}
+                      当前来源：{shown!.source_file}
                     </div>
                   </div>
                   <div style={{ ...DETAIL_ACTION_ROW_STYLE, justifySelf: "end", alignSelf: "center" }}>

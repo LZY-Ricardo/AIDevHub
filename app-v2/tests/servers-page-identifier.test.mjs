@@ -41,9 +41,10 @@ test('MCP 详情抽屉使用统一的紧凑卡片内边距', () => {
   assert.match(source, /const DETAIL_CARD_PADDING = "12px"/);
 });
 
-test('MCP 详情抽屉不再保留独立的来源文件卡片', () => {
-  assert.doesNotMatch(source, /<div className="ui-label">来源文件<\/div>\s*[\r\n]+\s*<div className="ui-code"/);
-  assert.match(source, /来源文件：/);
+test('MCP 详情抽屉不再保留独立的当前来源卡片', () => {
+  assert.doesNotMatch(source, /<div className="ui-label">当前来源<\/div>\s*[\r\n]+\s*<div className="ui-code"/);
+  assert.match(source, /当前来源：/);
+  assert.doesNotMatch(source, /来源文件/);
 });
 
 test('MCP 详情抽屉移除配置区默认说明文案', () => {

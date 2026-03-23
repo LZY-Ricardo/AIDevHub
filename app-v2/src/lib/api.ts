@@ -2,6 +2,11 @@ import type {
   ApplyResult,
   BackupRecord,
   Client,
+  ConfigConfirmMcpRequest,
+  ConfigConfirmMcpResponse,
+  ConfigCheckUpdatesResponse,
+  ConfigIgnoreCondition,
+  ConfigIgnoreUpdatesResponse,
   FilePrecondition,
   Profile,
   RuntimeInfo,
@@ -229,6 +234,26 @@ export const api = {
       skillId: payload.skill_id,
       enabled: payload.enabled,
       expectedFiles: payload.expected_files,
+    });
+  },
+
+  configCheckUpdates(): Promise<ConfigCheckUpdatesResponse> {
+    return invokeCmd("config_check_updates");
+  },
+
+  configIgnoreUpdates(payload: {
+    conditions: ConfigIgnoreCondition[];
+  }): Promise<ConfigIgnoreUpdatesResponse> {
+    return invokeCmd("config_ignore_updates", {
+      conditions: payload.conditions,
+    });
+  },
+
+  configAcceptMcpUpdates(payload: ConfigConfirmMcpRequest): Promise<ConfigConfirmMcpResponse> {
+    return invokeCmd("config_accept_mcp_updates", {
+      sourceId: payload.source_id,
+      currentSha256: payload.current_sha256,
+      client: payload.client,
     });
   },
 };

@@ -234,3 +234,46 @@ pub struct RuntimeExists {
     pub claude_config: bool,
     pub codex_config: bool,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigSourceKind {
+    Mcp,
+    Skill,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigUpdateItem {
+    pub source_id: String,
+    pub client: Client,
+    pub kind: ConfigSourceKind,
+    pub current_sha256: String,
+    pub diff_unified: String,
+    pub requires_confirm_sync: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confirm_sync_available: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ConfigCheckUpdatesResponse {
+    #[serde(default)]
+    pub updates: Vec<ConfigUpdateItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ConfigIgnoreUpdatesResponse {
+    #[serde(default)]
+    pub ignored_source_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigIgnoreCondition {
+    pub source_id: String,
+    pub current_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigAcceptMcpResponse {
+    pub accepted: bool,
+    pub message: String,
+}
