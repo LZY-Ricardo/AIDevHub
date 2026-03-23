@@ -61,8 +61,15 @@
 }
 
 html,
-body {
+body,
+#root {
   height: 100%;
+}
+
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -73,6 +80,10 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  overflow: hidden;
 }
 
 a {
@@ -105,5 +116,17 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 920px) {
+  html,
+  body {
+    overflow: auto;
+    overscroll-behavior: auto;
+  }
+
+  #root {
+    overflow: visible;
   }
 }

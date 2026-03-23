@@ -1,7 +1,12 @@
-import type { AppError, ConfigConfirmMcpRequest, ConfigConfirmMcpResponse } from "./types";
+import type {
+  AppError,
+  ConfigConfirmMcpRequest,
+  ConfigConfirmMcpResponse,
+  ConfigUpdateItem,
+} from "./types";
 
 export interface ConfirmFlowStaleState {
-  updates: unknown[];
+  updates: ConfigUpdateItem[];
   dialogOpen: boolean;
 }
 
