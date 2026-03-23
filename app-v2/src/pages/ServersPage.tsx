@@ -35,6 +35,26 @@ const EMPTY_SERVER_NOTES: ServerNotes = {
 
 const DETAIL_CARD_PADDING = "12px";
 const DETAIL_STACK_GAP = "10px";
+const DETAIL_HEADER_LAYOUT_STYLE = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gap: "10px 12px",
+  alignItems: "start",
+} as const;
+const DETAIL_ACTION_ROW_STYLE = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: "8px",
+  flexWrap: "nowrap",
+} as const;
+const DETAIL_ACTION_BUTTON_STYLE = {
+  padding: "8px 10px",
+  borderRadius: 10,
+  fontSize: "13px",
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
+} as const;
 
 export function ServersPage() {
   const [client, setClient] = useState<Client>("claude_code");
@@ -512,6 +532,7 @@ function DetailsDrawer({
             <button
               type="button"
               className="ui-btn"
+              style={DETAIL_ACTION_BUTTON_STYLE}
               disabled={notesBusy}
               onClick={() => startFieldEdit(field.key, field.hint)}
             >
@@ -540,6 +561,7 @@ function DetailsDrawer({
               <button
                 type="button"
                 className="ui-btn"
+                style={DETAIL_ACTION_BUTTON_STYLE}
                 disabled={notesBusy}
                 onClick={() => saveFieldHint(field.key)}
               >
@@ -548,6 +570,7 @@ function DetailsDrawer({
               <button
                 type="button"
                 className="ui-btn"
+                style={DETAIL_ACTION_BUTTON_STYLE}
                 disabled={notesBusy}
                 onClick={() => {
                   setEditingFieldKey(null);
@@ -727,32 +750,35 @@ function DetailsDrawer({
           ) : (
             <div style={{ display: "grid", gap: DETAIL_STACK_GAP }}>
               <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
-                <div className="ui-label">名称</div>
-                <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
-                  {formatMcpName(shown!.server_id)}
-                </div>
-                <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <span className="ui-pill">
-                    <span className={`ui-pillDot ${shown!.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-                    <span className="ui-code">{enabledLabel(shown!.enabled)}</span>
-                  </span>
-                  <span className="ui-pill">
-                    <span className="ui-pillDot" />
-                    <span className="ui-code">{clientLabel(shown!.client)}</span>
-                  </span>
-                  <span className="ui-pill">
-                    <span className="ui-pillDot" />
-                    <span className="ui-code">{transportLabel(shown!.transport)}</span>
-                  </span>
-                </div>
-                <div style={{ marginTop: "8px" }} className="ui-code">
-                  来源文件：{shown!.source_file}
-                </div>
-                <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-                  <div className="ui-btnRow">
+                <div style={DETAIL_HEADER_LAYOUT_STYLE}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="ui-label">名称</div>
+                    <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
+                      {formatMcpName(shown!.server_id)}
+                    </div>
+                    <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span className="ui-pill">
+                        <span className={`ui-pillDot ${shown!.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
+                        <span className="ui-code">{enabledLabel(shown!.enabled)}</span>
+                      </span>
+                      <span className="ui-pill">
+                        <span className="ui-pillDot" />
+                        <span className="ui-code">{clientLabel(shown!.client)}</span>
+                      </span>
+                      <span className="ui-pill">
+                        <span className="ui-pillDot" />
+                        <span className="ui-code">{transportLabel(shown!.transport)}</span>
+                      </span>
+                    </div>
+                    <div style={{ marginTop: "8px" }} className="ui-code">
+                      来源文件：{shown!.source_file}
+                    </div>
+                  </div>
+                  <div style={{ ...DETAIL_ACTION_ROW_STYLE, justifySelf: "end", alignSelf: "center" }}>
                     <button
                       type="button"
                       className="ui-btn"
+                      style={DETAIL_ACTION_BUTTON_STYLE}
                       disabled={busy || editBusy}
                       onClick={startEdit}
                     >
@@ -761,6 +787,7 @@ function DetailsDrawer({
                     <button
                       type="button"
                       className="ui-btn"
+                      style={DETAIL_ACTION_BUTTON_STYLE}
                       disabled={!canReveal || revealBusy || busy}
                       onClick={() => toggleReveal(!reveal)}
                       title="显示敏感信息（若后端允许）"
@@ -780,7 +807,13 @@ function DetailsDrawer({
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
                   <div className="ui-label">功能作用</div>
                   {!editingDescription ? (
-                    <button type="button" className="ui-btn" disabled={notesBusy} onClick={startDescriptionEdit}>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      style={DETAIL_ACTION_BUTTON_STYLE}
+                      disabled={notesBusy}
+                      onClick={startDescriptionEdit}
+                    >
                       编辑功能说明
                     </button>
                   ) : null}
@@ -803,12 +836,19 @@ function DetailsDrawer({
                       }}
                     />
                     <div className="ui-btnRow">
-                      <button type="button" className="ui-btn" disabled={notesBusy} onClick={saveDescription}>
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        style={DETAIL_ACTION_BUTTON_STYLE}
+                        disabled={notesBusy}
+                        onClick={saveDescription}
+                      >
                         保存
                       </button>
                       <button
                         type="button"
                         className="ui-btn"
+                        style={DETAIL_ACTION_BUTTON_STYLE}
                         disabled={notesBusy}
                         onClick={() => {
                           setEditingDescription(false);
@@ -832,10 +872,11 @@ function DetailsDrawer({
               <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="ui-label">配置说明</div>
-                  <div className="ui-btnRow">
+                  <div style={{ ...DETAIL_ACTION_ROW_STYLE, flexWrap: "wrap" }}>
                     <button
                       type="button"
                       className="ui-btn"
+                      style={DETAIL_ACTION_BUTTON_STYLE}
                       disabled={notesBusy}
                       onClick={toggleConfigPanel}
                     >
@@ -845,6 +886,7 @@ function DetailsDrawer({
                       <button
                         type="button"
                         className="ui-btn"
+                        style={DETAIL_ACTION_BUTTON_STYLE}
                         disabled={notesBusy}
                         onClick={() => toggleDetailPanel("fields")}
                       >
@@ -855,6 +897,7 @@ function DetailsDrawer({
                       <button
                         type="button"
                         className="ui-btn"
+                        style={DETAIL_ACTION_BUTTON_STYLE}
                         disabled={notesBusy}
                         onClick={() => switchConfigViewMode(configViewMode === "summary" ? "raw" : "summary")}
                       >

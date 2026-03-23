@@ -60,3 +60,11 @@ test('MCP 详情抽屉中的按钮文案明确指向具体内容', () => {
   assert.match(source, /展开其余 \$\{remainingFields\.length\} 项/);
   assert.doesNotMatch(source, />\s*编辑\s*</);
 });
+
+test('MCP 详情抽屉顶部操作区使用单行紧凑工具栏', () => {
+  assert.match(source, /const DETAIL_HEADER_LAYOUT_STYLE = \{/);
+  assert.match(source, /const DETAIL_ACTION_ROW_STYLE = \{/);
+  assert.match(source, /const DETAIL_ACTION_BUTTON_STYLE = \{/);
+  assert.match(source, /gridTemplateColumns: "minmax\(0, 1fr\) auto"/);
+  assert.match(source, /whiteSpace: "nowrap"/);
+});
