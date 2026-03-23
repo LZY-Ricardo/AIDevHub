@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use aidevhub_core::model::{AppError, Client, FilePrecondition, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, Transport};
+use aidevhub_core::model::{
+    AppError, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition, ConfigIgnoreUpdatesResponse,
+    FilePrecondition, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, Transport,
+};
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
 use tauri::Manager;
@@ -39,6 +42,7 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         app_local_data_dir: app_local_data_dir.clone(),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
+        mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),
         backup_index_path: app_local_data_dir.join("backup_index.json"),
@@ -269,6 +273,32 @@ fn backup_apply_rollback(
 }
 
 #[tauri::command]
+fn config_check_updates(app: tauri::AppHandle) -> Result<ConfigCheckUpdatesResponse, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::config_sync::config_check_updates(&paths)
+}
+
+#[tauri::command]
+fn config_ignore_updates(
+    app: tauri::AppHandle,
+    conditions: Vec<ConfigIgnoreCondition>,
+) -> Result<ConfigIgnoreUpdatesResponse, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::config_sync::config_ignore_updates(&paths, conditions)
+}
+
+#[tauri::command]
+fn config_accept_mcp_updates(
+    app: tauri::AppHandle,
+    source_id: String,
+    current_sha256: String,
+    client: Client,
+) -> Result<ConfigAcceptMcpResponse, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::config_sync::config_accept_mcp_updates(&paths, source_id, current_sha256, client)
+}
+
+#[tauri::command]
 fn skill_list(
     app: tauri::AppHandle,
     client: Option<Client>,
@@ -359,6 +389,9 @@ pub fn run() {
             backup_list,
             backup_preview_rollback,
             backup_apply_rollback,
+            config_check_updates,
+            config_ignore_updates,
+            config_accept_mcp_updates,
             skill_list,
             skill_get,
             skill_preview_create,

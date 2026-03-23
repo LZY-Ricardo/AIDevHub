@@ -13,6 +13,7 @@ use thiserror::Error;
 use toml_edit::{DocumentMut, Item, Table, Value as TomlValue};
 use uuid::Uuid;
 
+use crate::mcp_registry::{self, McpRegistryServer, McpRegistryStore};
 use crate::model::*;
 
 #[derive(Debug, Error)]
@@ -48,6 +49,19 @@ impl From<CoreError> for AppError {
     }
 }
 
+impl From<AppError> for CoreError {
+    fn from(value: AppError) -> Self {
+        match value.code.as_str() {
+            "VALIDATION_ERROR" => CoreError::Validation(value.message),
+            "NOT_FOUND" => CoreError::NotFound(value.message),
+            "PARSE_ERROR" => CoreError::Parse(value.message),
+            "IO_ERROR" => CoreError::Io(value.message),
+            "PRECONDITION_FAILED" => CoreError::Validation(value.message),
+            _ => CoreError::Internal(value.message),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AppPaths {
     pub claude_config_path: PathBuf,
@@ -59,6 +73,7 @@ pub struct AppPaths {
     pub app_local_data_dir: PathBuf,
     pub profiles_path: PathBuf,
     pub mcp_notes_path: PathBuf,
+    pub mcp_registry_path: PathBuf,
     pub disabled_pool_path: PathBuf,
     pub backups_dir: PathBuf,
     pub backup_index_path: PathBuf,
@@ -317,26 +332,6 @@ fn validate_preconditions(expected: &[FilePrecondition]) -> Result<(), CoreError
     }
 }
 
-fn load_disabled_pool(path: &Path) -> Result<BTreeMap<String, Value>, CoreError> {
-    let s = read_to_string_opt(path)?;
-    let Some(s) = s else {
-        return Ok(BTreeMap::new());
-    };
-    let v: Value =
-        serde_json::from_str(&s).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))?;
-    let Value::Object(map) = v else {
-        return Err(CoreError::Parse(format!(
-            "{} is not a JSON object",
-            path.display()
-        )));
-    };
-    Ok(map.into_iter().map(|(k, v)| (k, v)).collect())
-}
-
-fn save_disabled_pool(map: &BTreeMap<String, Value>) -> Result<String, CoreError> {
-    serde_json::to_string_pretty(map).map_err(|e| CoreError::Internal(format!("serialize disabled_pool: {e}")))
-}
-
 fn load_profiles(path: &Path) -> Result<Vec<Profile>, CoreError> {
     let s = read_to_string_opt(path)?;
     let Some(s) = s else { return Ok(vec![]); };
@@ -414,11 +409,95 @@ fn parse_claude_config(path: &Path) -> Result<(Value, serde_json::Map<String, Va
 
 fn write_claude_config(mut root: Value, servers: serde_json::Map<String, Value>) -> Result<String, CoreError> {
     if let Value::Object(map) = &mut root {
-        map.insert("mcpServers".to_string(), Value::Object(servers));
+        if servers.is_empty() {
+            map.remove("mcpServers");
+        } else {
+            map.insert("mcpServers".to_string(), Value::Object(servers));
+        }
     } else {
         return Err(CoreError::Parse("claude config root is not JSON object".to_string()));
     }
     serde_json::to_string_pretty(&root).map_err(|e| CoreError::Internal(format!("serialize claude config: {e}")))
+}
+
+fn mcp_source_origin(client: Client) -> &'static str {
+    match client {
+        Client::ClaudeCode => "claudecode.mcp.json",
+        Client::Codex => "codex.mcp.json",
+    }
+}
+
+fn mcp_external_path(paths: &AppPaths, client: Client) -> &Path {
+    match client {
+        Client::ClaudeCode => &paths.claude_config_path,
+        Client::Codex => &paths.codex_config_path,
+    }
+}
+
+fn load_registry_store(paths: &AppPaths) -> Result<McpRegistryStore, CoreError> {
+    mcp_registry::load_registry_store(&paths.mcp_registry_path).map_err(CoreError::from)
+}
+
+fn serialize_registry_store(store: &McpRegistryStore) -> Result<String, CoreError> {
+    serde_json::to_string_pretty(store)
+        .map_err(|e| CoreError::Internal(format!("serialize mcp registry: {e}")))
+}
+
+fn sort_registry_servers(store: &mut McpRegistryStore) {
+    store
+        .servers
+        .sort_by(|a, b| a.server_id.cmp(&b.server_id).then_with(|| a.updated_at.cmp(&b.updated_at)));
+}
+
+fn enabled_from_payload(
+    payload: &serde_json::Map<String, Value>,
+    default_enabled: bool,
+) -> Result<bool, CoreError> {
+    match payload.get("enabled") {
+        Some(Value::Bool(enabled)) => Ok(*enabled),
+        Some(_) => Err(CoreError::Validation("enabled must be a boolean".to_string())),
+        None => Ok(default_enabled),
+    }
+}
+
+fn registry_payload_for_storage(
+    client: Client,
+    transport: Transport,
+    mut payload: serde_json::Map<String, Value>,
+    enabled: bool,
+) -> serde_json::Map<String, Value> {
+    match client {
+        Client::ClaudeCode => {
+            payload.remove("enabled");
+            if transport == Transport::Http {
+                payload
+                    .entry("type".to_string())
+                    .or_insert(Value::String("http".to_string()));
+            }
+        }
+        Client::Codex => {
+            payload.insert("enabled".to_string(), Value::Bool(enabled));
+        }
+    }
+    payload
+}
+
+fn is_effectively_empty_external(client: Client, text: &str) -> bool {
+    match client {
+        Client::ClaudeCode => serde_json::from_str::<Value>(text)
+            .ok()
+            .and_then(|value| value.as_object().cloned())
+            .map(|map| map.is_empty())
+            .unwrap_or_else(|| text.trim().is_empty()),
+        Client::Codex => text.trim().is_empty(),
+    }
+}
+
+fn should_write_external(before: &Option<String>, after: &str, client: Client) -> bool {
+    if before.is_none() && is_effectively_empty_external(client, after) {
+        return false;
+    }
+    before.as_deref() != Some(after)
 }
 
 fn normalize_server_notes(notes: ServerNotes) -> ServerNotes {
@@ -452,161 +531,130 @@ fn parse_codex_doc(path: &Path) -> Result<DocumentMut, CoreError> {
         .map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))
 }
 
-fn codex_mcp_servers_table_mut(doc: &mut DocumentMut) -> &mut Table {
-    if !doc.as_table().contains_key("mcp_servers") {
-        doc["mcp_servers"] = Item::Table(Table::new());
+fn json_scalar_to_toml_value(value: &Value) -> Result<TomlValue, CoreError> {
+    match value {
+        Value::String(v) => Ok(toml_edit::value(v.clone()).into_value().unwrap()),
+        Value::Bool(v) => Ok(toml_edit::value(*v).into_value().unwrap()),
+        Value::Number(v) => {
+            if let Some(i) = v.as_i64() {
+                Ok(toml_edit::value(i).into_value().unwrap())
+            } else if let Some(f) = v.as_f64() {
+                Ok(toml_edit::value(f).into_value().unwrap())
+            } else {
+                Err(CoreError::Validation("unsupported numeric value".to_string()))
+            }
+        }
+        Value::Array(items) => {
+            let mut arr = toml_edit::Array::new();
+            for item in items {
+                arr.push(json_scalar_to_toml_value(item)?);
+            }
+            Ok(TomlValue::Array(arr))
+        }
+        Value::Null => Err(CoreError::Validation("null values are not supported in codex MCP".to_string())),
+        Value::Object(_) => Err(CoreError::Validation(
+            "nested object must be handled as a table when exporting codex MCP".to_string(),
+        )),
     }
-    doc["mcp_servers"].as_table_mut().unwrap()
 }
 
-fn codex_get_enabled(table: &Table) -> bool {
-    table
-        .get("enabled")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true)
+fn json_map_to_toml_table(map: &serde_json::Map<String, Value>) -> Result<Table, CoreError> {
+    let mut table = Table::new();
+    for (key, value) in map {
+        match value {
+            Value::Object(child) => {
+                table.insert(key, Item::Table(json_map_to_toml_table(child)?));
+            }
+            Value::Null => {}
+            _ => {
+                table.insert(key, Item::Value(json_scalar_to_toml_value(value)?));
+            }
+        }
+    }
+    Ok(table)
 }
 
-fn codex_set_enabled(table: &mut Table, enabled: bool) {
-    table["enabled"] = toml_edit::value(enabled);
+fn export_claude_registry_config(paths: &AppPaths, store: &McpRegistryStore) -> Result<String, CoreError> {
+    let (root, _) = parse_claude_config(&paths.claude_config_path)?;
+    let mut servers = serde_json::Map::new();
+    for server in store
+        .servers
+        .iter()
+        .filter(|server| server.client == Client::ClaudeCode && server.enabled)
+    {
+        let mut payload = server.payload.clone();
+        payload.remove("enabled");
+        if server.transport == Transport::Http {
+            payload
+                .entry("type".to_string())
+                .or_insert(Value::String("http".to_string()));
+        }
+        servers.insert(server.name.clone(), Value::Object(payload));
+    }
+    write_claude_config(root, servers)
 }
 
-fn codex_get_transport(table: &Table) -> Transport {
-    if table.get("url").and_then(|v| v.as_str()).is_some() {
-        Transport::Http
-    } else if table.get("command").and_then(|v| v.as_str()).is_some() {
-        Transport::Stdio
-    } else {
-        Transport::Unknown
+fn export_codex_registry_config(paths: &AppPaths, store: &McpRegistryStore) -> Result<String, CoreError> {
+    let mut doc = parse_codex_doc(&paths.codex_config_path)?;
+    doc.as_table_mut().remove("mcp_servers");
+
+    let mut servers = Table::new();
+    for server in store
+        .servers
+        .iter()
+        .filter(|server| server.client == Client::Codex && server.enabled)
+    {
+        let mut payload = server.payload.clone();
+        payload.insert("enabled".to_string(), Value::Bool(true));
+        servers.insert(&server.name, Item::Table(json_map_to_toml_table(&payload)?));
+    }
+
+    if !servers.is_empty() {
+        doc["mcp_servers"] = Item::Table(servers);
+    }
+
+    Ok(doc.to_string())
+}
+
+fn export_registry_client_config(
+    paths: &AppPaths,
+    store: &McpRegistryStore,
+    client: Client,
+) -> Result<String, CoreError> {
+    match client {
+        Client::ClaudeCode => export_claude_registry_config(paths, store),
+        Client::Codex => export_codex_registry_config(paths, store),
     }
 }
 
-fn codex_identity(table: &Table) -> String {
-    if let Some(cmd) = table.get("command").and_then(|v| v.as_str()) {
+fn payload_identity(payload: &serde_json::Map<String, Value>) -> String {
+    if let Some(cmd) = payload.get("command").and_then(|v| v.as_str()) {
         let mut parts = vec![cmd.to_string()];
-        if let Some(arr) = table.get("args").and_then(|v| v.as_array()) {
-            for it in arr.iter() {
-                if let Some(s) = it.as_str() {
-                    parts.push(s.to_string());
+        if let Some(args) = payload.get("args").and_then(|v| v.as_array()) {
+            for item in args {
+                if let Some(value) = item.as_str() {
+                    parts.push(value.to_string());
                 }
             }
         }
         return parts.join(" ");
     }
-    if let Some(url) = table.get("url").and_then(|v| v.as_str()) {
+    if let Some(url) = payload.get("url").and_then(|v| v.as_str()) {
         return url.to_string();
     }
     "unknown".to_string()
 }
 
-fn toml_table_to_json_map(table: &Table) -> serde_json::Map<String, Value> {
-    let mut map = serde_json::Map::new();
-    for (k, item) in table.iter() {
-        if let Some(v) = item.as_value() {
-            let json = match v {
-                TomlValue::String(s) => Value::String(s.value().to_string()),
-                TomlValue::Integer(i) => Value::Number((*i.value()).into()),
-                TomlValue::Float(f) => Value::Number(serde_json::Number::from_f64(*f.value()).unwrap_or_else(|| 0.into())),
-                TomlValue::Boolean(b) => Value::Bool(*b.value()),
-                TomlValue::Datetime(dt) => Value::String(dt.value().to_string()),
-                TomlValue::Array(arr) => {
-                    let mut out = Vec::new();
-                    for it in arr.iter() {
-                        if let Some(s) = it.as_str() {
-                            out.push(Value::String(s.to_string()));
-                        } else if let Some(b) = it.as_bool() {
-                            out.push(Value::Bool(b));
-                        } else if let Some(i) = it.as_integer() {
-                            out.push(Value::Number(i.into()));
-                        } else if let Some(f) = it.as_float() {
-                            out.push(Value::Number(
-                                serde_json::Number::from_f64(f).unwrap_or_else(|| 0.into()),
-                            ));
-                        } else if let Some(dt) = it.as_datetime() {
-                            out.push(Value::String(dt.to_string()));
-                        } else {
-                            out.push(Value::Null);
-                        }
-                    }
-                    Value::Array(out)
-                }
-                _ => Value::Null,
-            };
-            map.insert(k.to_string(), json);
-        }
-    }
-    map
-}
-
-fn claude_transport(cfg: &Value) -> Transport {
-    if cfg.get("type").and_then(|v| v.as_str()) == Some("http") || cfg.get("url").is_some() {
-        Transport::Http
-    } else if cfg.get("command").is_some() {
-        Transport::Stdio
-    } else {
-        Transport::Unknown
-    }
-}
-
-fn claude_identity(cfg: &Value) -> String {
-    if let Some(cmd) = cfg.get("command").and_then(|v| v.as_str()) {
-        let mut parts = vec![cmd.to_string()];
-        if let Some(args) = cfg.get("args").and_then(|v| v.as_array()) {
-            for it in args {
-                if let Some(s) = it.as_str() {
-                    parts.push(s.to_string());
-                }
-            }
-        }
-        return parts.join(" ");
-    }
-    if let Some(url) = cfg.get("url").and_then(|v| v.as_str()) {
-        return url.to_string();
-    }
-    "unknown".to_string()
-}
-
-fn to_server_record_claude(
-    name: &str,
-    enabled: bool,
-    source_file: &Path,
-    cfg: Value,
-    reveal: bool,
-) -> ServerRecord {
-    let transport = claude_transport(&cfg);
-    let identity = claude_identity(&cfg);
-    let payload_obj = cfg.as_object().cloned().unwrap_or_default();
-    let payload = mask_payload(payload_obj, reveal);
+fn to_server_record_registry(paths: &AppPaths, server: McpRegistryServer, reveal: bool) -> ServerRecord {
+    let payload = mask_payload(server.payload.clone(), reveal);
     ServerRecord {
-        server_id: server_id(Client::ClaudeCode, name),
-        name: name.to_string(),
-        client: Client::ClaudeCode,
-        transport,
-        enabled,
-        source_file: source_file.to_string_lossy().to_string(),
-        identity,
-        payload,
-    }
-}
-
-fn to_server_record_codex(
-    name: &str,
-    enabled: bool,
-    source_file: &Path,
-    table: &Table,
-    reveal: bool,
-) -> ServerRecord {
-    let transport = codex_get_transport(table);
-    let identity = codex_identity(table);
-    let payload_obj = toml_table_to_json_map(table);
-    let payload = mask_payload(payload_obj, reveal);
-    ServerRecord {
-        server_id: server_id(Client::Codex, name),
-        name: name.to_string(),
-        client: Client::Codex,
-        transport,
-        enabled,
-        source_file: source_file.to_string_lossy().to_string(),
-        identity,
+        server_id: server.server_id,
+        name: server.name,
+        client: server.client,
+        transport: server.transport,
+        enabled: server.enabled,
+        source_file: paths.mcp_registry_path.to_string_lossy().to_string(),
+        identity: payload_identity(&server.payload),
         payload,
     }
 }
@@ -674,97 +722,18 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
 }
 
 pub fn server_list(paths: &AppPaths, client: Option<Client>) -> Result<Vec<ServerRecord>, AppError> {
-    let mut out = Vec::new();
-
-    if client.is_none() || client == Some(Client::ClaudeCode) {
-        let (_root, servers) = parse_claude_config(&paths.claude_config_path).map_err(AppError::from)?;
-        let pool = load_disabled_pool(&paths.disabled_pool_path).map_err(AppError::from)?;
-
-        let mut names: BTreeSet<String> = BTreeSet::new();
-        for k in servers.keys() {
-            names.insert(k.clone());
-        }
-        for k in pool.keys() {
-            names.insert(k.clone());
-        }
-
-        for name in names {
-            if let Some(cfg) = servers.get(&name) {
-                out.push(to_server_record_claude(
-                    &name,
-                    true,
-                    &paths.claude_config_path,
-                    cfg.clone(),
-                    false,
-                ));
-            } else if let Some(cfg) = pool.get(&name) {
-                out.push(to_server_record_claude(
-                    &name,
-                    false,
-                    &paths.disabled_pool_path,
-                    cfg.clone(),
-                    false,
-                ));
-            }
-        }
-    }
-
-    if client.is_none() || client == Some(Client::Codex) {
-        let doc = parse_codex_doc(&paths.codex_config_path).map_err(AppError::from)?;
-        if let Some(tbl) = doc.get("mcp_servers").and_then(|i| i.as_table()) {
-            for (name, item) in tbl.iter() {
-                if let Some(st) = item.as_table() {
-                    let enabled = codex_get_enabled(st);
-                    out.push(to_server_record_codex(
-                        name,
-                        enabled,
-                        &paths.codex_config_path,
-                        st,
-                        false,
-                    ));
-                }
-            }
-        }
-    }
-
-    Ok(out)
+    let servers = mcp_registry::list_registry_servers(paths, client)?;
+    Ok(servers
+        .into_iter()
+        .map(|server| to_server_record_registry(paths, server, false))
+        .collect())
 }
 
 pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result<ServerRecord, AppError> {
-    let (client, name) = parse_server_id(server_id_str).map_err(AppError::from)?;
-    match client {
-        Client::ClaudeCode => {
-            let (_root, servers) = parse_claude_config(&paths.claude_config_path).map_err(AppError::from)?;
-            let pool = load_disabled_pool(&paths.disabled_pool_path).map_err(AppError::from)?;
-            if let Some(cfg) = servers.get(&name) {
-                Ok(to_server_record_claude(&name, true, &paths.claude_config_path, cfg.clone(), reveal))
-            } else if let Some(cfg) = pool.get(&name) {
-                Ok(to_server_record_claude(
-                    &name,
-                    false,
-                    &paths.disabled_pool_path,
-                    cfg.clone(),
-                    reveal,
-                ))
-            } else {
-                Err(AppError::new("NOT_FOUND", format!("server not found: {server_id_str}")))
-            }
-        }
-        Client::Codex => {
-            let doc = parse_codex_doc(&paths.codex_config_path).map_err(AppError::from)?;
-            let Some(tbl) = doc.get("mcp_servers").and_then(|i| i.as_table()) else {
-                return Err(AppError::new("NOT_FOUND", format!("server not found: {server_id_str}")));
-            };
-            let Some(item) = tbl.get(&name) else {
-                return Err(AppError::new("NOT_FOUND", format!("server not found: {server_id_str}")));
-            };
-            let Some(st) = item.as_table() else {
-                return Err(AppError::new("PARSE_ERROR", format!("invalid codex server table: {server_id_str}")));
-            };
-            let enabled = codex_get_enabled(st);
-            Ok(to_server_record_codex(&name, enabled, &paths.codex_config_path, st, reveal))
-        }
-    }
+    parse_server_id(server_id_str).map_err(AppError::from)?;
+    let server = mcp_registry::get_registry_server(paths, server_id_str)?
+        .ok_or_else(|| AppError::new("NOT_FOUND", format!("server not found: {server_id_str}")))?;
+    Ok(to_server_record_registry(paths, server, reveal))
 }
 
 pub fn server_get_edit_session(paths: &AppPaths, server_id_str: &str) -> Result<ServerEditSession, AppError> {
@@ -1312,84 +1281,50 @@ fn plan_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<P
         backup_op: BackupOp::Toggle,
     };
 
-    match client {
-        Client::ClaudeCode => {
-            let (root, mut servers) = parse_claude_config(&paths.claude_config_path)?;
-            let mut pool = load_disabled_pool(&paths.disabled_pool_path)?;
+    let mut store = load_registry_store(paths)?;
+    let Some(server) = store
+        .servers
+        .iter_mut()
+        .find(|server| server.server_id == server_id_str)
+    else {
+        return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
+    };
 
-            let currently_enabled = servers.contains_key(&name);
-            if enabled == currently_enabled {
-                return Ok(planned);
-            }
+    if server.client != client || server.name != name {
+        return Err(CoreError::Validation(format!("server_id/client mismatch: {server_id_str}")));
+    }
+    if server.enabled == enabled {
+        return Ok(planned);
+    }
 
-            if enabled {
-                // move pool -> servers
-                let Some(cfg) = pool.remove(&name) else {
-                    planned.warnings.push(Warning {
-                        code: "MISSING_SERVER".to_string(),
-                        message: format!("Missing server config in disabled pool: {server_id_str}"),
-                        details: None,
-                    });
-                    return Ok(planned);
-                };
-                servers.insert(name.clone(), cfg);
-                planned.summary.will_enable.push(server_id_str.to_string());
-            } else {
-                // move servers -> pool
-                let Some(cfg) = servers.remove(&name) else {
-                    return Ok(planned);
-                };
-                pool.insert(name.clone(), cfg);
-                planned.summary.will_disable.push(server_id_str.to_string());
-            }
+    server.enabled = enabled;
+    server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    server.payload = registry_payload_for_storage(client, server.transport, server.payload.clone(), enabled);
+    sort_registry_servers(&mut store);
 
-            let before_cfg = read_to_string_opt(&paths.claude_config_path)?;
-            let after_cfg = write_claude_config(root, servers)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.claude_config_path.clone(),
-                before: before_cfg,
-                after: after_cfg,
-            });
+    let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
+    let after_registry = serialize_registry_store(&store)?;
+    planned.files.push(PlannedFileWrite {
+        path: paths.mcp_registry_path.clone(),
+        before: before_registry,
+        after: after_registry,
+    });
 
-            let before_pool = read_to_string_opt(&paths.disabled_pool_path)?;
-            let after_pool = save_disabled_pool(&pool)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.disabled_pool_path.clone(),
-                before: before_pool,
-                after: after_pool,
-            });
-        }
-        Client::Codex => {
-            let mut doc = parse_codex_doc(&paths.codex_config_path)?;
-            let before = read_to_string_opt(&paths.codex_config_path)?;
+    let external_path = mcp_external_path(paths, client).to_path_buf();
+    let before_external = read_to_string_opt(&external_path)?;
+    let after_external = export_registry_client_config(paths, &store, client)?;
+    if should_write_external(&before_external, &after_external, client) {
+        planned.files.push(PlannedFileWrite {
+            path: external_path,
+            before: before_external,
+            after: after_external,
+        });
+    }
 
-            let servers = codex_mcp_servers_table_mut(&mut doc);
-            let Some(item) = servers.get_mut(&name) else {
-                return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
-            };
-            let Some(table) = item.as_table_mut() else {
-                return Err(CoreError::Parse(format!("invalid codex server table: {server_id_str}")));
-            };
-
-            let curr = codex_get_enabled(table);
-            if curr == enabled {
-                return Ok(planned);
-            }
-
-            codex_set_enabled(table, enabled);
-            if enabled {
-                planned.summary.will_enable.push(server_id_str.to_string());
-            } else {
-                planned.summary.will_disable.push(server_id_str.to_string());
-            }
-
-            let after = doc.to_string();
-            planned.files.push(PlannedFileWrite {
-                path: paths.codex_config_path.clone(),
-                before,
-                after,
-            });
-        }
+    if enabled {
+        planned.summary.will_enable.push(server_id_str.to_string());
+    } else {
+        planned.summary.will_disable.push(server_id_str.to_string());
     }
 
     Ok(planned)
@@ -1414,83 +1349,53 @@ fn plan_add_server(
         backup_op: BackupOp::AddServer,
     };
 
-    match client {
-        Client::ClaudeCode => {
-            let (root, mut servers) = parse_claude_config(&paths.claude_config_path)?;
-            let pool = load_disabled_pool(&paths.disabled_pool_path)?;
-            if servers.contains_key(name) || pool.contains_key(name) {
-                return Err(CoreError::Validation(format!("server already exists: {name}")));
-            }
-            let mut cfg = Value::Object(config);
-            if transport == Transport::Http {
-                if let Value::Object(m) = &mut cfg {
-                    m.entry("type".to_string())
-                        .or_insert(Value::String("http".to_string()));
-                }
-            }
-            servers.insert(name.to_string(), cfg);
-            planned.summary.will_add.push(server_id(client, name));
-            planned.summary.will_enable.push(server_id(client, name));
+    let requested_enabled = enabled_from_payload(&config, true)?;
+    let normalized = normalize_server_payload(client, transport, config)?;
+    let sid = server_id(client, name);
 
-            let before_cfg = read_to_string_opt(&paths.claude_config_path)?;
-            let after_cfg = write_claude_config(root, servers)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.claude_config_path.clone(),
-                before: before_cfg,
-                after: after_cfg,
-            });
+    let mut store = load_registry_store(paths)?;
+    if store
+        .servers
+        .iter()
+        .any(|server| server.client == client && server.name == name)
+    {
+        return Err(CoreError::Validation(format!("server already exists: {name}")));
+    }
 
-            // no pool change needed
-        }
-        Client::Codex => {
-            let mut doc = parse_codex_doc(&paths.codex_config_path)?;
-            let before = read_to_string_opt(&paths.codex_config_path)?;
-            let servers = codex_mcp_servers_table_mut(&mut doc);
-            if servers.contains_key(name) {
-                return Err(CoreError::Validation(format!("server already exists: {name}")));
-            }
-            let mut table = Table::new();
-            // Minimal field check; other fields are passthrough.
-            for (k, v) in config {
-                match v {
-                    Value::String(s) => {
-                        table[&k] = toml_edit::value(s);
-                    }
-                    Value::Bool(b) => {
-                        table[&k] = toml_edit::value(b);
-                    }
-                    Value::Number(n) => {
-                        if let Some(i) = n.as_i64() {
-                            table[&k] = toml_edit::value(i);
-                        } else if let Some(f) = n.as_f64() {
-                            table[&k] = toml_edit::value(f);
-                        }
-                    }
-                    Value::Array(arr) => {
-                        let mut a = toml_edit::Array::new();
-                        for it in arr {
-                            if let Some(s) = it.as_str() {
-                                a.push(s);
-                            }
-                        }
-                        table[&k] = Item::Value(TomlValue::Array(a));
-                    }
-                    Value::Object(_) | Value::Null => {}
-                }
-            }
-            codex_set_enabled(&mut table, true);
-            servers[name] = Item::Table(table);
+    store.servers.push(McpRegistryServer {
+        server_id: sid.clone(),
+        client,
+        name: name.to_string(),
+        transport,
+        enabled: requested_enabled,
+        payload: registry_payload_for_storage(client, transport, normalized, requested_enabled),
+        source_origin: mcp_source_origin(client).to_string(),
+        updated_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+    });
+    sort_registry_servers(&mut store);
 
-            let sid = server_id(client, name);
-            planned.summary.will_add.push(sid.clone());
-            planned.summary.will_enable.push(sid);
+    let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
+    let after_registry = serialize_registry_store(&store)?;
+    planned.files.push(PlannedFileWrite {
+        path: paths.mcp_registry_path.clone(),
+        before: before_registry,
+        after: after_registry,
+    });
 
-            planned.files.push(PlannedFileWrite {
-                path: paths.codex_config_path.clone(),
-                before,
-                after: doc.to_string(),
-            });
-        }
+    let external_path = mcp_external_path(paths, client).to_path_buf();
+    let before_external = read_to_string_opt(&external_path)?;
+    let after_external = export_registry_client_config(paths, &store, client)?;
+    if should_write_external(&before_external, &after_external, client) {
+        planned.files.push(PlannedFileWrite {
+            path: external_path,
+            before: before_external,
+            after: after_external,
+        });
+    }
+
+    planned.summary.will_add.push(sid.clone());
+    if requested_enabled {
+        planned.summary.will_enable.push(sid);
     }
 
     Ok(planned)
@@ -1584,50 +1489,6 @@ fn normalize_server_payload(
     Ok(payload)
 }
 
-fn apply_codex_payload_to_table(
-    table: &mut Table,
-    payload: &serde_json::Map<String, Value>,
-) -> Result<(), CoreError> {
-    let existing_keys = table.iter().map(|(key, _)| key.to_string()).collect::<Vec<_>>();
-    for key in existing_keys {
-        if !payload.contains_key(&key) {
-            table.remove(&key);
-        }
-    }
-
-    for (key, value) in payload {
-        match value {
-            Value::String(v) => {
-                table[key] = toml_edit::value(v.clone());
-            }
-            Value::Bool(v) => {
-                table[key] = toml_edit::value(*v);
-            }
-            Value::Number(v) => {
-                if let Some(i) = v.as_i64() {
-                    table[key] = toml_edit::value(i);
-                } else if let Some(f) = v.as_f64() {
-                    table[key] = toml_edit::value(f);
-                } else {
-                    return Err(CoreError::Validation(format!("unsupported codex value type: {key}")));
-                }
-            }
-            Value::Array(items) if items.iter().all(|item| item.as_str().is_some()) => {
-                let mut arr = toml_edit::Array::new();
-                for item in items {
-                    arr.push(item.as_str().unwrap());
-                }
-                table[key] = Item::Value(TomlValue::Array(arr));
-            }
-            _ => {
-                return Err(CoreError::Validation(format!("unsupported codex value type: {key}")));
-            }
-        }
-    }
-
-    Ok(())
-}
-
 fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraft) -> Result<PlannedWrite, CoreError> {
     let (client, name) = parse_server_id(server_id_str)?;
     let mut planned = PlannedWrite {
@@ -1639,68 +1500,58 @@ fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraf
         backup_op: BackupOp::EditServer,
     };
 
-    match client {
-        Client::ClaudeCode => {
-            let (root, mut servers) = parse_claude_config(&paths.claude_config_path)?;
-            let mut pool = load_disabled_pool(&paths.disabled_pool_path)?;
-            let normalized = normalize_server_payload(client, draft.transport, draft.payload)?;
+    let mut store = load_registry_store(paths)?;
+    let Some(server) = store
+        .servers
+        .iter_mut()
+        .find(|server| server.server_id == server_id_str)
+    else {
+        return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
+    };
 
-            if let Some(existing) = servers.get(&name) {
-                if claude_transport(existing) != draft.transport {
-                    return Err(CoreError::Validation("transport cannot change".to_string()));
-                }
-                servers.insert(name, Value::Object(normalized));
-                let before_cfg = read_to_string_opt(&paths.claude_config_path)?;
-                let after_cfg = write_claude_config(root, servers)?;
-                planned.files.push(PlannedFileWrite {
-                    path: paths.claude_config_path.clone(),
-                    before: before_cfg,
-                    after: after_cfg,
-                });
-                return Ok(planned);
-            }
+    if server.client != client || server.name != name {
+        return Err(CoreError::Validation(format!("server_id/client mismatch: {server_id_str}")));
+    }
+    if server.transport != draft.transport {
+        return Err(CoreError::Validation("transport cannot change".to_string()));
+    }
 
-            if let Some(existing) = pool.get(&name) {
-                if claude_transport(existing) != draft.transport {
-                    return Err(CoreError::Validation("transport cannot change".to_string()));
-                }
-                pool.insert(name, Value::Object(normalized));
-                let before_pool = read_to_string_opt(&paths.disabled_pool_path)?;
-                let after_pool = save_disabled_pool(&pool)?;
-                planned.files.push(PlannedFileWrite {
-                    path: paths.disabled_pool_path.clone(),
-                    before: before_pool,
-                    after: after_pool,
-                });
-                return Ok(planned);
-            }
+    let requested_enabled = enabled_from_payload(&draft.payload, server.enabled)?;
+    let normalized = normalize_server_payload(client, draft.transport, draft.payload)?;
+    let previous_enabled = server.enabled;
+    server.enabled = requested_enabled;
+    server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    server.payload = registry_payload_for_storage(client, draft.transport, normalized, requested_enabled);
+    sort_registry_servers(&mut store);
 
-            Err(CoreError::NotFound(format!("server not found: {server_id_str}")))
-        }
-        Client::Codex => {
-            let mut doc = parse_codex_doc(&paths.codex_config_path)?;
-            let before = read_to_string_opt(&paths.codex_config_path)?;
-            let normalized = normalize_server_payload(client, draft.transport, draft.payload)?;
-            let servers = codex_mcp_servers_table_mut(&mut doc);
-            let Some(item) = servers.get_mut(&name) else {
-                return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
-            };
-            let Some(table) = item.as_table_mut() else {
-                return Err(CoreError::Parse(format!("invalid codex server table: {server_id_str}")));
-            };
-            if codex_get_transport(table) != draft.transport {
-                return Err(CoreError::Validation("transport cannot change".to_string()));
-            }
+    let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
+    let after_registry = serialize_registry_store(&store)?;
+    planned.files.push(PlannedFileWrite {
+        path: paths.mcp_registry_path.clone(),
+        before: before_registry,
+        after: after_registry,
+    });
 
-            apply_codex_payload_to_table(table, &normalized)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.codex_config_path.clone(),
-                before,
-                after: doc.to_string(),
-            });
-            Ok(planned)
+    let external_path = mcp_external_path(paths, client).to_path_buf();
+    let before_external = read_to_string_opt(&external_path)?;
+    let after_external = export_registry_client_config(paths, &store, client)?;
+    if should_write_external(&before_external, &after_external, client) {
+        planned.files.push(PlannedFileWrite {
+            path: external_path,
+            before: before_external,
+            after: after_external,
+        });
+    }
+
+    if previous_enabled != requested_enabled {
+        if requested_enabled {
+            planned.summary.will_enable.push(server_id_str.to_string());
+        } else {
+            planned.summary.will_disable.push(server_id_str.to_string());
         }
     }
+
+    Ok(planned)
 }
 
 fn build_preview(planned: PlannedWrite) -> Result<WritePreview, CoreError> {
@@ -1945,117 +1796,70 @@ fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Re
         backup_op: BackupOp::ApplyProfile,
     };
 
-    match client {
-        Client::ClaudeCode => {
-            let (root, mut servers) = parse_claude_config(&paths.claude_config_path)?;
-            let mut pool = load_disabled_pool(&paths.disabled_pool_path)?;
+    let want: BTreeSet<String> = match client {
+        Client::ClaudeCode => profile
+            .targets
+            .claude_code
+            .iter()
+            .filter_map(|sid| parse_server_id(sid).ok().map(|(_c, n)| n))
+            .collect(),
+        Client::Codex => profile
+            .targets
+            .codex
+            .iter()
+            .filter_map(|sid| parse_server_id(sid).ok().map(|(_c, n)| n))
+            .collect(),
+    };
 
-            let want: BTreeSet<String> = profile
-                .targets
-                .claude_code
-                .iter()
-                .filter_map(|sid| parse_server_id(sid).ok().map(|(_c, n)| n))
-                .collect();
-
-            // enable wanted servers from pool if not currently enabled
-            for name in want.iter() {
-                if servers.contains_key(name) {
-                    continue;
-                }
-                if let Some(cfg) = pool.remove(name) {
-                    servers.insert(name.clone(), cfg);
-                    planned.summary.will_enable.push(server_id(Client::ClaudeCode, name));
-                } else {
-                    planned.warnings.push(Warning {
-                        code: "MISSING_SERVER".to_string(),
-                        message: format!("Missing server config for profile target: claude_code:{name}"),
-                        details: None,
-                    });
-                }
+    let mut store = load_registry_store(paths)?;
+    let mut existing = BTreeSet::new();
+    for server in store.servers.iter_mut().filter(|server| server.client == client) {
+        existing.insert(server.name.clone());
+        let should_enable = want.contains(&server.name);
+        if server.enabled != should_enable {
+            server.enabled = should_enable;
+            server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            server.payload =
+                registry_payload_for_storage(client, server.transport, server.payload.clone(), should_enable);
+            if should_enable {
+                planned.summary.will_enable.push(server.server_id.clone());
+            } else {
+                planned.summary.will_disable.push(server.server_id.clone());
             }
+        }
+    }
 
-            // disable everything not in want
-            let current_names: Vec<String> = servers.keys().cloned().collect();
-            for name in current_names {
-                if want.contains(&name) {
-                    continue;
-                }
-                if let Some(cfg) = servers.remove(&name) {
-                    pool.insert(name.clone(), cfg);
-                    planned.summary.will_disable.push(server_id(Client::ClaudeCode, &name));
-                }
-            }
-
-            let before_cfg = read_to_string_opt(&paths.claude_config_path)?;
-            let after_cfg = write_claude_config(root, servers)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.claude_config_path.clone(),
-                before: before_cfg,
-                after: after_cfg,
-            });
-
-            let before_pool = read_to_string_opt(&paths.disabled_pool_path)?;
-            let after_pool = save_disabled_pool(&pool)?;
-            planned.files.push(PlannedFileWrite {
-                path: paths.disabled_pool_path.clone(),
-                before: before_pool,
-                after: after_pool,
+    for name in want {
+        if !existing.contains(&name) {
+            planned.warnings.push(Warning {
+                code: "MISSING_SERVER".to_string(),
+                message: format!("Missing server config for profile target: {}:{name}", match client {
+                    Client::ClaudeCode => "claude_code",
+                    Client::Codex => "codex",
+                }),
+                details: None,
             });
         }
-        Client::Codex => {
-            let mut doc = parse_codex_doc(&paths.codex_config_path)?;
-            let before = read_to_string_opt(&paths.codex_config_path)?;
-            let servers = codex_mcp_servers_table_mut(&mut doc);
+    }
 
-            let want: BTreeSet<String> = profile
-                .targets
-                .codex
-                .iter()
-                .filter_map(|sid| parse_server_id(sid).ok().map(|(_c, n)| n))
-                .collect();
+    sort_registry_servers(&mut store);
+    let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
+    let after_registry = serialize_registry_store(&store)?;
+    planned.files.push(PlannedFileWrite {
+        path: paths.mcp_registry_path.clone(),
+        before: before_registry,
+        after: after_registry,
+    });
 
-            // Toggle enabled for all existing servers; do not delete anything.
-            let mut existing: BTreeSet<String> = BTreeSet::new();
-            for (name, item) in servers.iter_mut() {
-                if let Some(tbl) = item.as_table_mut() {
-                    let name_str = name.get();
-                    existing.insert(name_str.to_string());
-                    let should = want.contains(name_str);
-                    let curr = codex_get_enabled(tbl);
-                    if curr != should {
-                        codex_set_enabled(tbl, should);
-                        if should {
-                            planned
-                                .summary
-                                .will_enable
-                                .push(server_id(Client::Codex, name_str));
-                        } else {
-                            planned
-                                .summary
-                                .will_disable
-                                .push(server_id(Client::Codex, name_str));
-                        }
-                    }
-                }
-            }
-
-            // Missing servers in profile are warned and skipped.
-            for name in want {
-                if !existing.contains(&name) {
-                    planned.warnings.push(Warning {
-                        code: "MISSING_SERVER".to_string(),
-                        message: format!("Missing server config for profile target: codex:{name}"),
-                        details: None,
-                    });
-                }
-            }
-
-            planned.files.push(PlannedFileWrite {
-                path: paths.codex_config_path.clone(),
-                before,
-                after: doc.to_string(),
-            });
-        }
+    let external_path = mcp_external_path(paths, client).to_path_buf();
+    let before_external = read_to_string_opt(&external_path)?;
+    let after_external = export_registry_client_config(paths, &store, client)?;
+    if should_write_external(&before_external, &after_external, client) {
+        planned.files.push(PlannedFileWrite {
+            path: external_path,
+            before: before_external,
+            after: after_external,
+        });
     }
 
     Ok(planned)

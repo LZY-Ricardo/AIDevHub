@@ -35,6 +35,7 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         app_local_data_dir: app_local_data_dir.clone(),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
+        mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),
         backup_index_path: app_local_data_dir.join("backup_index.json"),
@@ -46,6 +47,33 @@ fn write(path: &PathBuf, content: &str) {
         fs::create_dir_all(p).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+fn registry_server(
+    server_id: &str,
+    client: &str,
+    name: &str,
+    transport: &str,
+    enabled: bool,
+    payload: serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!({
+        "server_id": server_id,
+        "client": client,
+        "name": name,
+        "transport": transport,
+        "enabled": enabled,
+        "payload": payload,
+        "source_origin": if client == "codex" { "codex.mcp.json" } else { "claudecode.mcp.json" },
+        "updated_at": "2026-03-23T00:00:00Z"
+    })
+}
+
+fn write_registry(paths: &AppPaths, servers: Vec<serde_json::Value>) {
+    write(
+        &paths.mcp_registry_path,
+        &serde_json::to_string_pretty(&serde_json::json!({ "servers": servers })).unwrap(),
+    );
 }
 
 #[test]
@@ -155,10 +183,21 @@ fn runtime_info_paths_and_exists() {
 }
 
 #[test]
-fn claude_toggle_moves_between_config_and_disabled_pool() {
+fn claude_toggle_exports_enabled_state_from_registry() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "claude_code:s1",
+            "claude_code",
+            "s1",
+            "stdio",
+            true,
+            serde_json::json!({"command":"node","args":["a.js"],"env":{"API_KEY":"x"}}),
+        )],
+    );
     write(
         &paths.claude_config_path,
         r#"{"mcpServers":{"s1":{"command":"node","args":["a.js"],"env":{"API_KEY":"x"}}},"other":123}"#,
@@ -168,6 +207,9 @@ fn claude_toggle_moves_between_config_and_disabled_pool() {
     assert!(p1.summary.will_disable.contains(&"claude_code:s1".to_string()));
     let r1 = server_apply_toggle(&paths, "claude_code:s1", false, preconditions_from_preview(&p1)).unwrap();
     assert!(r1.summary.will_disable.contains(&"claude_code:s1".to_string()));
+    let cfg_after_disable = fs::read_to_string(&paths.claude_config_path).unwrap();
+    assert!(cfg_after_disable.contains("\"other\": 123"));
+    assert!(!cfg_after_disable.contains("\"s1\""));
 
     let list1 = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
     let s1 = list1.iter().find(|s| s.server_id == "claude_code:s1").unwrap();
@@ -176,6 +218,10 @@ fn claude_toggle_moves_between_config_and_disabled_pool() {
     let p2 = server_preview_toggle(&paths, "claude_code:s1", true).unwrap();
     assert!(p2.summary.will_enable.contains(&"claude_code:s1".to_string()));
     let _r2 = server_apply_toggle(&paths, "claude_code:s1", true, preconditions_from_preview(&p2)).unwrap();
+    let cfg_after_enable = fs::read_to_string(&paths.claude_config_path).unwrap();
+    assert!(cfg_after_enable.contains("\"other\": 123"));
+    assert!(cfg_after_enable.contains("\"s1\""));
+    assert!(cfg_after_enable.contains("\"a.js\""));
 
     let list2 = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
     let s1b = list2.iter().find(|s| s.server_id == "claude_code:s1").unwrap();
@@ -183,10 +229,21 @@ fn claude_toggle_moves_between_config_and_disabled_pool() {
 }
 
 #[test]
-fn codex_toggle_only_enabled_field() {
+fn codex_toggle_removes_and_restores_registry_server_in_external_file() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "codex:alpha",
+            "codex",
+            "alpha",
+            "stdio",
+            true,
+            serde_json::json!({"command":"node","args":["server.js"],"enabled":true}),
+        )],
+    );
     write(
         &paths.codex_config_path,
         r#"
@@ -194,6 +251,9 @@ fn codex_toggle_only_enabled_field() {
 command = "node"
 args = ["server.js"]
 enabled = true
+
+[workspace]
+name = "demo"
 "#,
     );
 
@@ -202,8 +262,21 @@ enabled = true
     server_apply_toggle(&paths, "codex:alpha", false, preconditions_from_preview(&p1)).unwrap();
 
     let s = fs::read_to_string(&paths.codex_config_path).unwrap();
-    assert!(s.contains("command = \"node\""));
-    assert!(s.contains("enabled = false"));
+    assert!(!s.contains("[mcp_servers.alpha]"));
+    assert!(s.contains("[workspace]"));
+
+    let list1 = server_list(&paths, Some(Client::Codex)).unwrap();
+    let alpha = list1.iter().find(|server| server.server_id == "codex:alpha").unwrap();
+    assert!(!alpha.enabled);
+
+    let p2 = server_preview_toggle(&paths, "codex:alpha", true).unwrap();
+    assert!(p2.summary.will_enable.contains(&"codex:alpha".to_string()));
+    server_apply_toggle(&paths, "codex:alpha", true, preconditions_from_preview(&p2)).unwrap();
+
+    let restored = fs::read_to_string(&paths.codex_config_path).unwrap();
+    assert!(restored.contains("[mcp_servers.alpha]"));
+    assert!(restored.contains("command = \"node\""));
+    assert!(restored.contains("[workspace]"));
 }
 
 #[test]
@@ -211,6 +284,17 @@ fn precondition_failed_when_file_changes_after_preview() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "codex:alpha",
+            "codex",
+            "alpha",
+            "stdio",
+            true,
+            serde_json::json!({"command":"node","enabled":true}),
+        )],
+    );
     write(
         &paths.codex_config_path,
         r#"
@@ -237,18 +321,42 @@ enabled = true
 }
 
 #[test]
-fn profile_apply_converges_claude_enabled_set_and_warns_missing() {
+fn profile_apply_converges_claude_enabled_set_from_registry() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![
+            registry_server(
+                "claude_code:a",
+                "claude_code",
+                "a",
+                "stdio",
+                true,
+                serde_json::json!({"command":"node","args":["a.js"]}),
+            ),
+            registry_server(
+                "claude_code:b",
+                "claude_code",
+                "b",
+                "stdio",
+                true,
+                serde_json::json!({"command":"node","args":["b.js"]}),
+            ),
+            registry_server(
+                "claude_code:c",
+                "claude_code",
+                "c",
+                "stdio",
+                false,
+                serde_json::json!({"command":"node","args":["c.js"]}),
+            ),
+        ],
+    );
     write(
         &paths.claude_config_path,
         r#"{"mcpServers":{"a":{"command":"node"},"b":{"command":"node"}}}"#,
-    );
-    // pool has c
-    write(
-        &paths.disabled_pool_path,
-        r#"{"c":{"command":"node","args":["c.js"]}}"#,
     );
 
     let prof = profile_create(
@@ -272,6 +380,11 @@ fn profile_apply_converges_claude_enabled_set_and_warns_missing() {
     assert!(!a.enabled);
     assert!(b.enabled);
     assert!(c.enabled);
+
+    let cfg = fs::read_to_string(&paths.claude_config_path).unwrap();
+    assert!(!cfg.contains("\"a\""));
+    assert!(cfg.contains("\"b\""));
+    assert!(cfg.contains("\"c\""));
 }
 
 #[test]
@@ -279,6 +392,17 @@ fn apply_creates_backup_and_backup_list_filters() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "claude_code:s1",
+            "claude_code",
+            "s1",
+            "stdio",
+            true,
+            serde_json::json!({"command":"node"}),
+        )],
+    );
     write(
         &paths.claude_config_path,
         r#"{"mcpServers":{"s1":{"command":"node"}}}"#,
@@ -300,6 +424,17 @@ fn rollback_preview_and_apply_restores_file() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "claude_code:s1",
+            "claude_code",
+            "s1",
+            "stdio",
+            true,
+            serde_json::json!({"command":"node"}),
+        )],
+    );
     write(
         &paths.claude_config_path,
         r#"{"mcpServers":{"s1":{"command":"node"}}}"#,
@@ -373,6 +508,9 @@ fn add_server_preview_and_apply_for_codex_and_claude() {
 
     let got = server_get(&paths, "codex:alpha", false).unwrap();
     assert!(got.enabled);
+    let codex_cfg = fs::read_to_string(&paths.codex_config_path).unwrap();
+    assert!(codex_cfg.contains("[mcp_servers.alpha]"));
+    assert!(paths.mcp_registry_path.exists());
 
     let prev_cl = server_preview_add(
         &paths,
@@ -400,6 +538,9 @@ fn add_server_preview_and_apply_for_codex_and_claude() {
     let got2 = server_get(&paths, "claude_code:s1", false).unwrap();
     assert!(got2.enabled);
     assert_eq!(got2.transport, Transport::Http);
+    let claude_cfg = fs::read_to_string(&paths.claude_config_path).unwrap();
+    assert!(claude_cfg.contains("\"s1\""));
+    assert!(claude_cfg.contains("\"http://localhost:8080/mcp\""));
 }
 
 #[test]
@@ -408,16 +549,25 @@ fn server_get_edit_session_returns_editable_payload_for_claude() {
     let paths = mk_paths(&tmp);
 
     write(
-        &paths.claude_config_path,
+        &paths.mcp_registry_path,
         r#"{
-  "mcpServers": {
-    "demo": {
-      "command": "npx",
-      "args": ["-y", "@demo/server"],
-      "env": {"API_KEY": "secret"},
-      "x_extra": "keep-me"
+  "servers": [
+    {
+      "server_id": "claude_code:demo",
+      "client": "claude_code",
+      "name": "demo",
+      "transport": "stdio",
+      "enabled": true,
+      "payload": {
+        "command": "npx",
+        "args": ["-y", "@demo/server"],
+        "env": {"API_KEY": "secret"},
+        "x_extra": "keep-me"
+      },
+      "source_origin": "claudecode.mcp.json",
+      "updated_at": "2026-03-23T00:00:00Z"
     }
-  }
+  ]
 }"#,
     );
 
@@ -434,10 +584,62 @@ fn server_get_edit_session_returns_editable_payload_for_claude() {
 }
 
 #[test]
+fn server_get_reads_mcp_from_registry_even_without_external_config_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write(
+        &paths.mcp_registry_path,
+        r#"{
+  "servers": [
+    {
+      "server_id": "codex:alpha",
+      "client": "codex",
+      "name": "alpha",
+      "transport": "stdio",
+      "enabled": true,
+      "payload": {
+        "command": "node",
+        "args": ["alpha.js"]
+      },
+      "source_origin": "codex.mcp.json",
+      "updated_at": "2026-03-23T00:00:00Z"
+    }
+  ]
+}"#,
+    );
+
+    let got = server_get(&paths, "codex:alpha", false).unwrap();
+    assert_eq!(got.server_id, "codex:alpha");
+    assert_eq!(got.source_file, paths.mcp_registry_path.to_string_lossy().to_string());
+}
+
+#[test]
 fn claude_edit_preview_and_apply_updates_only_target_server() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![
+            registry_server(
+                "claude_code:demo",
+                "claude_code",
+                "demo",
+                "stdio",
+                true,
+                serde_json::json!({"command":"old","args":["a"],"x_extra":"keep"}),
+            ),
+            registry_server(
+                "claude_code:other",
+                "claude_code",
+                "other",
+                "stdio",
+                true,
+                serde_json::json!({"command":"stay"}),
+            ),
+        ],
+    );
     write(
         &paths.claude_config_path,
         r#"{
@@ -477,13 +679,40 @@ fn claude_edit_preview_and_apply_updates_only_target_server() {
     assert!(cfg.contains("\"command\": \"new\""));
     assert!(cfg.contains("\"other\""));
     assert!(cfg.contains("\"stay\""));
+
+    let got = server_get(&paths, "claude_code:demo", false).unwrap();
+    assert_eq!(
+        got.payload.get("command").and_then(|value| value.as_str()),
+        Some("new")
+    );
 }
 
 #[test]
-fn codex_edit_updates_only_target_table_and_preserves_neighbors() {
+fn codex_edit_updates_registry_and_external_for_enabled_server() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![
+            registry_server(
+                "codex:alpha",
+                "codex",
+                "alpha",
+                "stdio",
+                true,
+                serde_json::json!({"command":"old","args":["a"],"enabled":true}),
+            ),
+            registry_server(
+                "codex:beta",
+                "codex",
+                "beta",
+                "http",
+                false,
+                serde_json::json!({"url":"https://keep.example.com/mcp","enabled":false}),
+            ),
+        ],
+    );
     write(
         &paths.codex_config_path,
         r#"
@@ -501,7 +730,6 @@ enabled = false
     let mut payload = serde_json::Map::new();
     payload.insert("command".into(), serde_json::json!("new"));
     payload.insert("args".into(), serde_json::json!(["b"]));
-    payload.insert("enabled".into(), serde_json::json!(false));
 
     let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
     server_apply_edit(
@@ -515,15 +743,74 @@ enabled = false
 
     let cfg = fs::read_to_string(&paths.codex_config_path).unwrap();
     assert!(cfg.contains("command = \"new\""));
-    assert!(cfg.contains("[mcp_servers.beta]"));
-    assert!(cfg.contains("url = \"https://keep.example.com/mcp\""));
+    assert!(!cfg.contains("[mcp_servers.beta]"));
+
+    let got = server_get(&paths, "codex:alpha", false).unwrap();
+    assert_eq!(
+        got.payload.get("command").and_then(|value| value.as_str()),
+        Some("new")
+    );
 }
 
 #[test]
-fn codex_edit_rejects_nested_object_values() {
+fn editing_disabled_codex_server_updates_registry_without_touching_external_file() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "codex:alpha",
+            "codex",
+            "alpha",
+            "stdio",
+            false,
+            serde_json::json!({"command":"old","args":["a"],"enabled":false}),
+        )],
+    );
+    write(&paths.codex_config_path, "[workspace]\nname = \"demo\"\n");
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("command".into(), serde_json::json!("new"));
+    payload.insert("args".into(), serde_json::json!(["b"]));
+
+    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    server_apply_edit(
+        &paths,
+        "codex:alpha",
+        Transport::Stdio,
+        payload,
+        preconditions_from_preview(&preview),
+    )
+    .unwrap();
+
+    let cfg = fs::read_to_string(&paths.codex_config_path).unwrap();
+    assert_eq!(cfg, "[workspace]\nname = \"demo\"\n");
+
+    let got = server_get(&paths, "codex:alpha", false).unwrap();
+    assert!(!got.enabled);
+    assert_eq!(
+        got.payload.get("command").and_then(|value| value.as_str()),
+        Some("new")
+    );
+}
+
+#[test]
+fn codex_edit_supports_nested_object_values_via_child_tables() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write_registry(
+        &paths,
+        vec![registry_server(
+            "codex:alpha",
+            "codex",
+            "alpha",
+            "stdio",
+            true,
+            serde_json::json!({"command":"old","enabled":true}),
+        )],
+    );
     write(
         &paths.codex_config_path,
         r#"
@@ -537,6 +824,17 @@ enabled = true
     payload.insert("command".into(), serde_json::json!("new"));
     payload.insert("nested".into(), serde_json::json!({"bad": true}));
 
-    let err = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload).unwrap_err();
-    assert_eq!(err.code, "VALIDATION_ERROR");
+    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    server_apply_edit(
+        &paths,
+        "codex:alpha",
+        Transport::Stdio,
+        payload,
+        preconditions_from_preview(&preview),
+    )
+    .unwrap();
+
+    let cfg = fs::read_to_string(&paths.codex_config_path).unwrap();
+    assert!(cfg.contains("[mcp_servers.alpha.nested]"));
+    assert!(cfg.contains("bad = true"));
 }

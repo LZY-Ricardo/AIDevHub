@@ -19,6 +19,7 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         backups_dir: app_local_data_dir.join("backups"),
         backup_index_path: app_local_data_dir.join("backups").join("index.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
+        mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
     }
 }
 
@@ -30,24 +31,37 @@ fn write(path: &std::path::Path, s: &str) {
 }
 
 #[test]
-fn disabled_claude_server_uses_disabled_pool_as_source_file() {
+fn mcp_servers_use_registry_as_source_file() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
 
     write(
-        &paths.claude_config_path,
-        r#"{"mcpServers":{"enabled_one":{"command":"node"}}}"#,
-    );
-    write(
-        &paths.disabled_pool_path,
-        r#"{"disabled_one":{"command":"node","args":["server.js"]}}"#,
+        &paths.mcp_registry_path,
+        r#"{
+  "servers": [
+    {
+      "server_id": "claude_code:disabled_one",
+      "client": "claude_code",
+      "name": "disabled_one",
+      "transport": "stdio",
+      "enabled": false,
+      "payload": {
+        "command": "node",
+        "args": ["server.js"]
+      },
+      "source_origin": "claudecode.mcp.json",
+      "updated_at": "2026-03-23T00:00:00Z"
+    }
+  ]
+}"#,
     );
 
     let got = server_get(&paths, "claude_code:disabled_one", false).unwrap();
     assert_eq!(
         got.source_file,
-        paths.disabled_pool_path.to_string_lossy().to_string()
+        paths.mcp_registry_path.to_string_lossy().to_string()
     );
+    assert!(!got.enabled);
 
     let list = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
     let disabled = list
@@ -56,6 +70,6 @@ fn disabled_claude_server_uses_disabled_pool_as_source_file() {
         .unwrap();
     assert_eq!(
         disabled.source_file,
-        paths.disabled_pool_path.to_string_lossy().to_string()
+        paths.mcp_registry_path.to_string_lossy().to_string()
     );
 }

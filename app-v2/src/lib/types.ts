@@ -158,3 +158,39 @@ export interface SkillGetResponse {
   record: SkillRecord;
   content: string;
 }
+
+export type ConfigSourceKind = "mcp" | "skill";
+
+export interface ConfigUpdateItem {
+  source_id: string;
+  client: Client;
+  kind: ConfigSourceKind;
+  current_sha256: string;
+  diff_unified: string;
+  requires_confirm_sync: boolean;
+  confirm_sync_available?: boolean;
+}
+
+export interface ConfigCheckUpdatesResponse {
+  updates: ConfigUpdateItem[];
+}
+
+export interface ConfigIgnoreCondition {
+  source_id: string;
+  current_sha256: string;
+}
+
+export interface ConfigIgnoreUpdatesResponse {
+  ignored_source_ids: string[];
+}
+
+export interface ConfigConfirmMcpRequest {
+  source_id: string;
+  current_sha256: string;
+  client: Client;
+}
+
+export interface ConfigConfirmMcpResponse {
+  accepted: boolean;
+  message: string;
+}

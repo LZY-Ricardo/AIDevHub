@@ -33,7 +33,13 @@ const EMPTY_SERVER_NOTES: ServerNotes = {
   field_hints: {},
 };
 
-export function ServersPage() {
+export function ServersPage({
+  onCheckConfigUpdates,
+  configCheckBusy,
+}: {
+  onCheckConfigUpdates: () => Promise<void>;
+  configCheckBusy: boolean;
+}) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
@@ -162,6 +168,9 @@ export function ServersPage() {
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
               <Icon name="refresh" /> 刷新
+            </button>
+            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy}>
+              <Icon name="refresh" /> 手动检查更新
             </button>
           </div>
         </div>
@@ -606,7 +615,7 @@ function DetailsDrawer({
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">来源文件</div>
+                <div className="ui-label">当前来源</div>
                 <div className="ui-code" style={{ marginTop: "8px" }}>{editSession.source_file}</div>
               </div>
             </div>
@@ -716,7 +725,7 @@ function DetailsDrawer({
               </div>
 
               <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">来源文件</div>
+                <div className="ui-label">当前来源</div>
                 <div className="ui-code" style={{ marginTop: "8px" }}>
                   {shown!.source_file}
                 </div>
