@@ -395,10 +395,14 @@ fn read_to_string_opt(path: &Path) -> Result<Option<String>, AppError> {
     }
 }
 
-fn sha256_hex(s: &str) -> String {
+fn sha256_hex_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(s.as_bytes());
+    hasher.update(bytes);
     hex::encode(hasher.finalize())
+}
+
+fn sha256_hex(s: &str) -> String {
+    sha256_hex_bytes(s.as_bytes())
 }
 
 fn unified_diff(header: &str, before: &str, after: &str) -> String {
@@ -459,8 +463,19 @@ fn collect_skill_files(base_dir: &Path) -> Result<Vec<(String, String)>, AppErro
             })?
             .to_string_lossy()
             .replace('\\', "/");
-        let content = fs::read_to_string(&file)
-            .map_err(|e| AppError::new("IO_ERROR", format!("read {}: {e}", file.display())))?;
+        let bytes =
+            fs::read(&file).map_err(|e| AppError::new("IO_ERROR", format!("read {}: {e}", file.display())))?;
+        let content = match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(err) => {
+                let bytes = err.into_bytes();
+                format!(
+                    "[binary file omitted: {} bytes, sha256={}]",
+                    bytes.len(),
+                    sha256_hex_bytes(&bytes)
+                )
+            }
+        };
         out.push((rel, content));
     }
 

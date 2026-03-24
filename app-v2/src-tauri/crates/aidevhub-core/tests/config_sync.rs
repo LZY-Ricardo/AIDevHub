@@ -41,6 +41,14 @@ fn write_skill_file(dir: &PathBuf, name: &str, content: &str) {
     fs::write(path, content).unwrap();
 }
 
+fn write_skill_bytes(dir: &PathBuf, name: &str, content: &[u8]) {
+    let path = dir.join(name);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).unwrap();
+    }
+    fs::write(path, content).unwrap();
+}
+
 fn seed_all_sources(paths: &AppPaths) {
     write(
         &paths.claude_config_path,
@@ -302,4 +310,26 @@ fn corrupted_snapshot_file_is_recovered_to_safe_state() {
     let changed = config_check_updates(&paths).unwrap();
     assert_eq!(changed.updates.len(), 1);
     assert_eq!(changed.updates[0].source_id, "claudecode.mcp.json");
+}
+
+#[test]
+fn skill_snapshot_keeps_binary_assets_as_text_placeholders() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+    seed_all_sources(&paths);
+    write_skill_bytes(
+        &paths.codex_skills_dir,
+        "openai-docs/assets/openai.png",
+        &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0x00],
+    );
+
+    let check = config_check_updates(&paths).unwrap();
+    let codex_skill = check
+        .updates
+        .iter()
+        .find(|u| u.source_id == "codex.skill.json")
+        .unwrap();
+
+    assert!(codex_skill.diff_unified.contains("openai-docs/assets/openai.png"));
+    assert!(codex_skill.diff_unified.contains("[binary file omitted"));
 }
