@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 
 export type SettingsTab = "profiles" | "backups" | "preferences";
 
-interface SettingsTabConfig {
+export interface SettingsTabConfig {
   key: SettingsTab;
   label: string;
   content: ReactNode;
 }
 
-interface SettingsTabsProps {
+export interface SettingsTabsProps {
   tabs: SettingsTabConfig[];
   defaultTab?: SettingsTab;
 }
