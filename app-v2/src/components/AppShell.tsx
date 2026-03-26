@@ -1,3 +1,11 @@
+/**
+ * @deprecated 使用 TopNavShell 代替。此组件将在未来版本中移除。
+ *
+ * 旧的侧边栏布局组件，已被顶部导航栏布局替代。
+ * 请迁移到新的 TopNavShell 组件。
+ *
+ * @see TopNavShell
+ */
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
