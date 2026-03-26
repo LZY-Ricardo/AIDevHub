@@ -2,7 +2,7 @@
   height: 100vh;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   overflow: hidden;
 }
 
@@ -68,7 +68,8 @@
 }
 
 .ui-main {
-  grid-column: 2;
+  grid-column: 1;
+  grid-row: 2;
   height: 100vh;
   min-height: 0;
   box-sizing: border-box;
@@ -816,47 +817,443 @@
 }
 
 @media (max-width: 920px) {
+  /* Shell layout */
   .ui-shell {
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Topbar becomes responsive */
+  .ui-topbar {
     height: auto;
-    min-height: 0;
+    padding: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .ui-topbarBrand {
+    width: 100%;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+  }
+
+  .ui-topbarNav {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ui-topbarNavItem {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Dashboard becomes single column */
+  .ui-dashboardStats {
     grid-template-columns: 1fr;
-    overflow: visible;
   }
-  .ui-sidebar {
-    position: relative;
-    inset: auto;
-    width: auto;
+
+  .ui-dashboardQuickActions {
+    grid-template-columns: 1fr;
+  }
+
+  /* Page header responsive */
+  .ui-pageHeader {
     height: auto;
-    overflow: visible;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-md);
+    flex-wrap: wrap;
+    gap: var(--space-sm);
   }
+
+  .ui-pageHeaderLeft {
+    width: 100%;
+  }
+
+  .ui-pageHeaderActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Main content padding adjustment */
   .ui-main {
-    grid-column: auto;
-    height: auto;
-    overflow-y: visible;
-    padding: var(--space-xl);
+    padding: var(--space-md);
   }
+
+  /* Cards become full width */
   .ui-card {
     grid-column: 1 / -1;
   }
+
+  /* Fields become full width */
   .ui-field {
     grid-column: 1 / -1;
   }
 
-  /* On small screens the sidebar becomes top-aligned; keep tooltips within viewport. */
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]::after {
-    left: 10px;
-    right: 10px;
-    top: auto;
-    bottom: calc(100% + 10px);
-    width: auto;
-    max-width: none;
-    transform: translateY(4px);
+  /* Tab navigation responsive */
+  .ui-tabs {
+    overflow-x: auto;
+    justify-content: flex-start;
   }
+}
 
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:hover::after,
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:focus-within::after {
-    transform: translateY(0);
-  }
+/* === 顶部导航栏 === */
+.ui-topbar {
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: #ffffff;
+}
+
+.ui-topbarBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.ui-brandName {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ui-topbarNav {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ui-topbarNavItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ui-topbarNavItem:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ui-iconBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+}
+
+.ui-iconBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+/* === 页面头部栏（二级页面） === */
+.ui-pageHeaderBar {
+  height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(var(--color-ink-rgb), 0.02);
+}
+
+.ui-pageHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.ui-backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ui-backBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-backBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+.ui-pageTitleBar {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.ui-pageHeaderActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ui-actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(var(--color-text-rgb), 0.04);
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ui-actionBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.08);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+}
+
+.ui-actionBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+.ui-actionLabel {
+  font-family: var(--font-body);
+}
+
+/* === 适配主内容区域 === */
+.ui-shell > .ui-main:not(:only-child) {
+  padding-top: var(--space-lg);
+}
+
+/* === Dashboard 仪表盘 === */
+.ui-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.ui-dashboardWelcome h1 {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ui-dashboardStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.ui-statCard {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ui-statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-statCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  color: var(--color-muted);
+}
+
+.ui-statCardTitle {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ui-statCardBody {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.ui-statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-statLabel {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.ui-statValue {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.ui-sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 var(--space-md) 0;
+}
+
+.ui-quickActionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-md);
+}
+
+.ui-quickActionBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.ui-quickActionBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.04);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+  transform: translateY(-2px);
+}
+
+.ui-activityList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.ui-activityItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ui-activityItem:last-child {
+  border-bottom: none;
+}
+
+.ui-activityTime {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.ui-activityDesc {
+  color: var(--color-text);
+}
+
+.ui-activityEmpty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 14px;
+  background: rgba(var(--color-text-rgb), 0.02);
+  border-radius: var(--radius-md);
+}
+
+/* === 废弃旧侧边栏样式（保留用于参考） === */
+/*
+.ui-sidebar { ... }
+.ui-nav { ... }
+.ui-navItem { ... }
+.ui-navLabel { ... }
+.ui-badge { ... }
+*/
+
+/* === Settings Tabs === */
+.ui-settingsTabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ui-settingsTabList {
+  display: flex;
+  gap: var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--space-lg);
+}
+
+.ui-settingsTabBtn {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ui-settingsTabBtn:hover {
+  color: var(--color-text);
+}
+
+.ui-settingsTabBtn[aria-selected="true"] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+}
+
+.ui-settingsTabContent {
+  padding: 0 var(--space-lg);
 }
