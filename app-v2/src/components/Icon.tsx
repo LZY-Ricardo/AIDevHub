@@ -282,7 +282,7 @@ export function Icon({
       return (
         <svg {...common}>
           <path
-            d="m19 12-7-7 7-7M12 19V5"
+            d="M19 12H5M12 19l-7-7 7-7"
             stroke="currentColor"
             strokeWidth="1.8"
             strokeLinecap="round"
