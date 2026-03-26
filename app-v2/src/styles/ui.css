@@ -937,6 +937,14 @@
   transition: background var(--dur-fast) var(--ease-out);
 }
 
+.ui-topbarNavItem span {
+  color: var(--color-text);
+}
+
+.ui-topbarNavItem svg {
+  color: var(--color-text);
+}
+
 .ui-topbarNavItem:hover {
   background: rgba(var(--color-text-rgb), 0.06);
 }
