@@ -1025,6 +1025,160 @@
   padding-top: var(--space-lg);
 }
 
+/* === Dashboard 仪表盘 === */
+.ui-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.ui-dashboardWelcome h1 {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ui-dashboardStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.ui-statCard {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ui-statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-statCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  color: var(--color-muted);
+}
+
+.ui-statCardTitle {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ui-statCardBody {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.ui-statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-statLabel {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.ui-statValue {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.ui-sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 var(--space-md) 0;
+}
+
+.ui-quickActionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-md);
+}
+
+.ui-quickActionBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.ui-quickActionBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.04);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+  transform: translateY(-2px);
+}
+
+.ui-activityList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.ui-activityItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ui-activityItem:last-child {
+  border-bottom: none;
+}
+
+.ui-activityTime {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.ui-activityDesc {
+  color: var(--color-text);
+}
+
+.ui-activityEmpty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 14px;
+  background: rgba(var(--color-text-rgb), 0.02);
+  border-radius: var(--radius-md);
+}
+
 /* === 废弃旧侧边栏样式（保留用于参考） === */
 /*
 .ui-sidebar { ... }
