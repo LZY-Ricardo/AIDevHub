@@ -942,7 +942,7 @@
 }
 
 .ui-topbarNavItem svg {
-  color: var(--color-text);
+  stroke: var(--color-text);
 }
 
 .ui-topbarNavItem:hover {
@@ -960,6 +960,7 @@
   background: transparent;
   cursor: pointer;
   color: var(--color-text);
+  stroke: var(--color-text);
   transition: background var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out);
 }
