@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { TopNavShell, type RouteKey } from "./components/TopNavShell";
-import { PageHeader, type PageHeaderAction } from "./components/PageHeader";
-import { Dashboard } from "./components/Dashboard";
-import { SettingsTabs } from "./components/SettingsTabs";
+import { AppShell, type RouteKey } from "./components/AppShell";
 import { ConfigChangeDialog } from "./components/ConfigChangeDialog";
 import { McpConfigDiffDialog } from "./components/McpConfigDiffDialog";
 import { McpConfigDiffSummaryDialog } from "./components/McpConfigDiffSummaryDialog";
@@ -25,15 +22,16 @@ import type {
   McpRegistryExternalDiff,
 } from "./lib/types";
 import { ServersPage } from "./pages/ServersPage";
+import { AddServerPage } from "./pages/AddServerPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { BackupsPage } from "./pages/BackupsPage";
-import { SettingsPage as SettingsPageContent } from "./pages/SettingsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 let startupConfigCheckBootstrapped = false;
 
 function App() {
-  const [route, setRoute] = useState<RouteKey>(() => readRouteFromHash() ?? "dashboard");
+  const [route, setRoute] = useState<RouteKey>(() => readRouteFromHash() ?? "servers");
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsError, setSettingsError] = useState<AppError | null>(null);
@@ -48,11 +46,6 @@ function App() {
   const [registryFlowError, setRegistryFlowError] = useState<AppError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const configCheckFlow = useMemo(() => createRequestCoordinator(), []);
-
-  const [mcpCount] = useState(12);
-  const [mcpActiveCount] = useState(10);
-  const [skillCount] = useState(8);
-  const [skillInstalledCount] = useState(6);
 
   useEffect(() => {
     const onHash = () => {
@@ -75,7 +68,7 @@ function App() {
 
   function navigate(r: RouteKey) {
     setRoute(r);
-    window.location.hash = r === "dashboard" ? "#/" : `#/${r}`;
+    window.location.hash = `#/${r}`;
   }
 
   async function runConfigCheck(options?: { propagateError?: boolean }) {
@@ -205,96 +198,25 @@ function App() {
     }
   }
 
-  const mcpPageActions: PageHeaderAction[] = [
-    { icon: "refresh", label: "检测差异", onClick: () => navigate("mcp") },
-    { icon: "save", label: "写入配置", onClick: () => console.log("写入配置") },
-    { icon: "plus", label: "添加", onClick: () => navigate("mcp") },
-  ];
-
-  const skillPageActions: PageHeaderAction[] = [
-    { icon: "refresh", label: "检测差异", onClick: () => navigate("skills") },
-    { icon: "save", label: "写入配置", onClick: () => console.log("写入配置") },
-    { icon: "download", label: "安装", onClick: () => navigate("skills") },
-  ];
-
   return (
-    <TopNavShell route={route} onNavigate={navigate}>
-      {route === "dashboard" ? (
-        <Dashboard
-          onNavigate={navigate}
-          mcpCount={mcpCount}
-          mcpActiveCount={mcpActiveCount}
-          skillCount={skillCount}
-          skillInstalledCount={skillInstalledCount}
+    <AppShell route={route} onNavigate={navigate}>
+      {route === "servers" ? (
+        <ServersPage
+          onCheckConfigUpdates={runConfigCheck}
+          configCheckBusy={configBusy}
+          onCheckRegistryExternalDiff={onCheckRegistryExternalDiff}
+          onPreviewSyncRegistryToExternal={onPreviewSyncRegistryToExternal}
+          onApplySyncRegistryToExternal={onApplySyncRegistryToExternal}
+          reloadToken={reloadToken}
         />
       ) : null}
-
-      {route === "mcp" ? (
-        <>
-          <PageHeader
-            title="MCP管理"
-            kicker="开关、详情与状态"
-            actions={mcpPageActions}
-            onBack={() => navigate("dashboard")}
-          />
-          <ServersPage
-            onCheckConfigUpdates={runConfigCheck}
-            configCheckBusy={configBusy}
-            onCheckRegistryExternalDiff={onCheckRegistryExternalDiff}
-            onPreviewSyncRegistryToExternal={onPreviewSyncRegistryToExternal}
-            onApplySyncRegistryToExternal={onApplySyncRegistryToExternal}
-            reloadToken={reloadToken}
-          />
-        </>
-      ) : null}
-
-      {route === "skills" ? (
-        <>
-          <PageHeader
-            title="Skill管理"
-            kicker="Codex skills / Claude 命令"
-            actions={skillPageActions}
-            onBack={() => navigate("dashboard")}
-          />
-          <SkillsPage />
-        </>
-      ) : null}
-
+      {route === "add" ? <AddServerPage /> : null}
+      {route === "profiles" ? <ProfilesPage /> : null}
+      {route === "skills" ? <SkillsPage /> : null}
+      {route === "backups" ? <BackupsPage /> : null}
       {route === "settings" ? (
-        <>
-          <PageHeader
-            title="设置"
-            onBack={() => navigate("dashboard")}
-          />
-          <SettingsTabs
-            tabs={[
-              {
-                key: "profiles",
-                label: "配置方案",
-                content: <ProfilesPage />,
-              },
-              {
-                key: "backups",
-                label: "备份回滚",
-                content: <BackupsPage />,
-              },
-              {
-                key: "preferences",
-                label: "界面设置",
-                content: (
-                  <SettingsPageContent
-                    settings={settings}
-                    busy={settingsBusy}
-                    error={settingsError}
-                    onSave={saveSettings}
-                  />
-                ),
-              },
-            ]}
-          />
-        </>
+        <SettingsPage settings={settings} busy={settingsBusy} error={settingsError} onSave={saveSettings} />
       ) : null}
-
       <ConfigChangeDialog
         updates={updates}
         open={configDialogOpen}
@@ -338,19 +260,15 @@ function App() {
           <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{registryFlowError.message}</div>
         </div>
       ) : null}
-    </TopNavShell>
+    </AppShell>
   );
 }
 
 function readRouteFromHash(): RouteKey | null {
   const h = window.location.hash || "";
-  const match = h.match(/^#\/?(dashboard|mcp|skills|settings)?$/);
+  const match = h.match(/^#\/(servers|add|profiles|skills|backups|settings)$/);
   if (!match) return null;
-  const path = match[1] || "dashboard";
-  if (path === "dashboard" || path === "mcp" || path === "skills" || path === "settings") {
-    return path;
-  }
-  return "dashboard";
+  return match[1] as RouteKey;
 }
 
 export default App;
