@@ -817,49 +817,79 @@
 }
 
 @media (max-width: 920px) {
+  /* Shell layout */
   .ui-shell {
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Topbar becomes responsive */
+  .ui-topbar {
     height: auto;
-    min-height: 0;
+    padding: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .ui-topbarBrand {
+    width: 100%;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+  }
+
+  .ui-topbarNav {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ui-topbarNavItem {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Dashboard becomes single column */
+  .ui-dashboardStats {
     grid-template-columns: 1fr;
-    overflow: visible;
   }
-  .ui-sidebar {
-    position: relative;
-    inset: auto;
-    width: auto;
+
+  .ui-dashboardQuickActions {
+    grid-template-columns: 1fr;
+  }
+
+  /* Page header responsive */
+  .ui-pageHeader {
     height: auto;
-    overflow: visible;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-md);
+    flex-wrap: wrap;
+    gap: var(--space-sm);
   }
+
+  .ui-pageHeaderLeft {
+    width: 100%;
+  }
+
+  .ui-pageHeaderActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Main content padding adjustment */
   .ui-main {
-    grid-column: auto;
-    grid-row: auto;
-    height: auto;
-    overflow-y: visible;
-    padding: var(--space-xl);
+    padding: var(--space-md);
   }
+
+  /* Cards become full width */
   .ui-card {
     grid-column: 1 / -1;
   }
+
+  /* Fields become full width */
   .ui-field {
     grid-column: 1 / -1;
   }
 
-  /* On small screens the sidebar becomes top-aligned; keep tooltips within viewport. */
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]::after {
-    left: 10px;
-    right: 10px;
-    top: auto;
-    bottom: calc(100% + 10px);
-    width: auto;
-    max-width: none;
-    transform: translateY(4px);
-  }
-
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:hover::after,
-  .ui-sidebar .ui-navItem.ui-tooltipHost[data-tooltip]:focus-within::after {
-    transform: translateY(0);
+  /* Tab navigation responsive */
+  .ui-tabs {
+    overflow-x: auto;
+    justify-content: flex-start;
   }
 }
 
