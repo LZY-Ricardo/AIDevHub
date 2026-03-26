@@ -6,7 +6,7 @@ export interface PageHeaderAction {
   onClick: () => void;
 }
 
-interface PageHeaderProps {
+export interface PageHeaderProps {
   title: string;
   kicker?: string;
   actions?: PageHeaderAction[];
