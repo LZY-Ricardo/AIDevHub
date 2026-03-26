@@ -292,6 +292,6 @@ export const api = {
   },
 
   settingsPut(payload: AppSettings): Promise<AppSettings> {
-    return invokeCmd<Partial<AppSettings>>("settings_put", payload).then(normalizeAppSettings);
+    return invokeCmd<Partial<AppSettings>>("settings_put", payload as unknown as Record<string, unknown>).then(normalizeAppSettings);
   },
 };

@@ -18,6 +18,8 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
     let claude_config_path = home.join(".claude.json");
     let claude_commands_dir = home.join(".claude").join("commands");
     let claude_commands_disabled_dir = home.join(".claude").join("commands_disabled");
+    let claude_skills_dir = home.join(".claude").join("skills");
+    let claude_skills_disabled_dir = home.join(".claude").join("skills_disabled");
 
     let codex_home = if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
         PathBuf::from(codex_home)
@@ -37,6 +39,8 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         claude_config_path,
         claude_commands_dir,
         claude_commands_disabled_dir,
+        claude_skills_dir,
+        claude_skills_disabled_dir,
         codex_config_path,
         codex_skills_dir,
         codex_skills_disabled_dir,

@@ -67,6 +67,8 @@ pub struct AppPaths {
     pub claude_config_path: PathBuf,
     pub claude_commands_dir: PathBuf,
     pub claude_commands_disabled_dir: PathBuf,
+    pub claude_skills_dir: PathBuf,
+    pub claude_skills_disabled_dir: PathBuf,
     pub codex_config_path: PathBuf,
     pub codex_skills_dir: PathBuf,
     pub codex_skills_disabled_dir: PathBuf,
@@ -996,6 +998,8 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
                 .claude_commands_disabled_dir
                 .to_string_lossy()
                 .to_string(),
+            claude_skills_dir: paths.claude_skills_dir.to_string_lossy().to_string(),
+            claude_skills_disabled_dir: paths.claude_skills_disabled_dir.to_string_lossy().to_string(),
             codex_config_path: paths.codex_config_path.to_string_lossy().to_string(),
             codex_skills_dir: paths.codex_skills_dir.to_string_lossy().to_string(),
             codex_skills_disabled_dir: paths.codex_skills_disabled_dir.to_string_lossy().to_string(),
@@ -1174,6 +1178,42 @@ fn build_skill_record_claude(
     ))
 }
 
+/// Build a SkillRecord for Claude Code directory-based skills (~/.claude/skills/*/)
+/// These have the same structure as Codex skills: directory + SKILL.md
+fn build_skill_record_claude_skill(
+    id_name: &str,
+    dir_path: &Path,
+    enabled: bool,
+    scope: SkillScope,
+) -> Result<(SkillRecord, String), CoreError> {
+    let entry_path = dir_path.join("SKILL.md");
+    let Some(content) = read_to_string_opt(&entry_path)? else {
+        return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_path.display())));
+    };
+    let fm = parse_yaml_frontmatter(&content);
+    let fallback = dir_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(id_name)
+        .to_string();
+    let name = fm.get("name").cloned().unwrap_or(fallback);
+    let description = fm.get("description").cloned().unwrap_or_default();
+    Ok((
+        SkillRecord {
+            skill_id: server_id(Client::ClaudeCode, id_name),
+            client: Client::ClaudeCode,
+            name,
+            description,
+            scope,
+            kind: SkillKind::Dir,
+            enabled,
+            entry_path: entry_path.to_string_lossy().to_string(),
+            container_path: dir_path.to_string_lossy().to_string(),
+        },
+        content,
+    ))
+}
+
 pub fn skill_list(
     paths: &AppPaths,
     client: Option<Client>,
@@ -1217,6 +1257,48 @@ pub fn skill_list(
                 continue;
             };
             if let Ok((rec, _content)) = build_skill_record_claude(stem, &p, false) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+
+        // enabled personal skills (directory-based, same structure as Codex)
+        for ent in read_dir_entries(&paths.claude_skills_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_claude_skill(dir_name, &p, true, SkillScope::User) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+
+        // disabled personal skills
+        for ent in read_dir_entries(&paths.claude_skills_disabled_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_claude_skill(dir_name, &p, false, SkillScope::User) {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1317,12 +1399,21 @@ pub fn skill_get(paths: &AppPaths, skill_id_str: &str) -> Result<SkillGetRespons
 
     let (record, content) = match client {
         Client::ClaudeCode => {
-            let enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
-            let disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
-            if enabled_path.exists() {
-                build_skill_record_claude(&name, &enabled_path, true).map_err(AppError::from)?
-            } else if disabled_path.exists() {
-                build_skill_record_claude(&name, &disabled_path, false).map_err(AppError::from)?
+            // Try commands first (file-based)
+            let command_enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
+            let command_disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            // Then try skills (directory-based)
+            let skill_enabled_path = paths.claude_skills_dir.join(&name);
+            let skill_disabled_path = paths.claude_skills_disabled_dir.join(&name);
+
+            if command_enabled_path.exists() {
+                build_skill_record_claude(&name, &command_enabled_path, true).map_err(AppError::from)?
+            } else if command_disabled_path.exists() {
+                build_skill_record_claude(&name, &command_disabled_path, false).map_err(AppError::from)?
+            } else if skill_enabled_path.exists() && skill_enabled_path.join("SKILL.md").exists() {
+                build_skill_record_claude_skill(&name, &skill_enabled_path, true, SkillScope::User).map_err(AppError::from)?
+            } else if skill_disabled_path.exists() && skill_disabled_path.join("SKILL.md").exists() {
+                build_skill_record_claude_skill(&name, &skill_disabled_path, false, SkillScope::User).map_err(AppError::from)?
             } else {
                 return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
             }

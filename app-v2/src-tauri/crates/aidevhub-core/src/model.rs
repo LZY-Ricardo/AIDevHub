@@ -219,6 +219,8 @@ pub struct RuntimePaths {
     pub claude_config_path: String,
     pub claude_commands_dir: String,
     pub claude_commands_disabled_dir: String,
+    pub claude_skills_dir: String,
+    pub claude_skills_disabled_dir: String,
     pub codex_config_path: String,
     pub codex_skills_dir: String,
     pub codex_skills_disabled_dir: String,
