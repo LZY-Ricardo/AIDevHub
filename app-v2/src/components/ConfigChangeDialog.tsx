@@ -69,7 +69,7 @@ export function ConfigChangeDialog({
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-            <div className="ui-help">按逻辑来源分组展示，共 {groupedBySource.length} 组。</div>
+            <div className="ui-help">按来源分组。MCP 可同步，Skill 仅查看。共 {groupedBySource.length} 组。</div>
             <div className="ui-tabs" role="tablist" aria-label="差异视图">
               <button type="button" className="ui-tab" role="tab" aria-selected={mode === "split"} onClick={() => setMode("split")}>
                 对比视图
@@ -83,47 +83,56 @@ export function ConfigChangeDialog({
             </div>
           </div>
 
-          {groupedBySource.map(([sourceId, items]) => (
-            <div key={sourceId} className="ui-card" style={{ padding: "16px", display: "grid", gap: "12px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-                <div>
-                  <div className="ui-label">逻辑来源</div>
-                  <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>{sourceId}</div>
-                </div>
-                <div className="ui-help">{items.length} 条变化</div>
-              </div>
+          {groupedBySource.map(([sourceId, items]) => {
+            const groupKind = items[0]?.kind ?? "skill";
+            const groupConfirmRequest = items.find((item) => buildConfirmMcpRequest(item))
+              ? buildConfirmMcpRequest(items.find((item) => buildConfirmMcpRequest(item))!)
+              : null;
 
-              {items.map((item, idx) => {
-                const confirmRequest = buildConfirmMcpRequest(item);
-                const confirmDisabled = busy || !confirmRequest;
-
-                return (
-                  <div key={`${sourceId}-${idx}`} style={{ display: "grid", gap: "10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-                      <div className="ui-help">{labelOfUpdate(item)}</div>
+            return (
+              <div key={sourceId} className="ui-card" style={{ padding: "16px", display: "grid", gap: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+                  <div>
+                    <div className="ui-label">来源</div>
+                    <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>{sourceId}</div>
+                  </div>
+                  <div style={{ display: "grid", justifyItems: "end", gap: "8px" }}>
+                    <span className="ui-badge">{items.length} 条变化</span>
+                    {groupKind === "skill" ? (
+                      <span className="ui-pill" title="Skill 不纳入项目内部副本，仅支持查看差异或忽略本次变化。">
+                        <span className="ui-pillDot" />
+                        <span className="ui-code ui-pillText">仅查看</span>
+                      </span>
+                    ) : groupConfirmRequest ? (
                       <button
                         type="button"
                         className="ui-btn"
-                        disabled={confirmDisabled}
+                        disabled={busy}
                         onClick={() => {
-                          if (!confirmRequest) return;
-                          void onConfirmMcp(confirmRequest);
+                          void onConfirmMcp(groupConfirmRequest);
                         }}
-                        title={
-                          confirmDisabled
-                            ? "当前变更暂不支持确认同步"
-                            : "按当前逻辑来源确认更新 MCP"
-                        }
-                      >
-                        确认更新 MCP
-                      </button>
-                    </div>
+                        title="将当前外部 MCP 变化同步到项目内部副本，不会回写外部文件。"
+                        >
+                          同步到项目内 MCP
+                        </button>
+                    ) : (
+                      <span className="ui-pill" title="当前 MCP 变更暂不支持同步到项目内部副本。">
+                        <span className="ui-pillDot" />
+                        <span className="ui-code ui-pillText">暂不支持同步</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {items.map((item, idx) => (
+                  <div key={`${sourceId}-${idx}`} style={{ display: "grid", gap: "10px" }}>
+                    <div className="ui-help">{labelOfUpdate(item)}</div>
                     <DiffViewer diff={item.diff_unified} mode={mode} wrap={wrap} />
                   </div>
-                );
-              })}
-            </div>
-          ))}
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </Dialog>

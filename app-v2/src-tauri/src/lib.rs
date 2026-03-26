@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
 use aidevhub_core::model::{
-    AppError, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition, ConfigIgnoreUpdatesResponse,
-    FilePrecondition, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, Transport,
+    AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
+    ConfigIgnoreUpdatesResponse, FilePrecondition, McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse,
+    ServerNotes, Transport,
 };
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
@@ -299,6 +300,46 @@ fn config_accept_mcp_updates(
 }
 
 #[tauri::command]
+fn mcp_check_registry_external_diff(
+    app: tauri::AppHandle,
+    client: Client,
+) -> Result<McpRegistryExternalDiff, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::mcp_check_registry_external_diff(&paths, client)
+}
+
+#[tauri::command]
+fn mcp_preview_sync_registry_to_external(
+    app: tauri::AppHandle,
+    client: Client,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::mcp_preview_sync_registry_to_external(&paths, client)
+}
+
+#[tauri::command]
+fn mcp_apply_sync_registry_to_external(
+    app: tauri::AppHandle,
+    client: Client,
+    expected_files: Vec<FilePrecondition>,
+) -> Result<aidevhub_core::model::ApplyResult, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::mcp_apply_sync_registry_to_external(&paths, client, expected_files)
+}
+
+#[tauri::command]
+fn settings_get(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::app_settings::load_settings(&paths)
+}
+
+#[tauri::command]
+fn settings_put(app: tauri::AppHandle, settings: AppSettings) -> Result<AppSettings, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::app_settings::save_settings(&paths, settings)
+}
+
+#[tauri::command]
 fn skill_list(
     app: tauri::AppHandle,
     client: Option<Client>,
@@ -392,6 +433,11 @@ pub fn run() {
             config_check_updates,
             config_ignore_updates,
             config_accept_mcp_updates,
+            mcp_check_registry_external_diff,
+            mcp_preview_sync_registry_to_external,
+            mcp_apply_sync_registry_to_external,
+            settings_get,
+            settings_put,
             skill_list,
             skill_get,
             skill_preview_create,

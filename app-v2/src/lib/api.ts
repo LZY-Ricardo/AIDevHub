@@ -1,5 +1,6 @@
 import type {
   ApplyResult,
+  AppSettings,
   BackupRecord,
   Client,
   ConfigConfirmMcpRequest,
@@ -8,6 +9,7 @@ import type {
   ConfigIgnoreCondition,
   ConfigIgnoreUpdatesResponse,
   FilePrecondition,
+  McpRegistryExternalDiff,
   Profile,
   RuntimeInfo,
   ServerEditDraft,
@@ -24,6 +26,12 @@ function normalizeServerNotes(notes: Partial<ServerNotes> | null | undefined): S
   return {
     description: notes?.description ?? "",
     field_hints: notes?.field_hints ?? {},
+  };
+}
+
+function normalizeAppSettings(settings: Partial<AppSettings> | null | undefined): AppSettings {
+  return {
+    mcp_diff_check_mode: settings?.mcp_diff_check_mode === "summary_only" ? "summary_only" : "open_diff",
   };
 }
 
@@ -255,5 +263,35 @@ export const api = {
       currentSha256: payload.current_sha256,
       client: payload.client,
     });
+  },
+
+  mcpCheckRegistryExternalDiff(payload: { client: Client }): Promise<McpRegistryExternalDiff> {
+    return invokeCmd("mcp_check_registry_external_diff", {
+      client: payload.client,
+    });
+  },
+
+  mcpPreviewSyncRegistryToExternal(payload: { client: Client }): Promise<WritePreview> {
+    return invokeCmd("mcp_preview_sync_registry_to_external", {
+      client: payload.client,
+    });
+  },
+
+  mcpApplySyncRegistryToExternal(payload: {
+    client: Client;
+    expected_files: FilePrecondition[];
+  }): Promise<ApplyResult> {
+    return invokeCmd("mcp_apply_sync_registry_to_external", {
+      client: payload.client,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  settingsGet(): Promise<AppSettings> {
+    return invokeCmd<Partial<AppSettings>>("settings_get").then(normalizeAppSettings);
+  },
+
+  settingsPut(payload: AppSettings): Promise<AppSettings> {
+    return invokeCmd<Partial<AppSettings>>("settings_put", payload).then(normalizeAppSettings);
   },
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AppError,
   Client,
@@ -10,6 +10,7 @@ import type {
   WritePreview,
 } from "../lib/types";
 import { api } from "../lib/api";
+import { createRequestCoordinator } from "../lib/config-check-flow.js";
 import { clientLabel, enabledLabel, transportLabel } from "../lib/format";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
@@ -59,14 +60,23 @@ const DETAIL_ACTION_BUTTON_STYLE = {
 export function ServersPage({
   onCheckConfigUpdates,
   configCheckBusy,
+  onCheckRegistryExternalDiff,
+  onPreviewSyncRegistryToExternal,
+  onApplySyncRegistryToExternal,
+  reloadToken,
 }: {
   onCheckConfigUpdates: () => Promise<void>;
   configCheckBusy: boolean;
+  onCheckRegistryExternalDiff: (client: Client) => Promise<void>;
+  onPreviewSyncRegistryToExternal: (client: Client) => Promise<WritePreview>;
+  onApplySyncRegistryToExternal: (payload: { client: Client; expected_files: FilePrecondition[] }) => Promise<void>;
+  reloadToken: number;
 }) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [registryBusy, setRegistryBusy] = useState(false);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selected, setSelected] = useState<ServerRecord | null>(null);
@@ -81,6 +91,10 @@ export function ServersPage({
   const [pendingEdit, setPendingEdit] = useState<{ server_id: string; draft: ServerEditDraft } | null>(
     null,
   );
+  const [registrySyncPreview, setRegistrySyncPreview] = useState<WritePreview | null>(null);
+  const [registryPreviewOpen, setRegistryPreviewOpen] = useState(false);
+  const [registryPreviewClient, setRegistryPreviewClient] = useState<Client | null>(null);
+  const listLoadFlow = useMemo(() => createRequestCoordinator(), []);
 
   const clientOptions = [
     { value: "claude_code", label: clientLabel("claude_code") },
@@ -88,18 +102,21 @@ export function ServersPage({
   ] satisfies Array<UiSelectOption<Client>>;
 
   async function load() {
+    const requestId = listLoadFlow.begin();
     setError(null);
     try {
       const list = await api.serverList({ client });
+      if (!listLoadFlow.isLatest(requestId)) return;
       setServers(list);
     } catch (e) {
+      if (!listLoadFlow.isLatest(requestId)) return;
       setError(e as AppError);
     }
   }
 
   useEffect(() => {
-    load();
-  }, [client]);
+    void load();
+  }, [client, reloadToken]);
 
   async function openDetails(s: ServerRecord) {
     setSelected(s);
@@ -173,6 +190,50 @@ export function ServersPage({
     }
   }
 
+  async function requestRegistryExternalDiff() {
+    setRegistryBusy(true);
+    setError(null);
+    try {
+      await onCheckRegistryExternalDiff(client);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setRegistryBusy(false);
+    }
+  }
+
+  async function requestRegistrySyncPreview() {
+    setRegistryBusy(true);
+    setError(null);
+    try {
+      const previewRequest = { client: client };
+      const preview = await onPreviewSyncRegistryToExternal(previewRequest.client);
+      setRegistryPreviewClient(client);
+      setRegistrySyncPreview(preview);
+      setRegistryPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setRegistryBusy(false);
+    }
+  }
+
+  async function applyRegistrySyncPreview(expected_files: FilePrecondition[]) {
+    if (!registryPreviewClient) return;
+    setRegistryBusy(true);
+    setError(null);
+    try {
+      await onApplySyncRegistryToExternal({ client: registryPreviewClient, expected_files });
+      setRegistryPreviewOpen(false);
+      setRegistrySyncPreview(null);
+      setRegistryPreviewClient(null);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setRegistryBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: "16px" }}>
       <div className="ui-card" style={{ padding: "16px" }}>
@@ -191,6 +252,22 @@ export function ServersPage({
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
               <Icon name="refresh" /> 刷新
+            </button>
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={requestRegistryExternalDiff}
+              disabled={busy || registryBusy}
+            >
+              检测项目与本地差异
+            </button>
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={requestRegistrySyncPreview}
+              disabled={busy || registryBusy}
+            >
+              写入项目内 MCP 到本地
             </button>
             <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy}>
               <Icon name="refresh" /> 手动检查更新
@@ -313,6 +390,18 @@ export function ServersPage({
           setPreviewOpen(false);
         }}
         onConfirm={applyPreview}
+      />
+      <WritePreviewDialog
+        title="写入项目内 MCP 到本地"
+        preview={registrySyncPreview}
+        open={registryPreviewOpen}
+        busy={registryBusy}
+        onClose={() => {
+          if (registryBusy) return;
+          setRegistryPreviewOpen(false);
+          setRegistryPreviewClient(null);
+        }}
+        onConfirm={applyRegistrySyncPreview}
       />
     </div>
   );

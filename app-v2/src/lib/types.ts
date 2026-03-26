@@ -1,8 +1,13 @@
 export type Client = "claude_code" | "codex";
 export type Transport = "stdio" | "http" | "unknown";
+export type McpDiffCheckMode = "open_diff" | "summary_only";
 
 export type SkillScope = "user" | "system";
 export type SkillKind = "dir" | "file";
+
+export interface AppSettings {
+  mcp_diff_check_mode: McpDiffCheckMode;
+}
 
 export interface AppError {
   code:
@@ -193,4 +198,13 @@ export interface ConfigConfirmMcpRequest {
 export interface ConfigConfirmMcpResponse {
   accepted: boolean;
   message: string;
+}
+
+export interface McpRegistryExternalDiff {
+  client: Client;
+  has_diff: boolean;
+  target_path: string;
+  diff_unified: string;
+  before_fragment: string;
+  after_fragment: string;
 }

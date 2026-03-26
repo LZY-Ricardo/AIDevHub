@@ -277,3 +277,32 @@ pub struct ConfigAcceptMcpResponse {
     pub accepted: bool,
     pub message: String,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum McpDiffCheckMode {
+    OpenDiff,
+    SummaryOnly,
+}
+
+impl Default for McpDiffCheckMode {
+    fn default() -> Self {
+        Self::OpenDiff
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AppSettings {
+    #[serde(default)]
+    pub mcp_diff_check_mode: McpDiffCheckMode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpRegistryExternalDiff {
+    pub client: Client,
+    pub target_path: String,
+    pub has_diff: bool,
+    pub diff_unified: String,
+    pub before_fragment: String,
+    pub after_fragment: String,
+}

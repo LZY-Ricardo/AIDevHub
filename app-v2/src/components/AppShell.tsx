@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 
-export type RouteKey = "servers" | "add" | "profiles" | "skills" | "backups";
+export type RouteKey = "servers" | "add" | "profiles" | "skills" | "backups" | "settings";
 
 const ROUTES: Array<{
   key: RouteKey;
@@ -15,6 +15,7 @@ const ROUTES: Array<{
   { key: "profiles", label: "配置方案", icon: "profiles", kicker: "按方案收敛切换" },
   { key: "skills", label: "skill管理", icon: "skills", kicker: "Codex skills / Claude 命令" },
   { key: "backups", label: "备份回滚", icon: "backups", kicker: "历史记录与恢复" },
+  { key: "settings", label: "设置", icon: "profiles", kicker: "界面与差异展示偏好" },
 ];
 
 export function AppShell({
@@ -76,5 +77,7 @@ function pageTitle(route: RouteKey): string {
       return "skill管理";
     case "backups":
       return "备份回滚";
+    case "settings":
+      return "设置";
   }
 }
