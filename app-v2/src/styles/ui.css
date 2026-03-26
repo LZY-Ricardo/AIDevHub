@@ -2,7 +2,7 @@
   height: 100vh;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   overflow: hidden;
 }
 
@@ -68,7 +68,8 @@
 }
 
 .ui-main {
-  grid-column: 2;
+  grid-column: 1;
+  grid-row: 2;
   height: 100vh;
   min-height: 0;
   box-sizing: border-box;
@@ -833,6 +834,7 @@
   }
   .ui-main {
     grid-column: auto;
+    grid-row: auto;
     height: auto;
     overflow-y: visible;
     padding: var(--space-xl);
@@ -860,3 +862,174 @@
     transform: translateY(0);
   }
 }
+
+/* === 顶部导航栏 === */
+.ui-topbar {
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: #ffffff;
+}
+
+.ui-topbarBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.ui-brandName {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ui-topbarNav {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ui-topbarNavItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ui-topbarNavItem:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ui-iconBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+}
+
+.ui-iconBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+/* === 页面头部栏（二级页面） === */
+.ui-pageHeaderBar {
+  height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(var(--color-ink-rgb), 0.02);
+}
+
+.ui-pageHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.ui-backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ui-backBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.06);
+}
+
+.ui-backBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+.ui-pageTitleBar {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.ui-pageHeaderActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ui-actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(var(--color-text-rgb), 0.04);
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ui-actionBtn:hover {
+  background: rgba(var(--color-text-rgb), 0.08);
+  border-color: rgba(var(--color-text-rgb), 0.15);
+}
+
+.ui-actionBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
+}
+
+.ui-actionLabel {
+  font-family: var(--font-body);
+}
+
+/* === 适配主内容区域 === */
+.ui-shell > .ui-main:not(:only-child) {
+  padding-top: var(--space-lg);
+}
+
+/* === 废弃旧侧边栏样式（保留用于参考） === */
+/*
+.ui-sidebar { ... }
+.ui-nav { ... }
+.ui-navItem { ... }
+.ui-navLabel { ... }
+.ui-badge { ... }
+*/
