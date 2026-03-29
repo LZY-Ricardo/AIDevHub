@@ -75,7 +75,7 @@
   box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-lg) var(--space-2xl) var(--space-2xl);
+  padding: var(--space-md) var(--space-2xl) var(--space-2xl);
   min-width: 0;
 }
 
