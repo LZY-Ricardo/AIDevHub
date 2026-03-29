@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-export type SettingsTab = "profiles" | "backups" | "preferences";
+export type SettingsTab = "profiles" | "backups" | "preferences" | "about";
 
 export interface SettingsTabConfig {
   key: SettingsTab;

@@ -412,6 +412,14 @@ fn skill_apply_toggle(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             runtime_get_info,
             server_list,
