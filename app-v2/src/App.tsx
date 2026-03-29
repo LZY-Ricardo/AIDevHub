@@ -28,6 +28,7 @@ import { ProfilesPage } from "./pages/ProfilesPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { BackupsPage } from "./pages/BackupsPage";
 import { SettingsPage as SettingsPageContent } from "./pages/SettingsPage";
+import { UpdateChecker } from "./components/UpdateChecker";
 
 let startupConfigCheckBootstrapped = false;
 
@@ -206,7 +207,6 @@ function App() {
 
   const mcpPageHeader = {
     title: "MCP管理",
-    kicker: "开关、详情与状态",
     actions: [
       { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("mcp") },
       { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
@@ -216,7 +216,6 @@ function App() {
 
   const skillPageHeader = {
     title: "Skill管理",
-    kicker: "Codex skills / Claude 命令",
     actions: [
       { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("skills") },
       { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
@@ -285,6 +284,11 @@ function App() {
                     onSave={saveSettings}
                   />
                 ),
+              },
+              {
+                key: "about",
+                label: "关于",
+                content: <UpdateChecker />,
               },
             ]}
           />

@@ -222,11 +222,6 @@ export function SkillsPage() {
             </button>
           </div>
         </div>
-
-        <div style={{ marginTop: "10px" }} className="ui-help">
-          列表同时包含 Codex skills（目录 + SKILL.md）与 Claude Code 命令（~/.claude/commands/*.md）。
-          任何写入都会先生成差异预览，确认后才会执行。
-        </div>
       </div>
 
       {createOpen ? (

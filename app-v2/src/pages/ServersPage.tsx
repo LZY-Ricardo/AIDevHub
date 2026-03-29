@@ -274,9 +274,6 @@ export function ServersPage({
             </button>
           </div>
         </div>
-        <div style={{ marginTop: "10px" }} className="ui-help">
-          点击行可查看详情。开关操作会先生成差异预览，确认后才会写入并备份。
-        </div>
       </div>
 
       {error ? (
