@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { TopNavShell, type RouteKey } from "./components/TopNavShell";
-import { PageHeader, type PageHeaderAction } from "./components/PageHeader";
+import { TopNavShell, type RouteKey, type TopbarAction } from "./components/TopNavShell";
 import { Dashboard } from "./components/Dashboard";
 import { SettingsTabs } from "./components/SettingsTabs";
 import { ConfigChangeDialog } from "./components/ConfigChangeDialog";
@@ -205,20 +204,38 @@ function App() {
     }
   }
 
-  const mcpPageActions: PageHeaderAction[] = [
-    { icon: "refresh", label: "检测差异", onClick: () => navigate("mcp") },
-    { icon: "save", label: "写入配置", onClick: () => console.log("写入配置") },
-    { icon: "plus", label: "添加", onClick: () => navigate("mcp") },
-  ];
+  const mcpPageHeader = {
+    title: "MCP管理",
+    kicker: "开关、详情与状态",
+    actions: [
+      { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("mcp") },
+      { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
+      { icon: "plus" as const, label: "添加", onClick: () => navigate("mcp") },
+    ] satisfies TopbarAction[],
+  };
 
-  const skillPageActions: PageHeaderAction[] = [
-    { icon: "refresh", label: "检测差异", onClick: () => navigate("skills") },
-    { icon: "save", label: "写入配置", onClick: () => console.log("写入配置") },
-    { icon: "download", label: "安装", onClick: () => navigate("skills") },
-  ];
+  const skillPageHeader = {
+    title: "Skill管理",
+    kicker: "Codex skills / Claude 命令",
+    actions: [
+      { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("skills") },
+      { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
+      { icon: "download" as const, label: "安装", onClick: () => navigate("skills") },
+    ] satisfies TopbarAction[],
+  };
+
+  const settingsPageHeader = {
+    title: "设置",
+  };
+
+  const activePageHeader =
+    route === "mcp" ? mcpPageHeader
+    : route === "skills" ? skillPageHeader
+    : route === "settings" ? settingsPageHeader
+    : undefined;
 
   return (
-    <TopNavShell route={route} onNavigate={navigate}>
+    <TopNavShell route={route} onNavigate={navigate} pageHeader={activePageHeader}>
       {route === "dashboard" ? (
         <Dashboard
           onNavigate={navigate}
@@ -230,43 +247,22 @@ function App() {
       ) : null}
 
       {route === "mcp" ? (
-        <>
-          <PageHeader
-            title="MCP管理"
-            kicker="开关、详情与状态"
-            actions={mcpPageActions}
-            onBack={() => navigate("dashboard")}
-          />
-          <ServersPage
-            onCheckConfigUpdates={runConfigCheck}
-            configCheckBusy={configBusy}
-            onCheckRegistryExternalDiff={onCheckRegistryExternalDiff}
-            onPreviewSyncRegistryToExternal={onPreviewSyncRegistryToExternal}
-            onApplySyncRegistryToExternal={onApplySyncRegistryToExternal}
-            reloadToken={reloadToken}
-          />
-        </>
+        <ServersPage
+          onCheckConfigUpdates={runConfigCheck}
+          configCheckBusy={configBusy}
+          onCheckRegistryExternalDiff={onCheckRegistryExternalDiff}
+          onPreviewSyncRegistryToExternal={onPreviewSyncRegistryToExternal}
+          onApplySyncRegistryToExternal={onApplySyncRegistryToExternal}
+          reloadToken={reloadToken}
+        />
       ) : null}
 
       {route === "skills" ? (
-        <>
-          <PageHeader
-            title="Skill管理"
-            kicker="Codex skills / Claude 命令"
-            actions={skillPageActions}
-            onBack={() => navigate("dashboard")}
-          />
-          <SkillsPage />
-        </>
+        <SkillsPage />
       ) : null}
 
       {route === "settings" ? (
-        <>
-          <PageHeader
-            title="设置"
-            onBack={() => navigate("dashboard")}
-          />
-          <SettingsTabs
+        <SettingsTabs
             tabs={[
               {
                 key: "profiles",
@@ -292,7 +288,6 @@ function App() {
               },
             ]}
           />
-        </>
       ) : null}
 
       <ConfigChangeDialog

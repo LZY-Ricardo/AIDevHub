@@ -75,7 +75,7 @@
   box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-2xl);
+  padding: var(--space-lg) var(--space-2xl) var(--space-2xl);
   min-width: 0;
 }
 
@@ -829,6 +829,15 @@
     flex-wrap: wrap;
   }
 
+  .ui-topbarPageLeft {
+    width: 100%;
+  }
+
+  .ui-topbarActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .ui-topbarBrand {
     width: 100%;
     justify-content: space-between;
@@ -852,23 +861,6 @@
 
   .ui-dashboardQuickActions {
     grid-template-columns: 1fr;
-  }
-
-  /* Page header responsive */
-  .ui-pageHeader {
-    height: auto;
-    padding: var(--space-md);
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-  }
-
-  .ui-pageHeaderLeft {
-    width: 100%;
-  }
-
-  .ui-pageHeaderActions {
-    width: 100%;
-    justify-content: flex-end;
   }
 
   /* Main content padding adjustment */
@@ -902,6 +894,9 @@
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--color-border);
   background: #ffffff;
+  /* Force GPU compositing layer to prevent WebKitGTK paint invalidation bug
+     where nav items become invisible after route changes back to dashboard */
+  transform: translateZ(0);
 }
 
 .ui-topbarBrand {
@@ -978,21 +973,16 @@
   box-shadow: 0 0 0 4px rgba(30, 41, 59, 0.15);
 }
 
-/* === 页面头部栏（二级页面） === */
-.ui-pageHeaderBar {
-  height: 56px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: rgba(var(--color-ink-rgb), 0.02);
-}
-
-.ui-pageHeaderLeft {
+/* === 页面头部栏（二级页面，嵌入顶部栏） === */
+.ui-topbarPageLeft {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+}
+
+.ui-topbarActions {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 .ui-backBtn {
@@ -1027,11 +1017,6 @@
   margin: 0;
 }
 
-.ui-pageHeaderActions {
-  display: flex;
-  gap: var(--space-sm);
-}
-
 .ui-actionBtn {
   display: flex;
   align-items: center;
@@ -1060,11 +1045,6 @@
 
 .ui-actionLabel {
   font-family: var(--font-body);
-}
-
-/* === 适配主内容区域 === */
-.ui-shell > .ui-main:not(:only-child) {
-  padding-top: var(--space-lg);
 }
 
 /* === Dashboard 仪表盘 === */
