@@ -43,7 +43,19 @@ pub fn import_external_source(
 ) -> Result<Vec<String>, AppError> {
     let imported = parse_external_source(source_id, client, content)?;
     let mut store = load_registry_store(&paths.mcp_registry_path)?;
-    store.servers.retain(|entry| entry.client != client);
+
+    let imported_ids: std::collections::HashSet<_> = imported.iter().map(|s| s.server_id.clone()).collect();
+    // Mark registry entries that belong to this client but are absent from
+    // the external source as disabled (instead of deleting them).
+    for entry in store.servers.iter_mut() {
+        if entry.client == client && !imported_ids.contains(&entry.server_id) {
+            entry.enabled = false;
+        }
+    }
+    // Remove entries that are present in the external source so they can be
+    // replaced with fresh data. Entries absent from the external source are
+    // kept (with enabled=false from above).
+    store.servers.retain(|entry| entry.client != client || !imported_ids.contains(&entry.server_id));
     store.servers.extend(imported.clone());
     store
         .servers
