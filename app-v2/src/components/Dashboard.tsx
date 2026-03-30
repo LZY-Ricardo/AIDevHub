@@ -1,7 +1,17 @@
+import { useEffect, useState } from "react";
 import { StatCard } from "./StatCard";
 import { QuickActionButton } from "./QuickActionButton";
 import { ActivityList } from "./ActivityList";
 import type { RouteKey } from "./TopNavShell";
+import type { BackupRecord } from "../lib/types";
+import { api } from "../lib/api";
+import { formatRelativeTime, opLabel } from "../lib/format";
+
+interface Activity {
+  id: string;
+  time: string;
+  description: string;
+}
 
 interface DashboardProps {
   onNavigate: (route: RouteKey) => void;
@@ -11,6 +21,14 @@ interface DashboardProps {
   skillInstalledCount?: number;
 }
 
+function backupToActivity(record: BackupRecord): Activity {
+  return {
+    id: record.backup_id,
+    time: formatRelativeTime(record.created_at),
+    description: opLabel(record.op),
+  };
+}
+
 export function Dashboard({
   onNavigate,
   mcpCount = 0,
@@ -18,11 +36,32 @@ export function Dashboard({
   skillCount = 0,
   skillInstalledCount = 0,
 }: DashboardProps) {
-  const recentActivities = [
-    { id: "1", time: "2分钟前", description: "更新了 mcp-server-demo" },
-    { id: "2", time: "10分钟前", description: "安装了 skill-code-reviewer" },
-    { id: "3", time: "1小时前", description: "创建了备份点 v1.2.0" },
-  ];
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api
+      .backupList()
+      .then((records) => {
+        if (cancelled) return;
+        const sorted = [...records].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        setActivities(sorted.slice(0, 3).map(backupToActivity));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActivities([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAddMcp = () => {
     onNavigate("mcp");
@@ -66,7 +105,11 @@ export function Dashboard({
 
       <section className="ui-dashboardActivity">
         <h2 className="ui-sectionTitle">最近活动</h2>
-        <ActivityList activities={recentActivities} />
+        {loading ? (
+          <div className="ui-activityEmpty">加载中...</div>
+        ) : (
+          <ActivityList activities={activities} />
+        )}
       </section>
     </div>
   );
