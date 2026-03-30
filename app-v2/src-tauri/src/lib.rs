@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use aidevhub_core::model::{
     AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
-    ConfigIgnoreUpdatesResponse, FilePrecondition, McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse,
+    ConfigIgnoreUpdatesResponse, FilePrecondition, HealthCheckResult, McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse,
     ServerNotes, Transport,
 };
 use aidevhub_core::ops::{self, AppPaths};
@@ -408,6 +408,18 @@ fn skill_apply_toggle(
     ops::skill_apply_toggle(&paths, &skill_id, enabled, expected_files)
 }
 
+#[tauri::command]
+fn mcp_health_check(app: tauri::AppHandle, server_id: String) -> Result<HealthCheckResult, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::health_check::check_single(&paths, &server_id)
+}
+
+#[tauri::command]
+fn mcp_health_check_all(app: tauri::AppHandle, client: Client) -> Result<Vec<HealthCheckResult>, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::health_check::check_all(&paths, client)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -455,7 +467,9 @@ pub fn run() {
             skill_preview_create,
             skill_apply_create,
             skill_preview_toggle,
-            skill_apply_toggle
+            skill_apply_toggle,
+            mcp_health_check,
+            mcp_health_check_all
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
