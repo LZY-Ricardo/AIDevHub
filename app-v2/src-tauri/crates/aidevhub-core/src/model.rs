@@ -310,3 +310,23 @@ pub struct McpRegistryExternalDiff {
     pub before_fragment: String,
     pub after_fragment: String,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthStatus {
+    Checking,
+    Ok,
+    Fail,
+    Timeout,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthCheckResult {
+    pub server_id: String,
+    pub status: HealthStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub checked_at: String,
+}

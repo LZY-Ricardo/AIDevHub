@@ -209,3 +209,13 @@ export interface McpRegistryExternalDiff {
   before_fragment: string;
   after_fragment: string;
 }
+
+export type HealthStatus = "checking" | "ok" | "fail" | "timeout";
+
+export interface HealthCheckResult {
+  server_id: string;
+  status: HealthStatus;
+  latency_ms?: number;
+  error?: string;
+  checked_at: string;
+}
