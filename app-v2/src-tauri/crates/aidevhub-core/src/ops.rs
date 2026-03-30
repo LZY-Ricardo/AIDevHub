@@ -411,7 +411,7 @@ fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str, a
         return Err(CoreError::NotFound(format!("backup target missing: {}", target.display())));
     };
 
-    let ts = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let ts = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true).replace(':', "-");
     let backup_id = Uuid::new_v4().to_string();
     let name_hash = sha256_hex(&target.to_string_lossy());
     let backup_path = backups_dir.join(format!("{ts}_{name_hash}_{backup_id}.bak"));
