@@ -3,9 +3,9 @@ import { StatCard } from "./StatCard";
 import { QuickActionButton } from "./QuickActionButton";
 import { ActivityList } from "./ActivityList";
 import type { RouteKey } from "./TopNavShell";
-import type { BackupRecord } from "../lib/types";
+import type { BackupRecord, BackupOp } from "../lib/types";
 import { api } from "../lib/api";
-import { formatRelativeTime, opLabel } from "../lib/format";
+import { formatRelativeTime } from "../lib/format";
 
 interface Activity {
   id: string;
@@ -21,11 +21,34 @@ interface DashboardProps {
   skillInstalledCount?: number;
 }
 
+function extractName(id: string): string {
+  const idx = id.indexOf(':');
+  return idx >= 0 ? id.slice(idx + 1) : id;
+}
+
+function formatActivityDescription(op: BackupOp, affectedIds?: string[]): string {
+  const names = (affectedIds ?? []).map(extractName);
+  const nameStr = names.length > 0 ? names.join('、') : '';
+
+  switch (op) {
+    case 'toggle':
+      return nameStr ? `切换了 ${nameStr}` : '切换了服务器状态';
+    case 'add_server':
+      return nameStr ? `添加了 ${nameStr}` : '添加了 MCP 服务器';
+    case 'edit_server':
+      return nameStr ? `编辑了 ${nameStr}` : '编辑了 MCP 服务器';
+    case 'apply_profile':
+      return '应用了配置方案';
+    case 'rollback':
+      return '回滚了配置';
+  }
+}
+
 function backupToActivity(record: BackupRecord): Activity {
   return {
     id: record.backup_id,
     time: formatRelativeTime(record.created_at),
-    description: opLabel(record.op),
+    description: formatActivityDescription(record.op, record.affected_ids),
   };
 }
 

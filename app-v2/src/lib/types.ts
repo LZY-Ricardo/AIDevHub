@@ -119,6 +119,7 @@ export interface BackupRecord {
   created_at: string;
   op: BackupOp;
   summary: string;
+  affected_ids?: string[];
 }
 
 export interface ApplyResult {
