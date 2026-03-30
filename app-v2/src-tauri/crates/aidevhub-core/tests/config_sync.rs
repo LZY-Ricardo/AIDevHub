@@ -93,17 +93,20 @@ fn establish_baseline(paths: &AppPaths) {
 }
 
 #[test]
-fn first_check_reports_non_empty_sources_when_snapshots_are_missing() {
+fn first_check_auto_saves_baseline_without_reporting_updates() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     seed_all_sources(&paths);
 
     let first = config_check_updates(&paths).unwrap();
-    assert_eq!(first.updates.len(), 4);
-    assert!(!paths.app_local_data_dir.join("config_snapshots.json").exists());
+    assert!(first.updates.is_empty(), "first run should not report updates");
+    assert!(
+        paths.app_local_data_dir.join("config_snapshots.json").exists(),
+        "snapshot file should be created on first run"
+    );
 
     let second = config_check_updates(&paths).unwrap();
-    assert_eq!(second.updates.len(), 4);
+    assert!(second.updates.is_empty(), "no changes since baseline, should still be empty");
 }
 
 #[test]
@@ -319,6 +322,12 @@ fn skill_snapshot_keeps_binary_assets_as_text_placeholders() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     seed_all_sources(&paths);
+
+    // First run establishes baseline (auto-saves snapshot)
+    let baseline = config_check_updates(&paths).unwrap();
+    assert!(baseline.updates.is_empty());
+
+    // Now add a binary file — this creates a diff against the baseline
     write_skill_bytes(
         &paths.codex_skills_dir,
         "openai-docs/assets/openai.png",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import type {
   AppError,
   Client,
@@ -208,9 +208,11 @@ export function ServersPage({
     try {
       const previewRequest = { client: client };
       const preview = await onPreviewSyncRegistryToExternal(previewRequest.client);
-      setRegistryPreviewClient(client);
-      setRegistrySyncPreview(preview);
-      setRegistryPreviewOpen(true);
+      startTransition(() => {
+        setRegistryPreviewClient(client);
+        setRegistrySyncPreview(preview);
+        setRegistryPreviewOpen(true);
+      });
     } catch (e) {
       setError(e as AppError);
     } finally {

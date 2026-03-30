@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, memo, useMemo } from "react";
 import { parseUnifiedDiff, type DiffCellType } from "../lib/unifiedDiff";
 
 export type DiffViewMode = "split" | "unified";
@@ -19,7 +19,7 @@ function cellTypeClass(t: DiffCellType): string {
   }
 }
 
-export function DiffViewer({
+export const DiffViewer = memo(function DiffViewer({
   diff,
   mode,
   wrap,
@@ -83,5 +83,5 @@ export function DiffViewer({
       </div>
     </div>
   );
-}
+});
 

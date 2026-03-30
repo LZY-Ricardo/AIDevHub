@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { TopNavShell, type RouteKey, type TopbarAction } from "./components/TopNavShell";
 import { Dashboard } from "./components/Dashboard";
 import { SettingsTabs } from "./components/SettingsTabs";
@@ -104,8 +104,10 @@ function App() {
       const res = await api.configCheckUpdates();
       if (!configCheckFlow.isLatest(requestId)) return;
       const next = deriveCheckResultState(res.updates, configError);
-      setUpdates(next.updates);
-      setConfigDialogOpen(next.dialogOpen);
+      startTransition(() => {
+        setUpdates(next.updates);
+        setConfigDialogOpen(next.dialogOpen);
+      });
       setConfigError(next.error);
     } catch (e) {
       if (!configCheckFlow.isLatest(requestId)) return;

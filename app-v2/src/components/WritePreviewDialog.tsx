@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { FilePrecondition, WritePreview } from "../lib/types";
 import { Dialog } from "./Dialog";
 import { DiffViewer, type DiffViewMode } from "./DiffViewer";
@@ -14,7 +14,7 @@ function expectedFilesFromPreview(preview: WritePreview): FilePrecondition[] {
   }));
 }
 
-export function WritePreviewDialog({
+export const WritePreviewDialog = memo(function WritePreviewDialog({
   title,
   preview,
   open,
@@ -121,7 +121,7 @@ export function WritePreviewDialog({
       )}
     </Dialog>
   );
-}
+});
 
 function SummaryView({ preview }: { preview: WritePreview }) {
   const { will_add, will_enable, will_disable } = preview.summary;
@@ -171,6 +171,59 @@ function ServerListBlock({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function LazyFileDiffCard({
+  path,
+  diffUnified,
+  willCreate,
+  afterSha256,
+  mode,
+  wrap,
+}: {
+  path: string;
+  diffUnified: string;
+  willCreate: boolean;
+  afterSha256: string;
+  mode: DiffViewMode;
+  wrap: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="ui-card" style={{ padding: "16px", minHeight: visible ? undefined : 48 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
+        <div className="ui-code" style={{ fontWeight: 700 }}>
+          {path}
+        </div>
+        <div className="ui-help">
+          {willCreate ? "新建" : "更新"} • 变更后 {afterSha256.slice(0, 8)}
+        </div>
+      </div>
+      {visible ? (
+        <div style={{ marginTop: "12px" }}>
+          <DiffViewer diff={diffUnified} mode={mode} wrap={wrap} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function DiffView({ preview }: { preview: WritePreview }) {
   const [mode, setMode] = useState<DiffViewMode>("split");
   const [wrap, setWrap] = useState(false);
@@ -215,19 +268,15 @@ function DiffView({ preview }: { preview: WritePreview }) {
       </div>
 
       {preview.files.map((f) => (
-        <div key={f.path} className="ui-card" style={{ padding: "16px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
-            <div className="ui-code" style={{ fontWeight: 700 }}>
-              {f.path}
-            </div>
-            <div className="ui-help">
-              {f.will_create ? "新建" : "更新"} • 变更后 {f.after_sha256.slice(0, 8)}
-            </div>
-          </div>
-          <div style={{ marginTop: "12px" }}>
-            <DiffViewer diff={f.diff_unified} mode={mode} wrap={wrap} />
-          </div>
-        </div>
+        <LazyFileDiffCard
+          key={f.path}
+          path={f.path}
+          diffUnified={f.diff_unified}
+          willCreate={f.will_create}
+          afterSha256={f.after_sha256}
+          mode={mode}
+          wrap={wrap}
+        />
       ))}
     </div>
   );

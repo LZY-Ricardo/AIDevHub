@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ConfigConfirmMcpRequest,
   ConfigConfirmMcpResponse,
@@ -13,6 +13,44 @@ function labelOfUpdate(update: ConfigUpdateItem): string {
   const clientLabel = update.client === "claude_code" ? "Claude Code" : "Codex";
   const kindLabel = update.kind === "mcp" ? "MCP" : "Skill";
   return `${clientLabel} / ${kindLabel}`;
+}
+
+function LazyDiffSection({
+  diff,
+  mode,
+  wrap,
+  label,
+}: {
+  diff: string;
+  mode: DiffViewMode;
+  wrap: boolean;
+  label: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ display: "grid", gap: "10px", minHeight: visible ? undefined : 48 }}>
+      <div className="ui-help">{label}</div>
+      {visible ? <DiffViewer diff={diff} mode={mode} wrap={wrap} /> : null}
+    </div>
+  );
 }
 
 export function ConfigChangeDialog({
@@ -125,10 +163,13 @@ export function ConfigChangeDialog({
                 </div>
 
                 {items.map((item, idx) => (
-                  <div key={`${sourceId}-${idx}`} style={{ display: "grid", gap: "10px" }}>
-                    <div className="ui-help">{labelOfUpdate(item)}</div>
-                    <DiffViewer diff={item.diff_unified} mode={mode} wrap={wrap} />
-                  </div>
+                  <LazyDiffSection
+                    key={`${sourceId}-${idx}`}
+                    diff={item.diff_unified}
+                    mode={mode}
+                    wrap={wrap}
+                    label={labelOfUpdate(item)}
+                  />
                 ))}
               </div>
             );

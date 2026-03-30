@@ -60,19 +60,7 @@ pub fn config_check_updates(paths: &AppPaths) -> Result<ConfigCheckUpdatesRespon
         let previous = if let Some(previous) = previous {
             previous
         } else {
-            if !was_corrupted && !state.content.trim().is_empty() {
-                updates.push(ConfigUpdateItem {
-                    source_id: state.source_id.to_string(),
-                    client: state.client,
-                    kind: state.kind,
-                    current_sha256: state.content_sha256,
-                    diff_unified: unified_diff(state.source_id, "", &state.content),
-                    requires_confirm_sync: state.kind == ConfigSourceKind::Mcp,
-                    confirm_sync_available: state.confirm_sync_available,
-                });
-                continue;
-            }
-
+            // First encounter: auto-save as baseline, do not generate diff
             touched = true;
             store.sources.insert(
                 state.source_id.to_string(),
