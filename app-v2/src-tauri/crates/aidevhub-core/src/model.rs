@@ -199,6 +199,8 @@ pub struct BackupRecord {
     pub created_at: String,
     pub op: BackupOp,
     pub summary: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub affected_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
