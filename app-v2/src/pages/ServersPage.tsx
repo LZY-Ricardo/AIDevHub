@@ -3,6 +3,7 @@ import type {
   AppError,
   Client,
   FilePrecondition,
+  HealthCheckResult,
   ServerEditDraft,
   ServerEditSession,
   ServerNotes,
@@ -95,6 +96,8 @@ export function ServersPage({
   const [registryPreviewOpen, setRegistryPreviewOpen] = useState(false);
   const [registryPreviewClient, setRegistryPreviewClient] = useState<Client | null>(null);
   const listLoadFlow = useMemo(() => createRequestCoordinator(), []);
+  const [healthResults, setHealthResults] = useState<Map<string, HealthCheckResult>>(new Map());
+  const [healthBusy, setHealthBusy] = useState(false);
 
   const clientOptions = [
     { value: "claude_code", label: clientLabel("claude_code") },
@@ -115,6 +118,7 @@ export function ServersPage({
   }
 
   useEffect(() => {
+    setHealthResults(new Map());
     void load();
   }, [client, reloadToken]);
 
@@ -236,6 +240,122 @@ export function ServersPage({
     }
   }
 
+  async function runHealthCheck(serverId: string) {
+    setHealthResults((prev) => {
+      const next = new Map(prev);
+      next.set(serverId, {
+        server_id: serverId,
+        status: "checking" as const,
+        checked_at: new Date().toISOString(),
+      });
+      return next;
+    });
+    try {
+      const result = await api.mcpHealthCheck({ server_id: serverId });
+      setHealthResults((prev) => {
+        const next = new Map(prev);
+        next.set(serverId, result);
+        return next;
+      });
+    } catch (e) {
+      setHealthResults((prev) => {
+        const next = new Map(prev);
+        next.set(serverId, {
+          server_id: serverId,
+          status: "fail" as const,
+          error: (e as AppError).message,
+          checked_at: new Date().toISOString(),
+        });
+        return next;
+      });
+    }
+  }
+
+  async function runHealthCheckAll() {
+    if (!servers) return;
+    const enabled = servers.filter((s) => s.enabled);
+    if (enabled.length === 0) return;
+
+    setHealthBusy(true);
+    const checking = new Map(healthResults);
+    for (const s of enabled) {
+      checking.set(s.server_id, {
+        server_id: s.server_id,
+        status: "checking" as const,
+        checked_at: new Date().toISOString(),
+      });
+    }
+    setHealthResults(new Map(checking));
+
+    try {
+      const results = await api.mcpHealthCheckAll({ client });
+      setHealthResults(() => {
+        const next = new Map<string, HealthCheckResult>();
+        for (const r of results) {
+          next.set(r.server_id, r);
+        }
+        return next;
+      });
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setHealthBusy(false);
+    }
+  }
+
+  function renderHealthStatus(serverId: string, enabled: boolean) {
+    const result = healthResults.get(serverId);
+    if (!result) {
+      if (!enabled) return null;
+      return (
+        <button
+          type="button"
+          className="ui-btn"
+          style={{ padding: "2px 8px", fontSize: "12px", borderRadius: 6 }}
+          onClick={() => runHealthCheck(serverId)}
+          disabled={healthBusy}
+        >
+          检测
+        </button>
+      );
+    }
+    switch (result.status) {
+      case "checking":
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--color-muted)" }}>
+            <span className="ui-spinner" /> 检测中
+          </span>
+        );
+      case "ok":
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#22c55e" }}>
+            <span style={{ fontWeight: 700 }}>&#10003;</span>
+            {result.latency_ms != null ? `${result.latency_ms}ms` : ""}
+          </span>
+        );
+      case "timeout":
+        return (
+          <span
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#f59e0b", cursor: "pointer" }}
+            title={result.error ?? ""}
+          >
+            <span style={{ fontWeight: 700 }}>&#9203;</span>
+            连接超时
+          </span>
+        );
+      case "fail":
+        return (
+          <span
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#ef4444", cursor: "pointer" }}
+            title={result.error ?? ""}
+          >
+            <span style={{ fontWeight: 700 }}>&#10007;</span>
+            {result.error && result.error.length > 16 ? result.error.slice(0, 16) + "..." : (result.error ?? "失败")}
+          </span>
+        );
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: "16px" }}>
       <div className="ui-card" style={{ padding: "16px" }}>
@@ -254,6 +374,14 @@ export function ServersPage({
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
               <Icon name="refresh" /> 刷新
+            </button>
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={runHealthCheckAll}
+              disabled={busy || healthBusy || !servers || servers.filter((s) => s.enabled).length === 0}
+            >
+              <Icon name="refresh" /> 全部检测
             </button>
             <button
               type="button"
@@ -291,6 +419,7 @@ export function ServersPage({
             <col className="ui-colName" />
             <col className="ui-colTransport" />
             <col className="ui-colStatus" />
+            <col className="ui-colHealth" />
             <col className="ui-colAction" />
           </colgroup>
           <thead>
@@ -298,6 +427,7 @@ export function ServersPage({
               <th className="ui-th">名称</th>
               <th className="ui-th">传输方式</th>
               <th className="ui-th">启用状态</th>
+              <th className="ui-th">连通性</th>
               <th className="ui-th ui-tableColAction">
                 操作
               </th>
@@ -333,6 +463,9 @@ export function ServersPage({
                       <span className="ui-code ui-ellipsis ui-pillText">{statusText}</span>
                     </span>
                   </td>
+                  <td className="ui-td" onClick={(e) => e.stopPropagation()}>
+                    {renderHealthStatus(s.server_id, s.enabled)}
+                  </td>
                   <td className="ui-td ui-tableColAction" onClick={(e) => e.stopPropagation()}>
                     <div className="ui-btnRow ui-tableActionRow">
                       <button
@@ -354,14 +487,14 @@ export function ServersPage({
             })}
             {servers && servers.length === 0 ? (
               <tr>
-                <td className="ui-td" colSpan={4}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">暂无 MCP。</div>
                 </td>
               </tr>
             ) : null}
             {!servers ? (
               <tr>
-                <td className="ui-td" colSpan={4}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">加载中...</div>
                 </td>
               </tr>
