@@ -49,10 +49,10 @@ function App() {
   const [reloadToken, setReloadToken] = useState(0);
   const configCheckFlow = useMemo(() => createRequestCoordinator(), []);
 
-  const [mcpCount] = useState(12);
-  const [mcpActiveCount] = useState(10);
-  const [skillCount] = useState(8);
-  const [skillInstalledCount] = useState(6);
+  const [mcpCount, setMcpCount] = useState(0);
+  const [mcpActiveCount, setMcpActiveCount] = useState(0);
+  const [skillCount, setSkillCount] = useState(0);
+  const [skillInstalledCount, setSkillInstalledCount] = useState(0);
 
   useEffect(() => {
     const onHash = () => {
@@ -71,6 +71,24 @@ function App() {
 
   useEffect(() => {
     void loadSettings();
+  }, []);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [servers, skills] = await Promise.all([
+          api.serverList(),
+          api.skillList(),
+        ]);
+        setMcpCount(servers.length);
+        setMcpActiveCount(servers.filter((s) => s.enabled).length);
+        setSkillCount(skills.length);
+        setSkillInstalledCount(skills.filter((s) => s.scope === "user").length);
+      } catch {
+        // silent — keep defaults at 0
+      }
+    }
+    void loadStats();
   }, []);
 
   function navigate(r: RouteKey) {
