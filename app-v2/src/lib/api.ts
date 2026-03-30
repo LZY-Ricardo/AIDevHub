@@ -9,6 +9,7 @@ import type {
   ConfigIgnoreCondition,
   ConfigIgnoreUpdatesResponse,
   FilePrecondition,
+  HealthCheckResult,
   McpRegistryExternalDiff,
   Profile,
   RuntimeInfo,
@@ -285,6 +286,14 @@ export const api = {
       client: payload.client,
       expectedFiles: payload.expected_files,
     });
+  },
+
+  mcpHealthCheck(payload: { server_id: string }): Promise<HealthCheckResult> {
+    return invokeCmd("mcp_health_check", { serverId: payload.server_id });
+  },
+
+  mcpHealthCheckAll(payload: { client: Client }): Promise<HealthCheckResult[]> {
+    return invokeCmd("mcp_health_check_all", { client: payload.client });
   },
 
   settingsGet(): Promise<AppSettings> {
