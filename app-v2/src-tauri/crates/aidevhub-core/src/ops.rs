@@ -402,7 +402,7 @@ fn save_backup_index(v: &[BackupRecord]) -> Result<String, CoreError> {
     serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize backup_index: {e}")))
 }
 
-fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str) -> Result<BackupRecord, CoreError> {
+fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str, affected_ids: Vec<String>) -> Result<BackupRecord, CoreError> {
     fs::create_dir_all(backups_dir)
         .map_err(|e| CoreError::Io(format!("mkdir {}: {e}", backups_dir.display())))?;
 
@@ -425,6 +425,7 @@ fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str) -
         created_at: ts,
         op,
         summary: summary.to_string(),
+        affected_ids,
     })
 }
 
@@ -1989,12 +1990,20 @@ fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecon
     let required = planned_expected_files(&planned);
     validate_preconditions(&required, expected)?;
 
+    let affected_ids = {
+        let mut ids = Vec::new();
+        ids.extend(planned.summary.will_enable.iter().cloned());
+        ids.extend(planned.summary.will_disable.iter().cloned());
+        ids.extend(planned.summary.will_add.iter().cloned());
+        ids
+    };
+
     let mut backups = Vec::new();
     // Backup only user config files, not app storage.
     for f in &planned.files {
         let is_user_config = f.path == paths.claude_config_path || f.path == paths.codex_config_path;
         if is_user_config && f.before.is_some() {
-            let rec = backup_file(&paths.backups_dir, &f.path, planned.backup_op.clone(), "auto backup")?;
+            let rec = backup_file(&paths.backups_dir, &f.path, planned.backup_op.clone(), "auto backup", affected_ids.clone())?;
             backups.push(rec);
         }
     }
@@ -2447,7 +2456,7 @@ pub fn backup_apply_rollback(
     // Backup current target before rollback.
     let mut backups = Vec::new();
     if target.exists() {
-        let rec2 = backup_file(&paths.backups_dir, &target, BackupOp::Rollback, "pre-rollback backup")
+        let rec2 = backup_file(&paths.backups_dir, &target, BackupOp::Rollback, "pre-rollback backup", vec![])
             .map_err(AppError::from)?;
         backups.push(rec2);
     }
