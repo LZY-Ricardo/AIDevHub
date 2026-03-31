@@ -47,6 +47,8 @@ function App() {
   const [registryFlowBusy, setRegistryFlowBusy] = useState(false);
   const [registryFlowError, setRegistryFlowError] = useState<AppError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [writeConfigTrigger, setWriteConfigTrigger] = useState(0);
+  const [addServerTrigger, setAddServerTrigger] = useState(0);
   const configCheckFlow = useMemo(() => createRequestCoordinator(), []);
 
   const [mcpCount, setMcpCount] = useState(0);
@@ -228,18 +230,17 @@ function App() {
   const mcpPageHeader = {
     title: "MCP管理",
     actions: [
-      { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("mcp") },
-      { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
-      { icon: "plus" as const, label: "添加", onClick: () => navigate("mcp") },
+      { icon: "save" as const, label: "写入配置", tooltip: "将项目内部维护的 MCP 配置信息写入本机客户端配置文件", onClick: () => setWriteConfigTrigger((n) => n + 1) },
+      { icon: "plus" as const, label: "添加", tooltip: "添加新的 MCP 服务器到项目内部配置", onClick: () => setAddServerTrigger((n) => n + 1) },
     ] satisfies TopbarAction[],
   };
 
   const skillPageHeader = {
     title: "Skill管理",
     actions: [
-      { icon: "refresh" as const, label: "检测差异", onClick: () => navigate("skills") },
-      { icon: "save" as const, label: "写入配置", onClick: () => console.log("写入配置") },
-      { icon: "download" as const, label: "安装", onClick: () => navigate("skills") },
+      { icon: "refresh" as const, label: "检测差异", tooltip: "检测项目内部配置与本机客户端配置文件的差异", onClick: () => navigate("skills") },
+      { icon: "save" as const, label: "写入配置", tooltip: "将项目内部维护的 Skill 配置信息写入本机客户端配置文件", onClick: () => console.log("写入配置") },
+      { icon: "download" as const, label: "安装", tooltip: "安装新的 Skill 到项目内部配置", onClick: () => navigate("skills") },
     ] satisfies TopbarAction[],
   };
 
@@ -273,6 +274,8 @@ function App() {
           onPreviewSyncRegistryToExternal={onPreviewSyncRegistryToExternal}
           onApplySyncRegistryToExternal={onApplySyncRegistryToExternal}
           reloadToken={reloadToken}
+          writeConfigTrigger={writeConfigTrigger}
+          addServerTrigger={addServerTrigger}
         />
       ) : null}
 

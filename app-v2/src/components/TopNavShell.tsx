@@ -9,6 +9,7 @@ export interface TopbarAction {
   icon: Parameters<typeof Icon>[0]["name"];
   label: string;
   onClick: () => void;
+  tooltip?: string;
 }
 
 export interface PageHeaderInfo {
@@ -72,6 +73,7 @@ export function TopNavShell({ route, onNavigate, pageHeader, children }: TopNavS
                     className="ui-actionBtn"
                     onClick={action.onClick}
                     aria-label={action.label}
+                    title={action.tooltip ?? action.label}
                   >
                     <Icon name={action.icon} size={18} />
                     <span className="ui-actionLabel">{action.label}</span>

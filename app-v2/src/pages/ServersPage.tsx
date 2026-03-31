@@ -19,6 +19,7 @@ import { WritePreviewDialog } from "../components/WritePreviewDialog";
 import { explainServerDetails, type ExplainedServerField } from "../lib/serverExplain";
 import { ServerEditForm } from "../components/ServerEditForm";
 import { ServerRawEditor } from "../components/ServerRawEditor";
+import { Dialog } from "../components/Dialog";
 
 // 去掉 MCP ID 前缀，只显示名称
 function formatMcpName(serverId: string): string {
@@ -65,6 +66,8 @@ export function ServersPage({
   onPreviewSyncRegistryToExternal,
   onApplySyncRegistryToExternal,
   reloadToken,
+  writeConfigTrigger,
+  addServerTrigger,
 }: {
   onCheckConfigUpdates: () => Promise<void>;
   configCheckBusy: boolean;
@@ -72,6 +75,8 @@ export function ServersPage({
   onPreviewSyncRegistryToExternal: (client: Client) => Promise<WritePreview>;
   onApplySyncRegistryToExternal: (payload: { client: Client; expected_files: FilePrecondition[] }) => Promise<void>;
   reloadToken: number;
+  writeConfigTrigger?: number;
+  addServerTrigger?: number;
 }) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
@@ -99,6 +104,102 @@ export function ServersPage({
   const [healthResults, setHealthResults] = useState<Map<string, HealthCheckResult>>(new Map());
   const [healthBusy, setHealthBusy] = useState(false);
 
+  const [addServerOpen, setAddServerOpen] = useState(false);
+  const [addServerName, setAddServerName] = useState("");
+  const [addServerTransport, setAddServerTransport] = useState<"stdio" | "http">("stdio");
+  const [addServerCommand, setAddServerCommand] = useState("");
+  const [addServerArgsText, setAddServerArgsText] = useState("");
+  const [addServerEnvText, setAddServerEnvText] = useState("");
+  const [addServerUrl, setAddServerUrl] = useState("");
+  const [addServerHeadersText, setAddServerHeadersText] = useState("");
+  const [addServerBearerEnv, setAddServerBearerEnv] = useState("");
+  const [addServerError, setAddServerError] = useState<AppError | null>(null);
+  const [addServerBusy, setAddServerBusy] = useState(false);
+  const [addServerPreview, setAddServerPreview] = useState<WritePreview | null>(null);
+
+  function resetAddServerForm() {
+    setAddServerName("");
+    setAddServerTransport("stdio");
+    setAddServerCommand("");
+    setAddServerArgsText("");
+    setAddServerEnvText("");
+    setAddServerUrl("");
+    setAddServerHeadersText("");
+    setAddServerBearerEnv("");
+    setAddServerError(null);
+    setAddServerPreview(null);
+  }
+
+  function buildAddServerPayload(): {
+    client: Client;
+    name: string;
+    transport: "stdio" | "http";
+    config: Record<string, unknown>;
+  } {
+    const trimmedName = addServerName.trim();
+    if (!trimmedName) throw { code: "VALIDATION_ERROR", message: "名称不能为空" } satisfies AppError;
+
+    if (addServerTransport === "stdio") {
+      const cmd = addServerCommand.trim();
+      if (!cmd) throw { code: "VALIDATION_ERROR", message: "启动命令不能为空" } satisfies AppError;
+      const args = parseLines(addServerArgsText);
+      const env = client === "claude_code" ? parseKeyValue(addServerEnvText) : undefined;
+      const cfg: Record<string, unknown> = { command: cmd };
+      if (args.length) cfg.args = args;
+      if (env && Object.keys(env).length) cfg.env = env;
+      return { client, name: trimmedName, transport: addServerTransport, config: cfg };
+    }
+
+    const u = addServerUrl.trim();
+    if (!u) throw { code: "VALIDATION_ERROR", message: "URL 不能为空" } satisfies AppError;
+    const cfg: Record<string, unknown> = { url: u };
+    if (client === "claude_code") {
+      const headers = parseKeyValue(addServerHeadersText);
+      if (Object.keys(headers).length) cfg.headers = headers;
+    } else {
+      const v = addServerBearerEnv.trim();
+      if (v) cfg.bearer_token_env_var = v;
+    }
+    return { client, name: trimmedName, transport: addServerTransport, config: cfg };
+  }
+
+  async function requestAddServerPreview() {
+    setAddServerError(null);
+    setAddServerBusy(true);
+    setAddServerPreview(null);
+    try {
+      const payload = buildAddServerPayload();
+      const p = await api.serverPreviewAdd(payload);
+      setAddServerPreview(p);
+    } catch (e) {
+      setAddServerError(e as AppError);
+    } finally {
+      setAddServerBusy(false);
+    }
+  }
+
+  async function applyAddServer(expected_files: FilePrecondition[]) {
+    setAddServerError(null);
+    setAddServerBusy(true);
+    try {
+      const payload = buildAddServerPayload();
+      await api.serverApplyAdd({ ...payload, expected_files });
+      setAddServerPreview(null);
+      resetAddServerForm();
+      setAddServerOpen(false);
+      await load();
+    } catch (e) {
+      setAddServerError(e as AppError);
+    } finally {
+      setAddServerBusy(false);
+    }
+  }
+
+  const transportOptions = [
+    { value: "stdio", label: "stdio" },
+    { value: "http", label: "http" },
+  ] satisfies Array<UiSelectOption<"stdio" | "http">>;
+
   const clientOptions = [
     { value: "claude_code", label: clientLabel("claude_code") },
     { value: "codex", label: clientLabel("codex") },
@@ -121,6 +222,16 @@ export function ServersPage({
     setHealthResults(new Map());
     void load();
   }, [client, reloadToken]);
+
+  useEffect(() => {
+    if (!writeConfigTrigger) return;
+    void requestRegistrySyncPreview();
+  }, [writeConfigTrigger]);
+
+  useEffect(() => {
+    if (!addServerTrigger) return;
+    setAddServerOpen(true);
+  }, [addServerTrigger]);
 
   async function openDetails(s: ServerRecord) {
     setSelected(s);
@@ -372,7 +483,7 @@ export function ServersPage({
             </div>
           </div>
           <div className="ui-btnRow">
-            <button type="button" className="ui-btn" onClick={load} disabled={busy}>
+            <button type="button" className="ui-btn" onClick={load} disabled={busy} title="重新从后端加载当前客户端的 MCP 列表">
               <Icon name="refresh" /> 刷新
             </button>
             <button
@@ -380,6 +491,7 @@ export function ServersPage({
               className="ui-btn"
               onClick={runHealthCheckAll}
               disabled={busy || healthBusy || !servers || servers.filter((s) => s.enabled).length === 0}
+              title="对所有已启用的 MCP 服务器执行连通性检测"
             >
               <Icon name="refresh" /> 全部检测
             </button>
@@ -388,18 +500,11 @@ export function ServersPage({
               className="ui-btn"
               onClick={requestRegistryExternalDiff}
               disabled={busy || registryBusy}
+              title="对比项目内部配置与本机客户端配置文件的差异"
             >
               检测项目与本地差异
             </button>
-            <button
-              type="button"
-              className="ui-btn"
-              onClick={requestRegistrySyncPreview}
-              disabled={busy || registryBusy}
-            >
-              写入项目内 MCP 到本地
-            </button>
-            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy}>
+            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy} title="检查本机客户端配置文件是否有外部变更">
               <Icon name="refresh" /> 手动检查更新
             </button>
           </div>
@@ -534,6 +639,126 @@ export function ServersPage({
           setRegistryPreviewClient(null);
         }}
         onConfirm={applyRegistrySyncPreview}
+      />
+
+      <Dialog
+        title="添加 MCP 服务器"
+        open={addServerOpen}
+        onClose={() => {
+          if (addServerBusy) return;
+          resetAddServerForm();
+          setAddServerOpen(false);
+        }}
+        footer={
+          <div className="ui-btnRow">
+            <button
+              type="button"
+              className="ui-btn"
+              disabled={addServerBusy}
+              onClick={() => {
+                resetAddServerForm();
+                setAddServerOpen(false);
+              }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="ui-btn ui-btnPrimary"
+              disabled={addServerBusy}
+              onClick={requestAddServerPreview}
+            >
+              {addServerBusy ? "生成预览中..." : "生成变更预览"}
+            </button>
+          </div>
+        }
+      >
+        <div style={{ display: "grid", gap: "16px" }}>
+          {addServerError ? (
+            <div className="ui-error">
+              <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{addServerError.code}</div>
+              <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>{addServerError.message}</div>
+            </div>
+          ) : null}
+
+          <div className="ui-formGrid">
+            <div className="ui-field">
+              <div className="ui-label">客户端</div>
+              <UiSelect<Client>
+                ariaLabel="选择客户端"
+                value={client}
+                options={clientOptions}
+                onChange={setClient}
+              />
+              <div className="ui-help">选择将写入哪个客户端的全局配置。</div>
+            </div>
+
+            <div className="ui-field">
+              <div className="ui-label">传输方式</div>
+              <UiSelect<"stdio" | "http">
+                ariaLabel="选择传输方式"
+                value={addServerTransport}
+                options={transportOptions}
+                onChange={setAddServerTransport}
+              />
+            </div>
+
+            <div className="ui-field ui-fieldFull">
+              <div className="ui-label">名称</div>
+              <input className="ui-input" value={addServerName} onChange={(e) => setAddServerName(e.currentTarget.value)} placeholder="例如: context7 / github / local_files" />
+              <div className="ui-help">将作为 mcpServers 的 key。</div>
+            </div>
+          </div>
+
+          {addServerTransport === "stdio" ? (
+            <div className="ui-formGrid">
+              <div className="ui-field ui-fieldFull">
+                <div className="ui-label">启动命令</div>
+                <input className="ui-input ui-code" value={addServerCommand} onChange={(e) => setAddServerCommand(e.currentTarget.value)} placeholder="例如: npx" />
+              </div>
+              <div className="ui-field ui-fieldFull">
+                <div className="ui-label">参数（每行一个）</div>
+                <textarea className="ui-textarea ui-code" rows={3} value={addServerArgsText} onChange={(e) => setAddServerArgsText(e.currentTarget.value)} placeholder={"-y\n@upstash/context7-mcp"} />
+              </div>
+              {client === "claude_code" ? (
+                <div className="ui-field ui-fieldFull">
+                  <div className="ui-label">环境变量（每行 KEY=VALUE）</div>
+                  <textarea className="ui-textarea ui-code" rows={3} value={addServerEnvText} onChange={(e) => setAddServerEnvText(e.currentTarget.value)} placeholder={"API_KEY=xxxx"} />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="ui-formGrid">
+              <div className="ui-field ui-fieldFull">
+                <div className="ui-label">访问地址</div>
+                <input className="ui-input ui-code" value={addServerUrl} onChange={(e) => setAddServerUrl(e.currentTarget.value)} placeholder="http://localhost:8080/mcp" />
+              </div>
+              {client === "claude_code" ? (
+                <div className="ui-field ui-fieldFull">
+                  <div className="ui-label">请求头（每行 KEY=VALUE）</div>
+                  <textarea className="ui-textarea ui-code" rows={3} value={addServerHeadersText} onChange={(e) => setAddServerHeadersText(e.currentTarget.value)} placeholder={"Authorization=Bearer xxx"} />
+                </div>
+              ) : (
+                <div className="ui-field ui-fieldFull">
+                  <div className="ui-label">Bearer Token 环境变量（可选）</div>
+                  <input className="ui-input ui-code" value={addServerBearerEnv} onChange={(e) => setAddServerBearerEnv(e.currentTarget.value)} placeholder="FIGMA_OAUTH_TOKEN" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      <WritePreviewDialog
+        title="新增MCP预览"
+        preview={addServerPreview}
+        open={addServerPreview != null}
+        busy={addServerBusy}
+        onClose={() => {
+          if (addServerBusy) return;
+          setAddServerPreview(null);
+        }}
+        onConfirm={applyAddServer}
       />
     </div>
   );
@@ -1171,4 +1396,26 @@ function DetailsDrawer({
       </div>
     </div>
   );
+}
+
+function parseLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function parseKeyValue(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const idx = line.indexOf("=");
+    if (idx <= 0) continue;
+    const k = line.slice(0, idx).trim();
+    const v = line.slice(idx + 1).trim();
+    if (!k) continue;
+    out[k] = v;
+  }
+  return out;
 }
