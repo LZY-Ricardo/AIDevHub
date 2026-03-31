@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { checkForUpdate, downloadAndInstallUpdate, relaunchApp } from "../lib/updater";
+import { checkForUpdate, downloadInstallAndRelaunch } from "../lib/updater";
 
-type Phase = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "downloaded" | "error";
+type Phase = "idle" | "checking" | "up-to-date" | "available" | "downloading" | "error";
 
 export function UpdateChecker() {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -32,21 +32,20 @@ export function UpdateChecker() {
     }
   }
 
-  async function handleDownload() {
+  async function handleDownloadInstall() {
     setPhase("downloading");
     try {
-      await downloadAndInstallUpdate((p) => {
+      await downloadInstallAndRelaunch((p) => {
         setProgress({ downloaded: p.downloaded, total: p.total || 0 });
       });
-      setPhase("downloaded");
+      // On Windows, app exits during downloadAndInstall (NSIS takes over).
+      // On macOS/Linux, relaunch() restarts the app immediately.
+      // Neither platform reaches this point, but if it does, reset to idle.
+      setPhase("idle");
     } catch (e: any) {
       setErrorMsg(e?.message || String(e));
       setPhase("error");
     }
-  }
-
-  async function handleRelaunch() {
-    await relaunchApp();
   }
 
   return (
@@ -99,7 +98,7 @@ export function UpdateChecker() {
               <button
                 type="button"
                 className="ui-btn ui-btnPrimary"
-                onClick={handleDownload}
+                onClick={handleDownloadInstall}
               >
                 下载并安装
               </button>
@@ -108,7 +107,7 @@ export function UpdateChecker() {
 
           {phase === "downloading" && (
             <div style={{ display: "grid", gap: "8px" }}>
-              <span className="ui-help">正在下载更新…</span>
+              <span className="ui-help">正在下载并安装更新…</span>
               {progress.total > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <div
@@ -135,21 +134,6 @@ export function UpdateChecker() {
                   </span>
                 </div>
               )}
-            </div>
-          )}
-
-          {phase === "downloaded" && (
-            <div style={{ display: "grid", gap: "12px" }}>
-              <span style={{ color: "var(--color-success, #22c55e)" }}>
-                更新已下载完成
-              </span>
-              <button
-                type="button"
-                className="ui-btn ui-btnPrimary"
-                onClick={handleRelaunch}
-              >
-                重启应用以完成更新
-              </button>
             </div>
           )}
 

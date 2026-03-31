@@ -10,7 +10,7 @@ export async function checkForUpdate() {
   return check();
 }
 
-export async function downloadAndInstallUpdate(
+export async function downloadInstallAndRelaunch(
   onProgress?: (progress: UpdateProgress) => void,
 ) {
   const update = await check();
@@ -36,8 +36,8 @@ export async function downloadAndInstallUpdate(
         break;
     }
   });
-}
 
-export async function relaunchApp() {
+  // On Windows, downloadAndInstall triggers NSIS which terminates the app.
+  // This relaunch() only executes on macOS/Linux.
   await relaunch();
 }

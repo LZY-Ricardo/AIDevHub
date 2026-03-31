@@ -424,14 +424,10 @@ fn mcp_health_check_all(app: tauri::AppHandle, client: Client) -> Result<Vec<Hea
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            #[cfg(desktop)]
-            {
-                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
-                app.handle().plugin(tauri_plugin_process::init())?;
-            }
-            Ok(())
-        })
+        .plugin(
+            tauri_plugin_updater::Builder::new().build(),
+        )
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             runtime_get_info,
             server_list,
