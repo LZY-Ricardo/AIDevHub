@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use aidevhub_core::model::{
     AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
-    ConfigIgnoreUpdatesResponse, FilePrecondition, HealthCheckResult, McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse,
-    ServerNotes, Transport,
+    ConfigIgnoreUpdatesResponse, DeploymentTargetType, FilePrecondition, HealthCheckResult, ManagedSkillView,
+    McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, SkillCatalogEntry, SkillDeployment,
+    SkillRepoGetResponse, Transport,
 };
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
@@ -45,6 +46,10 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         codex_skills_dir,
         codex_skills_disabled_dir,
         app_local_data_dir: app_local_data_dir.clone(),
+        skill_store_root: app_local_data_dir.join("skill-store"),
+        skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
+        skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
+        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -363,6 +368,120 @@ fn skill_get(
 }
 
 #[tauri::command]
+fn skill_repo_list(app: tauri::AppHandle) -> Result<Vec<ManagedSkillView>, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::list_repo_skills(&paths)
+}
+
+#[tauri::command]
+fn skill_repo_get(app: tauri::AppHandle, skill_id: String) -> Result<SkillRepoGetResponse, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::get_repo_skill(&paths, &skill_id)
+}
+
+#[tauri::command]
+fn skill_repo_preview_import(
+    app: tauri::AppHandle,
+    client: Client,
+    name: String,
+    source_path: String,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::preview_import_skill(&paths, client, &name, &PathBuf::from(source_path))
+}
+
+#[tauri::command]
+fn skill_repo_apply_import(
+    app: tauri::AppHandle,
+    client: Client,
+    name: String,
+    source_path: String,
+    _expected_files: Vec<FilePrecondition>,
+) -> Result<SkillCatalogEntry, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::apply_import_skill(&paths, client, &name, &PathBuf::from(source_path))
+}
+
+#[tauri::command]
+fn skill_deployment_list(
+    app: tauri::AppHandle,
+    skill_id: Option<String>,
+) -> Result<Vec<SkillDeployment>, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::list_deployments(&paths, skill_id.as_deref())
+}
+
+#[tauri::command]
+fn skill_deployment_preview_add(
+    app: tauri::AppHandle,
+    skill_id: String,
+    target_type: DeploymentTargetType,
+    project_root: Option<String>,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::preview_deployment_add(&paths, &skill_id, target_type, project_root)
+}
+
+#[tauri::command]
+fn skill_deployment_apply_add(
+    app: tauri::AppHandle,
+    skill_id: String,
+    target_type: DeploymentTargetType,
+    project_root: Option<String>,
+    _expected_files: Vec<FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::apply_deployment_add(&paths, &skill_id, target_type, project_root)
+}
+
+#[tauri::command]
+fn skill_deployment_preview_remove(
+    app: tauri::AppHandle,
+    deployment_id: String,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::preview_deployment_remove(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_deployment_apply_remove(
+    app: tauri::AppHandle,
+    deployment_id: String,
+    _expected_files: Vec<FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::apply_deployment_remove(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_deployment_check_one(
+    app: tauri::AppHandle,
+    deployment_id: String,
+) -> Result<SkillDeployment, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::check_deployment_status(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_repo_preview_sync_from_deployment(
+    app: tauri::AppHandle,
+    deployment_id: String,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::preview_sync_from_deployment(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_repo_apply_sync_from_deployment(
+    app: tauri::AppHandle,
+    deployment_id: String,
+    _expected_files: Vec<FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::apply_sync_from_deployment(&paths, &deployment_id)
+}
+
+#[tauri::command]
 fn skill_preview_create(
     app: tauri::AppHandle,
     client: Client,
@@ -371,7 +490,8 @@ fn skill_preview_create(
     body: Option<String>,
 ) -> Result<aidevhub_core::model::WritePreview, AppError> {
     let paths = resolve_paths(&app)?;
-    ops::skill_preview_create(&paths, client, &name, &description, body)
+    let _ = client;
+    aidevhub_core::skill_repo::preview_create_repo_skill(&paths, &name, &name, &description, body)
 }
 
 #[tauri::command]
@@ -384,7 +504,17 @@ fn skill_apply_create(
     expected_files: Vec<FilePrecondition>,
 ) -> Result<aidevhub_core::model::ApplyResult, AppError> {
     let paths = resolve_paths(&app)?;
-    ops::skill_apply_create(&paths, client, &name, &description, body, expected_files)
+    let _ = (client, expected_files);
+    let created = aidevhub_core::skill_repo::apply_create_repo_skill(&paths, &name, &name, &description, body)?;
+    Ok(aidevhub_core::model::ApplyResult {
+        backups: Vec::new(),
+        summary: aidevhub_core::model::WriteSummary {
+            will_add: vec![format!("repo:{}", created.slug)],
+            will_enable: Vec::new(),
+            will_disable: Vec::new(),
+        },
+        warnings: Vec::new(),
+    })
 }
 
 #[tauri::command]
@@ -460,6 +590,18 @@ pub fn run() {
             settings_put,
             skill_list,
             skill_get,
+            skill_repo_list,
+            skill_repo_get,
+            skill_repo_preview_import,
+            skill_repo_apply_import,
+            skill_deployment_list,
+            skill_deployment_preview_add,
+            skill_deployment_apply_add,
+            skill_deployment_preview_remove,
+            skill_deployment_apply_remove,
+            skill_deployment_check_one,
+            skill_repo_preview_sync_from_deployment,
+            skill_repo_apply_sync_from_deployment,
             skill_preview_create,
             skill_apply_create,
             skill_preview_toggle,

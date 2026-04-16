@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   AppError,
   Client,
+  DeploymentTargetType,
   FilePrecondition,
+  ManagedSkillView,
+  SkillDeployment,
   SkillGetResponse,
+  SkillRepoGetResponse,
   SkillRecord,
   WritePreview,
 } from "../lib/types";
@@ -17,7 +21,11 @@ type ScopeFilter = "user" | "system" | "disabled";
 
 type PendingAction =
   | { type: "toggle"; skill_id: string; enabled: boolean }
-  | { type: "create"; client: Client; name: string; description: string; body?: string };
+  | { type: "create"; client: Client; name: string; description: string; body?: string }
+  | { type: "import"; client: Client; name: string; source_path: string }
+  | { type: "deploy_add"; skill_id: string; target_type: DeploymentTargetType; project_root?: string }
+  | { type: "deploy_remove"; deployment_id: string }
+  | { type: "sync_back"; deployment_id: string };
 
 function formatSkillName(skillId: string): string {
   if (skillId.includes(":")) {
@@ -30,6 +38,7 @@ export function SkillsPage() {
   const [client, setClient] = useState<Client>("claude_code");
   const [scope, setScope] = useState<ScopeFilter>("user");
   const [skills, setSkills] = useState<SkillRecord[] | null>(null);
+  const [repoSkills, setRepoSkills] = useState<ManagedSkillView[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -37,6 +46,12 @@ export function SkillsPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selected, setSelected] = useState<SkillRecord | null>(null);
   const [selectedDetails, setSelectedDetails] = useState<SkillGetResponse | null>(null);
+  const [repoDetailsOpen, setRepoDetailsOpen] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<ManagedSkillView | null>(null);
+  const [selectedRepoDetails, setSelectedRepoDetails] = useState<SkillRepoGetResponse | null>(null);
+  const [selectedRepoDeployments, setSelectedRepoDeployments] = useState<SkillDeployment[] | null>(null);
+  const [claudeProjectRoot, setClaudeProjectRoot] = useState("");
+  const [codexProjectRoot, setCodexProjectRoot] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createClient, setCreateClient] = useState<Client>("codex");
@@ -63,8 +78,9 @@ export function SkillsPage() {
   async function load() {
     setError(null);
     try {
-      const list = await api.skillList({ client, scope });
+      const [list, repoList] = await Promise.all([api.skillList({ client, scope }), api.skillRepoList()]);
       setSkills(list);
+      setRepoSkills(repoList);
     } catch (e) {
       setError(e as AppError);
     }
@@ -92,6 +108,103 @@ export function SkillsPage() {
       setSelectedDetails(full);
     } catch {
       // best-effort
+    }
+  }
+
+  async function openRepoDetails(skill: ManagedSkillView) {
+    setSelectedRepo(skill);
+    setSelectedRepoDetails(null);
+    setSelectedRepoDeployments(null);
+    setRepoDetailsOpen(true);
+    try {
+      const [full, deployments] = await Promise.all([
+        api.skillRepoGet({ skill_id: skill.skill_id }),
+        api.skillDeploymentList({ skill_id: skill.skill_id }),
+      ]);
+      setSelectedRepoDetails(full);
+      setSelectedRepoDeployments(deployments);
+    } catch {
+      // best-effort
+    }
+  }
+
+  async function deployRepoSkill(skillId: string, targetType: DeploymentTargetType, projectRoot?: string) {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    setPending({ type: "deploy_add", skill_id: skillId, target_type: targetType, project_root: projectRoot });
+    setPreviewTitle(
+      targetType === "claude_global"
+        ? "投放到 Claude 全局"
+        : targetType === "codex_global"
+          ? "投放到 Codex 全局"
+          : targetType === "claude_project"
+            ? "投放到 Claude 项目"
+            : "投放到 Codex 项目",
+    );
+    try {
+      const preview = await api.skillDeploymentPreviewAdd({
+        skill_id: skillId,
+        target_type: targetType,
+        project_root: projectRoot,
+      });
+      setPreview(preview);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeDeployment(deploymentId: string) {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    setPending({ type: "deploy_remove", deployment_id: deploymentId });
+    setPreviewTitle("撤回全局投放");
+    try {
+      const preview = await api.skillDeploymentPreviewRemove({ deployment_id: deploymentId });
+      setPreview(preview);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkDeployment(deploymentId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.skillDeploymentCheckOne({ deployment_id: deploymentId });
+      if (selectedRepo) {
+        await openRepoDetails(selectedRepo);
+      } else {
+        await load();
+      }
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncBackDeployment(deploymentId: string) {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    setPending({ type: "sync_back", deployment_id: deploymentId });
+    setPreviewTitle("从投放副本回流到仓库");
+    try {
+      const preview = await api.skillRepoPreviewSyncFromDeployment({ deployment_id: deploymentId });
+      setPreview(preview);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -139,6 +252,27 @@ export function SkillsPage() {
     }
   }
 
+  async function requestImport(s: SkillRecord) {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    setPending({ type: "import", client: s.client, name: formatSkillName(s.skill_id), source_path: s.container_path });
+    setPreviewTitle(`导入到仓库：${formatSkillName(s.skill_id)}`);
+    try {
+      const p = await api.skillRepoPreviewImport({
+        client: s.client,
+        name: formatSkillName(s.skill_id),
+        source_path: s.container_path,
+      });
+      setPreview(p);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function applyPending(expected_files: FilePrecondition[]) {
     if (!pending) return;
     setBusy(true);
@@ -146,6 +280,30 @@ export function SkillsPage() {
     try {
       if (pending.type === "toggle") {
         await api.skillApplyToggle({ skill_id: pending.skill_id, enabled: pending.enabled, expected_files });
+      } else if (pending.type === "import") {
+        await api.skillRepoApplyImport({
+          client: pending.client,
+          name: pending.name,
+          source_path: pending.source_path,
+          expected_files,
+        });
+      } else if (pending.type === "deploy_add") {
+        await api.skillDeploymentApplyAdd({
+          skill_id: pending.skill_id,
+          target_type: pending.target_type,
+          project_root: pending.project_root,
+          expected_files,
+        });
+      } else if (pending.type === "deploy_remove") {
+        await api.skillDeploymentApplyRemove({
+          deployment_id: pending.deployment_id,
+          expected_files,
+        });
+      } else if (pending.type === "sync_back") {
+        await api.skillRepoApplySyncFromDeployment({
+          deployment_id: pending.deployment_id,
+          expected_files,
+        });
       } else {
         await api.skillApplyCreate({
           client: pending.client,
@@ -159,6 +317,9 @@ export function SkillsPage() {
       setPending(null);
       setPreview(null);
       await load();
+      if (selectedRepo) {
+        await openRepoDetails(selectedRepo);
+      }
     } catch (e) {
       setError(e as AppError);
     } finally {
@@ -383,6 +544,15 @@ export function SkillsPage() {
                       >
                         {s.enabled ? "停用" : "启用"}
                       </button>
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy || s.kind !== "dir" || s.scope === "system"}
+                        onClick={() => requestImport(s)}
+                        title={s.kind !== "dir" ? "仅第一阶段目录型 Skill 支持导入到仓库" : "导入到内部仓库"}
+                      >
+                        导入仓库
+                      </button>
                       <button type="button" className="ui-btn" onClick={() => openDetails(s)}>
                         详情 <Icon name="chevronRight" />
                       </button>
@@ -416,6 +586,45 @@ export function SkillsPage() {
         full={selectedDetails}
       />
 
+      <div className="ui-card" style={{ padding: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+          <div className="ui-label">内部仓库</div>
+          <div className="ui-help">{repoSkills ? `${repoSkills.length} 个 Skill` : "加载中..."}</div>
+        </div>
+        <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+          {(repoSkills ?? []).map((skill) => (
+            <button
+              key={skill.skill_id}
+              type="button"
+              className="ui-btn"
+              style={{ justifyContent: "space-between" }}
+              onClick={() => openRepoDetails(skill)}
+            >
+              <span className="ui-code">{skill.display_name}</span>
+              <span className="ui-help">v{skill.version}</span>
+            </button>
+          ))}
+          {repoSkills && repoSkills.length === 0 ? <div className="ui-help">仓库中还没有 Skill。</div> : null}
+        </div>
+      </div>
+
+      <RepoDetailsDrawer
+        open={repoDetailsOpen}
+        onClose={() => setRepoDetailsOpen(false)}
+        basic={selectedRepo}
+        full={selectedRepoDetails}
+        deployments={selectedRepoDeployments}
+        busy={busy}
+        onDeploy={deployRepoSkill}
+        onRemoveDeployment={removeDeployment}
+        onCheckDeployment={checkDeployment}
+        onSyncBack={syncBackDeployment}
+        claudeProjectRoot={claudeProjectRoot}
+        codexProjectRoot={codexProjectRoot}
+        setClaudeProjectRoot={setClaudeProjectRoot}
+        setCodexProjectRoot={setCodexProjectRoot}
+      />
+
       <WritePreviewDialog
         title={previewTitle}
         preview={preview}
@@ -427,6 +636,211 @@ export function SkillsPage() {
         }}
         onConfirm={applyPending}
       />
+    </div>
+  );
+}
+
+function RepoDetailsDrawer({
+  open,
+  onClose,
+  basic,
+  full,
+  deployments,
+  busy,
+  onDeploy,
+  onRemoveDeployment,
+  onCheckDeployment,
+  onSyncBack,
+  claudeProjectRoot,
+  codexProjectRoot,
+  setClaudeProjectRoot,
+  setCodexProjectRoot,
+}: {
+  open: boolean;
+  onClose: () => void;
+  basic: ManagedSkillView | null;
+  full: SkillRepoGetResponse | null;
+  deployments: SkillDeployment[] | null;
+  busy: boolean;
+  onDeploy: (skillId: string, targetType: DeploymentTargetType, projectRoot?: string) => Promise<void>;
+  onRemoveDeployment: (deploymentId: string) => Promise<void>;
+  onCheckDeployment: (deploymentId: string) => Promise<void>;
+  onSyncBack: (deploymentId: string) => Promise<void>;
+  claudeProjectRoot: string;
+  codexProjectRoot: string;
+  setClaudeProjectRoot: (value: string) => void;
+  setCodexProjectRoot: (value: string) => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="ui-dialogOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="仓库Skill详情"
+      onMouseDown={(e) => {
+        if (e.currentTarget === e.target) onClose();
+      }}
+      style={{ placeItems: "end" }}
+    >
+      <div
+        className="ui-dialog"
+        style={{
+          width: "min(900px, 94vw)",
+          height: "100%",
+          maxHeight: "100vh",
+          borderRadius: "18px 0 0 18px",
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="ui-dialogHeader">
+          <div className="ui-dialogTitle">仓库 Skill 详情</div>
+          <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="ui-dialogBody">
+          <div style={{ display: "grid", gap: "12px" }}>
+            <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-label">名称</div>
+              <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
+                {full?.manifest.display_name ?? basic?.display_name ?? "（未加载）"}
+              </div>
+              <div className="ui-label" style={{ marginTop: "14px" }}>
+                描述
+              </div>
+              <div style={{ marginTop: "8px", color: "var(--color-muted)" }}>
+                {full?.manifest.description ?? basic?.description ?? "（无）"}
+              </div>
+            </div>
+            <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-label">仓库目录</div>
+              <div className="ui-code" style={{ marginTop: "8px" }}>
+                {full?.manifest.repo_root ?? "（未加载）"}
+              </div>
+              <div className="ui-label" style={{ marginTop: "14px" }}>
+                内容（只读）
+              </div>
+              <div style={{ marginTop: "10px" }}>
+                <pre className="ui-pre">{full?.content ?? "（未加载）"}</pre>
+              </div>
+            </div>
+
+            <div className="ui-card" style={{ padding: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                <div className="ui-label">投放</div>
+                <div className="ui-btnRow">
+                  <button
+                    type="button"
+                    className="ui-btn"
+                    disabled={busy || !basic}
+                    onClick={() => basic && onDeploy(basic.skill_id, "claude_global")}
+                  >
+                    投放到 Claude 全局
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn"
+                    disabled={busy || !basic}
+                    onClick={() => basic && onDeploy(basic.skill_id, "codex_global")}
+                  >
+                    投放到 Codex 全局
+                  </button>
+                </div>
+              </div>
+              <div className="ui-formGrid" style={{ marginTop: "12px" }}>
+                <div className="ui-field ui-fieldFull">
+                  <div className="ui-label">Claude 项目目录</div>
+                  <input
+                    className="ui-input"
+                    placeholder="例如 F:/myProjects/demo"
+                    value={claudeProjectRoot}
+                    onChange={(e) => setClaudeProjectRoot(e.currentTarget.value)}
+                    disabled={busy}
+                  />
+                  <div className="ui-btnRow" style={{ marginTop: "10px" }}>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || !basic || !claudeProjectRoot.trim()}
+                      onClick={() => basic && onDeploy(basic.skill_id, "claude_project", claudeProjectRoot.trim())}
+                    >
+                      投放到 Claude 项目
+                    </button>
+                  </div>
+                </div>
+                <div className="ui-field ui-fieldFull">
+                  <div className="ui-label">Codex 项目目录</div>
+                  <input
+                    className="ui-input"
+                    placeholder="例如 F:/myProjects/demo"
+                    value={codexProjectRoot}
+                    onChange={(e) => setCodexProjectRoot(e.currentTarget.value)}
+                    disabled={busy}
+                  />
+                  <div className="ui-btnRow" style={{ marginTop: "10px" }}>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || !basic || !codexProjectRoot.trim()}
+                      onClick={() => basic && onDeploy(basic.skill_id, "codex_project", codexProjectRoot.trim())}
+                    >
+                      投放到 Codex 项目
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+                {(deployments ?? []).map((deployment) => (
+                  <div key={deployment.deployment_id} className="ui-card" style={{ padding: "12px" }}>
+                    <div className="ui-code">{deployment.target_type}</div>
+                    {deployment.project_root ? (
+                      <div className="ui-help" style={{ marginTop: "6px" }}>
+                        项目：{deployment.project_root}
+                      </div>
+                    ) : null}
+                    <div className="ui-help" style={{ marginTop: "6px" }}>
+                      {deployment.target_skill_path}
+                    </div>
+                    <div className="ui-help" style={{ marginTop: "6px" }}>
+                      状态：{deployment.status}
+                    </div>
+                    <div className="ui-btnRow" style={{ marginTop: "10px" }}>
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy}
+                        onClick={() => onCheckDeployment(deployment.deployment_id)}
+                      >
+                        检查状态
+                      </button>
+                      {deployment.status === "drifted" ? (
+                        <button
+                          type="button"
+                          className="ui-btn"
+                          disabled={busy}
+                          onClick={() => onSyncBack(deployment.deployment_id)}
+                        >
+                          回流到仓库
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy || deployment.status === "disabled"}
+                        onClick={() => onRemoveDeployment(deployment.deployment_id)}
+                      >
+                        撤回
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {deployments && deployments.length === 0 ? <div className="ui-help">暂无投放。</div> : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

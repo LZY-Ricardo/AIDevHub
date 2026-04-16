@@ -137,6 +137,10 @@ export interface RuntimeInfo {
     codex_skills_dir: string;
     codex_skills_disabled_dir: string;
     app_local_data_dir: string;
+    skill_store_root: string;
+    skill_repo_root: string;
+    skill_indexes_root: string;
+    skill_index_path: string;
     profiles_path: string;
     disabled_pool_path: string;
     backups_dir: string;
@@ -163,6 +167,75 @@ export interface SkillRecord {
 export interface SkillGetResponse {
   record: SkillRecord;
   content: string;
+}
+
+export type SkillSupportMode = "claude_only" | "codex_only" | "both";
+export type SkillRepoSource = "imported_global" | "created_internal";
+
+export interface SkillCatalogEntry {
+  skill_id: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  support_mode: SkillSupportMode;
+  repo_root: string;
+  files_root: string;
+  entry_rel_path: string;
+  source: SkillRepoSource;
+  content_hash: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  archived: boolean;
+}
+
+export interface ManagedSkillView {
+  skill_id: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  support_mode: SkillSupportMode;
+  version: number;
+  updated_at: string;
+}
+
+export interface SkillManifest {
+  skill_id: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  support_mode: SkillSupportMode;
+  repo_root: string;
+  files_root: string;
+  entry_rel_path: string;
+  source: SkillRepoSource;
+  content_hash: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkillRepoGetResponse {
+  manifest: SkillManifest;
+  content: string;
+}
+
+export type DeploymentTargetType = "claude_global" | "codex_global" | "claude_project" | "codex_project";
+export type DeploymentStatus = "deployed" | "disabled" | "drifted" | "outdated";
+
+export interface SkillDeployment {
+  deployment_id: string;
+  skill_id: string;
+  target_type: DeploymentTargetType;
+  client: Client;
+  project_root?: string;
+  target_root: string;
+  target_skill_path: string;
+  deployed_name: string;
+  status: DeploymentStatus;
+  source_hash: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ConfigSourceKind = "mcp" | "skill";

@@ -4,3 +4,4 @@ pub mod health_check;
 pub mod mcp_registry;
 pub mod model;
 pub mod ops;
+pub mod skill_repo;

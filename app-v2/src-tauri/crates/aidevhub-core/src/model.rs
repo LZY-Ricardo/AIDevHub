@@ -127,6 +127,109 @@ pub struct SkillGetResponse {
     pub content: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillSupportMode {
+    ClaudeOnly,
+    CodexOnly,
+    Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillRepoSource {
+    ImportedGlobal,
+    CreatedInternal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillCatalogEntry {
+    pub skill_id: String,
+    pub slug: String,
+    pub display_name: String,
+    pub description: String,
+    pub support_mode: SkillSupportMode,
+    pub repo_root: String,
+    pub files_root: String,
+    pub entry_rel_path: String,
+    pub source: SkillRepoSource,
+    pub content_hash: String,
+    pub version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub archived: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillManifest {
+    pub skill_id: String,
+    pub slug: String,
+    pub display_name: String,
+    pub description: String,
+    pub support_mode: SkillSupportMode,
+    pub repo_root: String,
+    pub files_root: String,
+    pub entry_rel_path: String,
+    pub source: SkillRepoSource,
+    pub content_hash: String,
+    pub version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagedSkillView {
+    pub skill_id: String,
+    pub slug: String,
+    pub display_name: String,
+    pub description: String,
+    pub support_mode: SkillSupportMode,
+    pub version: u32,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillRepoGetResponse {
+    pub manifest: SkillManifest,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeploymentTargetType {
+    ClaudeGlobal,
+    CodexGlobal,
+    ClaudeProject,
+    CodexProject,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeploymentStatus {
+    Deployed,
+    Disabled,
+    Drifted,
+    Outdated,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillDeployment {
+    pub deployment_id: String,
+    pub skill_id: String,
+    pub target_type: DeploymentTargetType,
+    pub client: Client,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
+    pub target_root: String,
+    pub target_skill_path: String,
+    pub deployed_name: String,
+    pub status: DeploymentStatus,
+    pub source_hash: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub profile_id: String,
@@ -231,6 +334,10 @@ pub struct RuntimePaths {
     pub disabled_pool_path: String,
     pub backups_dir: String,
     pub backup_index_path: String,
+    pub skill_store_root: String,
+    pub skill_repo_root: String,
+    pub skill_indexes_root: String,
+    pub skill_index_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

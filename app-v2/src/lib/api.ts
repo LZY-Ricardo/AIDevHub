@@ -18,6 +18,11 @@ import type {
   ServerNotes,
   ServerRecord,
   SkillGetResponse,
+  ManagedSkillView,
+  SkillCatalogEntry,
+  SkillDeployment,
+  DeploymentTargetType,
+  SkillRepoGetResponse,
   SkillRecord,
   WritePreview,
 } from "./types";
@@ -203,6 +208,106 @@ export const api = {
 
   skillGet(payload: { skill_id: string }): Promise<SkillGetResponse> {
     return invokeCmd("skill_get", { skillId: payload.skill_id });
+  },
+
+  skillRepoList(): Promise<ManagedSkillView[]> {
+    return invokeCmd("skill_repo_list");
+  },
+
+  skillRepoGet(payload: { skill_id: string }): Promise<SkillRepoGetResponse> {
+    return invokeCmd("skill_repo_get", { skillId: payload.skill_id });
+  },
+
+  skillRepoPreviewImport(payload: { client: Client; name: string; source_path: string }): Promise<WritePreview> {
+    return invokeCmd("skill_repo_preview_import", {
+      client: payload.client,
+      name: payload.name,
+      sourcePath: payload.source_path,
+    });
+  },
+
+  skillRepoApplyImport(payload: {
+    client: Client;
+    name: string;
+    source_path: string;
+    expected_files: FilePrecondition[];
+  }): Promise<SkillCatalogEntry> {
+    return invokeCmd("skill_repo_apply_import", {
+      client: payload.client,
+      name: payload.name,
+      sourcePath: payload.source_path,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  skillDeploymentList(payload?: { skill_id?: string }): Promise<SkillDeployment[]> {
+    return invokeCmd("skill_deployment_list", {
+      skillId: payload?.skill_id,
+    });
+  },
+
+  skillDeploymentPreviewAdd(payload: {
+    skill_id: string;
+    target_type: DeploymentTargetType;
+    project_root?: string;
+  }): Promise<WritePreview> {
+    return invokeCmd("skill_deployment_preview_add", {
+      skillId: payload.skill_id,
+      targetType: payload.target_type,
+      projectRoot: payload.project_root,
+    });
+  },
+
+  skillDeploymentApplyAdd(payload: {
+    skill_id: string;
+    target_type: DeploymentTargetType;
+    project_root?: string;
+    expected_files: FilePrecondition[];
+  }): Promise<SkillDeployment> {
+    return invokeCmd("skill_deployment_apply_add", {
+      skillId: payload.skill_id,
+      targetType: payload.target_type,
+      projectRoot: payload.project_root,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  skillDeploymentPreviewRemove(payload: { deployment_id: string }): Promise<WritePreview> {
+    return invokeCmd("skill_deployment_preview_remove", {
+      deploymentId: payload.deployment_id,
+    });
+  },
+
+  skillDeploymentApplyRemove(payload: {
+    deployment_id: string;
+    expected_files: FilePrecondition[];
+  }): Promise<SkillDeployment> {
+    return invokeCmd("skill_deployment_apply_remove", {
+      deploymentId: payload.deployment_id,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
+  skillDeploymentCheckOne(payload: { deployment_id: string }): Promise<SkillDeployment> {
+    return invokeCmd("skill_deployment_check_one", {
+      deploymentId: payload.deployment_id,
+    });
+  },
+
+  skillRepoPreviewSyncFromDeployment(payload: { deployment_id: string }): Promise<WritePreview> {
+    return invokeCmd("skill_repo_preview_sync_from_deployment", {
+      deploymentId: payload.deployment_id,
+    });
+  },
+
+  skillRepoApplySyncFromDeployment(payload: {
+    deployment_id: string;
+    expected_files: FilePrecondition[];
+  }): Promise<SkillDeployment> {
+    return invokeCmd("skill_repo_apply_sync_from_deployment", {
+      deploymentId: payload.deployment_id,
+      expectedFiles: payload.expected_files,
+    });
   },
 
   skillPreviewCreate(payload: { client: Client; name: string; description: string; body?: string }): Promise<WritePreview> {

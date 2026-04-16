@@ -15,7 +15,7 @@ tempfile = "3"
 thiserror = "2"
 toml_edit = "0.22"
 uuid = { version = "1", features = ["v4", "serde"] }
-tokio = { version = "1", features = ["process", "io-util", "time", "rt", "sync", "macros"] }
+tokio = { version = "1", features = ["process", "io-util", "time", "rt", "rt-multi-thread", "sync", "macros"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
