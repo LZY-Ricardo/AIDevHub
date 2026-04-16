@@ -47,6 +47,11 @@ fn read_to_string(path: &Path) -> Result<String, AppError> {
     fs::read_to_string(path).map_err(|e| io_error("read", path, e))
 }
 
+fn read_to_string_lossy(path: &Path) -> Result<String, AppError> {
+    let bytes = fs::read(path).map_err(|e| io_error("read", path, e))?;
+    Ok(String::from_utf8_lossy(&bytes).to_string())
+}
+
 fn write_atomic(path: &Path, content: &str) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
@@ -216,6 +221,42 @@ fn sha256_text(s: &str) -> String {
     format!("sha256:{:x}", Sha256::digest(s.as_bytes()))
 }
 
+fn sha256_file(path: &Path) -> Result<String, AppError> {
+    let bytes = fs::read(path).map_err(|e| io_error("read", path, e))?;
+    Ok(format!("sha256:{:x}", Sha256::digest(&bytes)))
+}
+
+fn current_file_hash(path: &Path) -> Result<Option<String>, AppError> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    Ok(Some(sha256_file(path)?))
+}
+
+fn verify_expected_files(expected_files: &[crate::model::FilePrecondition]) -> Result<(), AppError> {
+    let mismatches: Vec<_> = expected_files
+        .iter()
+        .filter_map(|expected| {
+            let path = PathBuf::from(&expected.path);
+            let current = current_file_hash(&path).ok().flatten();
+            if current != expected.expected_before_sha256 {
+                Some(expected.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    if mismatches.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::new(
+            "PRECONDITION_FAILED",
+            "Target files changed since preview; please preview again.",
+        )
+        .with_details(serde_json::json!({ "mismatches": mismatches })))
+    }
+}
+
 fn write_manifest(repo_root: &Path, manifest: &SkillManifest) -> Result<(), AppError> {
     let raw = serde_json::to_string_pretty(manifest)
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize manifest: {e}")))?;
@@ -261,6 +302,41 @@ fn update_catalog_entry(paths: &AppPaths, updated: &SkillCatalogEntry) -> Result
         .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {}", updated.skill_id)))?;
     *entry = updated.clone();
     save_index(paths, &store)
+}
+
+fn build_tree_preview(from_root: &Path, to_root: &Path) -> Result<Vec<crate::model::FileChangePreview>, AppError> {
+    let mut rels = collect_tree_files(from_root)?;
+    for rel in collect_tree_files(to_root)? {
+        if !rels.contains(&rel) {
+            rels.push(rel);
+        }
+    }
+    rels.sort();
+    rels.dedup();
+
+    rels.into_iter()
+        .map(|rel| {
+            let from_path = from_root.join(&rel);
+            let to_path = to_root.join(&rel);
+            let before = if to_path.exists() {
+                Some(read_to_string_lossy(&to_path)?)
+            } else {
+                None
+            };
+            let after = if from_path.exists() {
+                read_to_string_lossy(&from_path)?
+            } else {
+                String::new()
+            };
+            Ok(crate::model::FileChangePreview {
+                path: to_path.to_string_lossy().to_string(),
+                will_create: !to_path.exists() && from_path.exists(),
+                before_sha256: before.as_deref().map(sha256_text),
+                after_sha256: sha256_text(&after),
+                diff_unified: after,
+            })
+        })
+        .collect()
 }
 
 pub fn ensure_skill_store_layout(paths: &AppPaths) -> Result<(), AppError> {
@@ -664,6 +740,16 @@ pub fn preview_deployment_add(
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize deployment index: {e}")))?;
     let skill_md_path = PathBuf::from(&skill.files_root).join(&skill.entry_rel_path);
     let skill_md = read_to_string(&skill_md_path)?;
+    let expected_files = vec![
+        crate::model::FilePrecondition {
+            path: target_skill_path.join("SKILL.md").to_string_lossy().to_string(),
+            expected_before_sha256: None,
+        },
+        crate::model::FilePrecondition {
+            path: deployment_index_path(paths).to_string_lossy().to_string(),
+            expected_before_sha256: current_file_hash(&deployment_index_path(paths))?,
+        },
+    ];
 
     Ok(WritePreview {
         files: vec![
@@ -683,7 +769,7 @@ pub fn preview_deployment_add(
             },
         ],
         moves: Vec::new(),
-        expected_files: Vec::new(),
+        expected_files,
         summary: WriteSummary {
             will_enable: vec![skill.skill_id.clone()],
             ..WriteSummary::default()
@@ -701,8 +787,10 @@ pub fn apply_deployment_add(
     skill_id: &str,
     target_type: DeploymentTargetType,
     project_root: Option<String>,
+    expected_files: Vec<crate::model::FilePrecondition>,
 ) -> Result<SkillDeployment, AppError> {
     ensure_skill_store_layout(paths)?;
+    verify_expected_files(&expected_files)?;
     let store = load_index(paths)?;
     let skill = store
         .skills
@@ -755,6 +843,19 @@ pub fn preview_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Resul
     dep.updated_at = Utc::now().to_rfc3339();
     let deployment_raw = serde_json::to_string_pretty(&next)
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize deployment index: {e}")))?;
+    let expected_files = vec![
+        crate::model::FilePrecondition {
+            path: PathBuf::from(&deployment.target_skill_path)
+                .join("SKILL.md")
+                .to_string_lossy()
+                .to_string(),
+            expected_before_sha256: current_file_hash(&PathBuf::from(&deployment.target_skill_path).join("SKILL.md"))?,
+        },
+        crate::model::FilePrecondition {
+            path: deployment_index_path(paths).to_string_lossy().to_string(),
+            expected_before_sha256: current_file_hash(&deployment_index_path(paths))?,
+        },
+    ];
 
     Ok(WritePreview {
         files: vec![crate::model::FileChangePreview {
@@ -769,7 +870,7 @@ pub fn preview_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Resul
             to: String::new(),
             kind: crate::model::SkillKind::Dir,
         }],
-        expected_files: Vec::new(),
+        expected_files,
         summary: WriteSummary {
             will_disable: vec![skill_id],
             ..WriteSummary::default()
@@ -778,8 +879,13 @@ pub fn preview_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Resul
     })
 }
 
-pub fn apply_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Result<SkillDeployment, AppError> {
+pub fn apply_deployment_remove(
+    paths: &AppPaths,
+    deployment_id: &str,
+    expected_files: Vec<crate::model::FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
     ensure_skill_store_layout(paths)?;
+    verify_expected_files(&expected_files)?;
     let mut deployments = load_deployments(paths)?;
     let deployment = deployments
         .deployments
@@ -817,6 +923,13 @@ pub fn check_deployment_status(paths: &AppPaths, deployment_id: &str) -> Result<
     }
 
     let target = PathBuf::from(&deployment.target_skill_path);
+    if !target.exists() {
+        deployment.status = DeploymentStatus::Missing;
+        deployment.updated_at = Utc::now().to_rfc3339();
+        let result = deployment.clone();
+        save_deployments(paths, &deployments)?;
+        return Ok(result);
+    }
     let current_hash = hash_tree(&target)?;
     deployment.status = if current_hash == skill.content_hash {
         DeploymentStatus::Deployed
@@ -840,29 +953,43 @@ pub fn preview_sync_from_deployment(paths: &AppPaths, deployment_id: &str) -> Re
         .find(|item| item.deployment_id == deployment_id)
         .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
     let repo = get_repo_skill(paths, &deployment.skill_id)?;
-    let target_skill_md = PathBuf::from(&deployment.target_skill_path).join("SKILL.md");
-    let target_content = read_to_string(&target_skill_md)?;
+    let target_root = PathBuf::from(&deployment.target_skill_path);
+    let repo_root = PathBuf::from(&repo.manifest.files_root);
+    let deployment_index = deployment_index_path(paths);
+    let expected_files = collect_tree_files(&repo_root)?
+        .into_iter()
+        .map(|rel| {
+            let full = repo_root.join(&rel);
+            Ok(crate::model::FilePrecondition {
+                path: full.to_string_lossy().to_string(),
+                expected_before_sha256: current_file_hash(&full)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
 
     Ok(WritePreview {
-        files: vec![crate::model::FileChangePreview {
-            path: PathBuf::from(&repo.manifest.files_root)
-                .join(&repo.manifest.entry_rel_path)
-                .to_string_lossy()
-                .to_string(),
-            will_create: false,
-            before_sha256: Some(sha256_text(&repo.content)),
-            after_sha256: sha256_text(&target_content),
-            diff_unified: target_content,
-        }],
+        files: build_tree_preview(&target_root, &repo_root)?,
         moves: Vec::new(),
-        expected_files: Vec::new(),
+        expected_files: {
+            let mut files = expected_files;
+            files.push(crate::model::FilePrecondition {
+                path: deployment_index.to_string_lossy().to_string(),
+                expected_before_sha256: current_file_hash(&deployment_index)?,
+            });
+            files
+        },
         summary: WriteSummary::default(),
         warnings: Vec::new(),
     })
 }
 
-pub fn apply_sync_from_deployment(paths: &AppPaths, deployment_id: &str) -> Result<SkillDeployment, AppError> {
+pub fn apply_sync_from_deployment(
+    paths: &AppPaths,
+    deployment_id: &str,
+    expected_files: Vec<crate::model::FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
     ensure_skill_store_layout(paths)?;
+    verify_expected_files(&expected_files)?;
     let mut deployments = load_deployments(paths)?;
     let dep_index = deployments
         .deployments

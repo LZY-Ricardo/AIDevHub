@@ -428,10 +428,10 @@ fn skill_deployment_apply_add(
     skill_id: String,
     target_type: DeploymentTargetType,
     project_root: Option<String>,
-    _expected_files: Vec<FilePrecondition>,
+    expected_files: Vec<FilePrecondition>,
 ) -> Result<SkillDeployment, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::apply_deployment_add(&paths, &skill_id, target_type, project_root)
+    aidevhub_core::skill_repo::apply_deployment_add(&paths, &skill_id, target_type, project_root, expected_files)
 }
 
 #[tauri::command]
@@ -447,10 +447,10 @@ fn skill_deployment_preview_remove(
 fn skill_deployment_apply_remove(
     app: tauri::AppHandle,
     deployment_id: String,
-    _expected_files: Vec<FilePrecondition>,
+    expected_files: Vec<FilePrecondition>,
 ) -> Result<SkillDeployment, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::apply_deployment_remove(&paths, &deployment_id)
+    aidevhub_core::skill_repo::apply_deployment_remove(&paths, &deployment_id, expected_files)
 }
 
 #[tauri::command]
@@ -475,10 +475,10 @@ fn skill_repo_preview_sync_from_deployment(
 fn skill_repo_apply_sync_from_deployment(
     app: tauri::AppHandle,
     deployment_id: String,
-    _expected_files: Vec<FilePrecondition>,
+    expected_files: Vec<FilePrecondition>,
 ) -> Result<SkillDeployment, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::apply_sync_from_deployment(&paths, &deployment_id)
+    aidevhub_core::skill_repo::apply_sync_from_deployment(&paths, &deployment_id, expected_files)
 }
 
 #[tauri::command]

@@ -211,6 +211,7 @@ pub enum DeploymentStatus {
     Disabled,
     Drifted,
     Outdated,
+    Missing,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

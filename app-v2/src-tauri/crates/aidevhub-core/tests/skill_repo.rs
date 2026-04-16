@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use aidevhub_core::{
-    model::{Client, DeploymentStatus, DeploymentTargetType},
+    model::{Client, DeploymentStatus, DeploymentTargetType, FilePrecondition},
     ops::AppPaths,
     skill_repo::{
         apply_create_repo_skill, apply_deployment_add, apply_deployment_remove, apply_import_skill, ensure_skill_store_layout,
@@ -41,6 +41,13 @@ fn write(path: &PathBuf, content: &str) {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+fn stale_expected(path: &str) -> Vec<FilePrecondition> {
+    vec![FilePrecondition {
+        path: path.to_string(),
+        expected_before_sha256: Some("sha256:stale".to_string()),
+    }]
 }
 
 #[test]
@@ -119,7 +126,7 @@ fn deploying_repo_skill_to_codex_global_copies_files_and_records_deployment() {
     )
     .unwrap();
 
-    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
     let deployed_skill_md = paths.codex_skills_dir.join("deploy-me").join("SKILL.md");
 
     assert_eq!(deployment.skill_id, created.skill_id);
@@ -146,12 +153,12 @@ fn removing_global_deployment_deletes_external_copy_but_keeps_repository_skill()
     )
     .unwrap();
 
-    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
     let repo_skill_md = PathBuf::from(&created.repo_root).join("files").join("SKILL.md");
     let deployed_skill_dir = paths.codex_skills_dir.join("undeploy-me");
     assert!(deployed_skill_dir.exists());
 
-    apply_deployment_remove(&paths, &deployment.deployment_id).unwrap();
+    apply_deployment_remove(&paths, &deployment.deployment_id, Vec::new()).unwrap();
 
     assert!(repo_skill_md.exists());
     assert!(!deployed_skill_dir.exists());
@@ -169,7 +176,7 @@ fn deployment_add_preview_points_to_same_global_target_used_by_apply() {
     let created = apply_create_repo_skill(&paths, "preview-add", "Preview Add", "Preview add test", None).unwrap();
 
     let preview = preview_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
-    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
 
     assert!(
         preview
@@ -191,10 +198,10 @@ fn deployment_remove_preview_points_to_same_target_removed_by_apply() {
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(&paths, "preview-remove", "Preview Remove", "Preview remove test", None).unwrap();
-    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
 
     let preview = preview_deployment_remove(&paths, &deployment.deployment_id).unwrap();
-    apply_deployment_remove(&paths, &deployment.deployment_id).unwrap();
+    apply_deployment_remove(&paths, &deployment.deployment_id, Vec::new()).unwrap();
 
     assert!(
         preview
@@ -233,6 +240,7 @@ fn deploying_repo_skill_to_claude_project_uses_project_skill_directory() {
         &created.skill_id,
         DeploymentTargetType::ClaudeProject,
         Some(project_root.to_string_lossy().to_string()),
+        Vec::new(),
     )
     .unwrap();
 
@@ -268,6 +276,7 @@ fn deploying_repo_skill_to_codex_project_uses_project_skill_directory() {
         &created.skill_id,
         DeploymentTargetType::CodexProject,
         Some(project_root.to_string_lossy().to_string()),
+        Vec::new(),
     )
     .unwrap();
 
@@ -283,7 +292,7 @@ fn manual_edit_on_deployed_copy_marks_deployment_as_drifted() {
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(&paths, "drift-me", "Drift Me", "Drift test", None).unwrap();
-    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
     let deployed_skill_md = PathBuf::from(&deployment.target_skill_path).join("SKILL.md");
 
     fs::write(&deployed_skill_md, "---\nname: Drift Me\ndescription: changed externally\n---\n\nChanged").unwrap();
@@ -300,12 +309,13 @@ fn sync_back_updates_repository_and_marks_sibling_deployment_outdated() {
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(&paths, "sync-back", "Sync Back", "Sync test", None).unwrap();
-    let global = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None).unwrap();
+    let global = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
     let project = apply_deployment_add(
         &paths,
         &created.skill_id,
         DeploymentTargetType::CodexProject,
         Some(project_root.to_string_lossy().to_string()),
+        Vec::new(),
     )
     .unwrap();
 
@@ -318,7 +328,7 @@ fn sync_back_updates_repository_and_marks_sibling_deployment_outdated() {
 
     let preview = preview_sync_from_deployment(&paths, &global.deployment_id).unwrap();
     assert!(preview.summary.will_add.is_empty());
-    let synced = apply_sync_from_deployment(&paths, &global.deployment_id).unwrap();
+    let synced = apply_sync_from_deployment(&paths, &global.deployment_id, Vec::new()).unwrap();
 
     let repo = get_repo_skill(&paths, &created.skill_id).unwrap();
     assert!(repo.content.contains("updated via deployment"));
@@ -330,4 +340,58 @@ fn sync_back_updates_repository_and_marks_sibling_deployment_outdated() {
         .find(|item| item.deployment_id == project.deployment_id)
         .unwrap();
     assert_eq!(sibling.status, DeploymentStatus::Outdated);
+}
+
+#[test]
+fn missing_deployment_directory_marks_status_missing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(&paths, "missing-me", "Missing Me", "Missing test", None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
+    fs::remove_dir_all(PathBuf::from(&deployment.target_skill_path)).unwrap();
+
+    let checked = check_deployment_status(&paths, &deployment.deployment_id).unwrap();
+    assert_eq!(checked.status, DeploymentStatus::Missing);
+}
+
+#[test]
+fn deployment_apply_add_rejects_stale_preconditions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(&paths, "precondition-add", "Precondition Add", "Precondition add test", None).unwrap();
+    let target_skill_md = paths.codex_skills_dir.join("precondition-add").join("SKILL.md");
+
+    let err = apply_deployment_add(
+        &paths,
+        &created.skill_id,
+        DeploymentTargetType::CodexGlobal,
+        None,
+        stale_expected(&target_skill_md.to_string_lossy()),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "PRECONDITION_FAILED");
+}
+
+#[test]
+fn sync_back_preview_lists_non_entry_files_that_will_change() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(&paths, "sync-preview", "Sync Preview", "Sync preview test", None).unwrap();
+    let deployment = apply_deployment_add(&paths, &created.skill_id, DeploymentTargetType::CodexGlobal, None, Vec::new()).unwrap();
+    let target_asset = PathBuf::from(&deployment.target_skill_path).join("scripts").join("run.sh");
+    write(&target_asset, "echo changed");
+
+    let preview = preview_sync_from_deployment(&paths, &deployment.deployment_id).unwrap();
+    assert!(
+        preview
+            .files
+            .iter()
+            .any(|f| f.path.ends_with("scripts\\run.sh") || f.path.ends_with("scripts/run.sh"))
+    );
 }
