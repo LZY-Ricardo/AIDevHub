@@ -171,6 +171,13 @@ export interface SkillGetResponse {
 
 export type SkillSupportMode = "claude_only" | "codex_only" | "both";
 export type SkillRepoSource = "imported_global" | "created_internal";
+export type SkillSyncEventType = "imported" | "created" | "deployed" | "removed" | "drift_detected" | "synced_back";
+
+export interface SkillSourceDetail {
+  imported_from_client?: Client;
+  imported_from_path?: string;
+  imported_at?: string;
+}
 
 export interface SkillCatalogEntry {
   skill_id: string;
@@ -182,6 +189,7 @@ export interface SkillCatalogEntry {
   files_root: string;
   entry_rel_path: string;
   source: SkillRepoSource;
+  source_detail: SkillSourceDetail;
   content_hash: string;
   version: number;
   created_at: string;
@@ -209,6 +217,7 @@ export interface SkillManifest {
   files_root: string;
   entry_rel_path: string;
   source: SkillRepoSource;
+  source_detail: SkillSourceDetail;
   content_hash: string;
   version: number;
   created_at: string;
@@ -236,6 +245,26 @@ export interface SkillDeployment {
   source_hash: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface SkillTargetProfile {
+  target_profile_id: string;
+  name: string;
+  target_type: DeploymentTargetType;
+  client: Client;
+  project_root?: string;
+  target_root: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkillSyncEvent {
+  event_id: string;
+  skill_id: string;
+  deployment_id?: string;
+  event_type: SkillSyncEventType;
+  message: string;
+  created_at: string;
 }
 
 export type ConfigSourceKind = "mcp" | "skill";

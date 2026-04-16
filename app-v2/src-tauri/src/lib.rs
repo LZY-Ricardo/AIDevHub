@@ -4,7 +4,7 @@ use aidevhub_core::model::{
     AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
     ConfigIgnoreUpdatesResponse, DeploymentTargetType, FilePrecondition, HealthCheckResult, ManagedSkillView,
     McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, SkillCatalogEntry, SkillDeployment,
-    SkillRepoGetResponse, Transport,
+    SkillRepoGetResponse, SkillSyncEvent, SkillTargetProfile, Transport,
 };
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
@@ -463,6 +463,21 @@ fn skill_deployment_check_one(
 }
 
 #[tauri::command]
+fn skill_target_profile_list(app: tauri::AppHandle) -> Result<Vec<SkillTargetProfile>, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::list_target_profiles(&paths)
+}
+
+#[tauri::command]
+fn skill_sync_event_list(
+    app: tauri::AppHandle,
+    skill_id: Option<String>,
+) -> Result<Vec<SkillSyncEvent>, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::list_sync_events(&paths, skill_id.as_deref())
+}
+
+#[tauri::command]
 fn skill_repo_preview_sync_from_deployment(
     app: tauri::AppHandle,
     deployment_id: String,
@@ -600,6 +615,8 @@ pub fn run() {
             skill_deployment_preview_remove,
             skill_deployment_apply_remove,
             skill_deployment_check_one,
+            skill_target_profile_list,
+            skill_sync_event_list,
             skill_repo_preview_sync_from_deployment,
             skill_repo_apply_sync_from_deployment,
             skill_preview_create,

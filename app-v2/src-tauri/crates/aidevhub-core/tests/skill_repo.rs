@@ -6,7 +6,7 @@ use aidevhub_core::{
     skill_repo::{
         apply_create_repo_skill, apply_deployment_add, apply_deployment_remove, apply_import_skill, ensure_skill_store_layout,
         apply_sync_from_deployment, check_deployment_status, get_repo_skill, list_deployments, list_repo_skills,
-        preview_deployment_add, preview_deployment_remove, preview_sync_from_deployment,
+        list_sync_events, list_target_profiles, preview_deployment_add, preview_deployment_remove, preview_sync_from_deployment,
     },
 };
 
@@ -84,6 +84,11 @@ fn importing_codex_skill_copies_full_directory_into_repository_and_lists_it() {
     let repo_skill = get_repo_skill(&paths, &imported.skill_id).unwrap();
     assert!(PathBuf::from(&repo_skill.manifest.repo_root).join("files").join("SKILL.md").exists());
     assert!(PathBuf::from(&repo_skill.manifest.repo_root).join("files").join("scripts").join("run.sh").exists());
+    assert_eq!(repo_skill.manifest.source_detail.imported_from_client, Some(Client::Codex));
+    assert_eq!(
+        repo_skill.manifest.source_detail.imported_from_path,
+        Some(paths.codex_skills_dir.join("alpha").to_string_lossy().to_string())
+    );
 }
 
 #[test]
@@ -253,6 +258,8 @@ fn deploying_repo_skill_to_claude_project_uses_project_skill_directory() {
             .iter()
             .any(|f| f.path == expected_dir.join("SKILL.md").to_string_lossy())
     );
+    let targets = list_target_profiles(&paths).unwrap();
+    assert!(targets.iter().any(|target| target.project_root.as_deref() == Some(project_root.to_string_lossy().as_ref())));
 }
 
 #[test]
@@ -340,6 +347,27 @@ fn sync_back_updates_repository_and_marks_sibling_deployment_outdated() {
         .find(|item| item.deployment_id == project.deployment_id)
         .unwrap();
     assert_eq!(sibling.status, DeploymentStatus::Outdated);
+    let events = list_sync_events(&paths, Some(&created.skill_id)).unwrap();
+    assert!(events.iter().any(|event| event.event_type == aidevhub_core::model::SkillSyncEventType::SyncedBack));
+}
+
+#[test]
+fn import_and_deploy_create_sync_event_history() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+    write(
+        &paths.codex_skills_dir.join("events-alpha").join("SKILL.md"),
+        "---\nname: Events Alpha\ndescription: Event source\n---\n\nBody",
+    );
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let imported = apply_import_skill(&paths, Client::Codex, "events-alpha", &paths.codex_skills_dir.join("events-alpha")).unwrap();
+    let deployment = apply_deployment_add(&paths, &imported.skill_id, DeploymentTargetType::ClaudeGlobal, None, Vec::new()).unwrap();
+    let _ = check_deployment_status(&paths, &deployment.deployment_id).unwrap();
+
+    let events = list_sync_events(&paths, Some(&imported.skill_id)).unwrap();
+    assert!(events.iter().any(|event| event.event_type == aidevhub_core::model::SkillSyncEventType::Imported));
+    assert!(events.iter().any(|event| event.event_type == aidevhub_core::model::SkillSyncEventType::Deployed));
 }
 
 #[test]

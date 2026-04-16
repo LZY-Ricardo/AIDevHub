@@ -9,6 +9,8 @@ import type {
   SkillGetResponse,
   SkillRepoGetResponse,
   SkillRecord,
+  SkillSyncEvent,
+  SkillTargetProfile,
   WritePreview,
 } from "../lib/types";
 import { api } from "../lib/api";
@@ -50,6 +52,8 @@ export function SkillsPage() {
   const [selectedRepo, setSelectedRepo] = useState<ManagedSkillView | null>(null);
   const [selectedRepoDetails, setSelectedRepoDetails] = useState<SkillRepoGetResponse | null>(null);
   const [selectedRepoDeployments, setSelectedRepoDeployments] = useState<SkillDeployment[] | null>(null);
+  const [selectedRepoProfiles, setSelectedRepoProfiles] = useState<SkillTargetProfile[] | null>(null);
+  const [selectedRepoEvents, setSelectedRepoEvents] = useState<SkillSyncEvent[] | null>(null);
   const [claudeProjectRoot, setClaudeProjectRoot] = useState("");
   const [codexProjectRoot, setCodexProjectRoot] = useState("");
 
@@ -115,14 +119,20 @@ export function SkillsPage() {
     setSelectedRepo(skill);
     setSelectedRepoDetails(null);
     setSelectedRepoDeployments(null);
+    setSelectedRepoProfiles(null);
+    setSelectedRepoEvents(null);
     setRepoDetailsOpen(true);
     try {
-      const [full, deployments] = await Promise.all([
+      const [full, deployments, profiles, events] = await Promise.all([
         api.skillRepoGet({ skill_id: skill.skill_id }),
         api.skillDeploymentList({ skill_id: skill.skill_id }),
+        api.skillTargetProfileList(),
+        api.skillSyncEventList({ skill_id: skill.skill_id }),
       ]);
       setSelectedRepoDetails(full);
       setSelectedRepoDeployments(deployments);
+      setSelectedRepoProfiles(profiles);
+      setSelectedRepoEvents(events);
     } catch {
       // best-effort
     }
@@ -614,6 +624,8 @@ export function SkillsPage() {
         basic={selectedRepo}
         full={selectedRepoDetails}
         deployments={selectedRepoDeployments}
+        targetProfiles={selectedRepoProfiles}
+        syncEvents={selectedRepoEvents}
         busy={busy}
         onDeploy={deployRepoSkill}
         onRemoveDeployment={removeDeployment}
@@ -646,6 +658,8 @@ function RepoDetailsDrawer({
   basic,
   full,
   deployments,
+  targetProfiles,
+  syncEvents,
   busy,
   onDeploy,
   onRemoveDeployment,
@@ -661,6 +675,8 @@ function RepoDetailsDrawer({
   basic: ManagedSkillView | null;
   full: SkillRepoGetResponse | null;
   deployments: SkillDeployment[] | null;
+  targetProfiles: SkillTargetProfile[] | null;
+  syncEvents: SkillSyncEvent[] | null;
   busy: boolean;
   onDeploy: (skillId: string, targetType: DeploymentTargetType, projectRoot?: string) => Promise<void>;
   onRemoveDeployment: (deploymentId: string) => Promise<void>;
@@ -718,6 +734,16 @@ function RepoDetailsDrawer({
               <div className="ui-code" style={{ marginTop: "8px" }}>
                 {full?.manifest.repo_root ?? "（未加载）"}
               </div>
+              {full?.manifest.source_detail.imported_from_path ? (
+                <>
+                  <div className="ui-label" style={{ marginTop: "14px" }}>
+                    导入来源
+                  </div>
+                  <div className="ui-code" style={{ marginTop: "8px" }}>
+                    {full.manifest.source_detail.imported_from_path}
+                  </div>
+                </>
+              ) : null}
               <div className="ui-label" style={{ marginTop: "14px" }}>
                 内容（只读）
               </div>
@@ -749,6 +775,25 @@ function RepoDetailsDrawer({
                 </div>
               </div>
               <div className="ui-formGrid" style={{ marginTop: "12px" }}>
+                {targetProfiles && targetProfiles.length > 0 ? (
+                  <div className="ui-field ui-fieldFull">
+                    <div className="ui-label">已保存目标</div>
+                    <div className="ui-btnRow" style={{ marginTop: "10px", flexWrap: "wrap" }}>
+                      {targetProfiles.map((profile) => (
+                        <button
+                          key={profile.target_profile_id}
+                          type="button"
+                          className="ui-btn"
+                          disabled={busy}
+                          onClick={() => basic && onDeploy(basic.skill_id, profile.target_type, profile.project_root)}
+                          title={profile.target_root}
+                        >
+                          {profile.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="ui-field ui-fieldFull">
                   <div className="ui-label">Claude 项目目录</div>
                   <input
@@ -836,6 +881,21 @@ function RepoDetailsDrawer({
                   </div>
                 ))}
                 {deployments && deployments.length === 0 ? <div className="ui-help">暂无投放。</div> : null}
+              </div>
+            </div>
+
+            <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-label">同步事件</div>
+              <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+                {(syncEvents ?? []).map((event) => (
+                  <div key={event.event_id} className="ui-card" style={{ padding: "12px" }}>
+                    <div className="ui-code">{event.event_type}</div>
+                    <div className="ui-help" style={{ marginTop: "6px" }}>
+                      {event.message}
+                    </div>
+                  </div>
+                ))}
+                {syncEvents && syncEvents.length === 0 ? <div className="ui-help">暂无同步事件。</div> : null}
               </div>
             </div>
           </div>

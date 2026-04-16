@@ -142,6 +142,16 @@ pub enum SkillRepoSource {
     CreatedInternal,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SkillSourceDetail {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imported_from_client: Option<Client>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imported_from_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imported_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillCatalogEntry {
     pub skill_id: String,
@@ -153,6 +163,8 @@ pub struct SkillCatalogEntry {
     pub files_root: String,
     pub entry_rel_path: String,
     pub source: SkillRepoSource,
+    #[serde(default)]
+    pub source_detail: SkillSourceDetail,
     pub content_hash: String,
     pub version: u32,
     pub created_at: String,
@@ -172,6 +184,8 @@ pub struct SkillManifest {
     pub files_root: String,
     pub entry_rel_path: String,
     pub source: SkillRepoSource,
+    #[serde(default)]
+    pub source_detail: SkillSourceDetail,
     pub content_hash: String,
     pub version: u32,
     pub created_at: String,
@@ -229,6 +243,41 @@ pub struct SkillDeployment {
     pub source_hash: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillTargetProfile {
+    pub target_profile_id: String,
+    pub name: String,
+    pub target_type: DeploymentTargetType,
+    pub client: Client,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
+    pub target_root: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillSyncEventType {
+    Imported,
+    Created,
+    Deployed,
+    Removed,
+    DriftDetected,
+    SyncedBack,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillSyncEvent {
+    pub event_id: String,
+    pub skill_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployment_id: Option<String>,
+    pub event_type: SkillSyncEventType,
+    pub message: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -23,6 +23,8 @@ import type {
   SkillDeployment,
   DeploymentTargetType,
   SkillRepoGetResponse,
+  SkillTargetProfile,
+  SkillSyncEvent,
   SkillRecord,
   WritePreview,
 } from "./types";
@@ -291,6 +293,16 @@ export const api = {
   skillDeploymentCheckOne(payload: { deployment_id: string }): Promise<SkillDeployment> {
     return invokeCmd("skill_deployment_check_one", {
       deploymentId: payload.deployment_id,
+    });
+  },
+
+  skillTargetProfileList(): Promise<SkillTargetProfile[]> {
+    return invokeCmd("skill_target_profile_list");
+  },
+
+  skillSyncEventList(payload?: { skill_id?: string }): Promise<SkillSyncEvent[]> {
+    return invokeCmd("skill_sync_event_list", {
+      skillId: payload?.skill_id,
     });
   },
 

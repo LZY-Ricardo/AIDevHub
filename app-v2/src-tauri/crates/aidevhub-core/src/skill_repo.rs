@@ -12,7 +12,8 @@ use uuid::Uuid;
 use crate::{
     model::{
         AppError, Client, DeploymentStatus, DeploymentTargetType, ManagedSkillView, SkillCatalogEntry, SkillDeployment,
-        SkillManifest, SkillRepoGetResponse, SkillRepoSource, SkillSupportMode, Warning, WritePreview, WriteSummary,
+        SkillManifest, SkillRepoGetResponse, SkillRepoSource, SkillSourceDetail, SkillSupportMode, SkillSyncEvent,
+        SkillSyncEventType, SkillTargetProfile, Warning, WritePreview, WriteSummary,
     },
     ops::AppPaths,
 };
@@ -29,6 +30,20 @@ struct SkillDeploymentStore {
     version: u32,
     #[serde(default)]
     deployments: Vec<SkillDeployment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct SkillTargetProfileStore {
+    version: u32,
+    #[serde(default)]
+    targets: Vec<SkillTargetProfile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct SkillSyncEventStore {
+    version: u32,
+    #[serde(default)]
+    events: Vec<SkillSyncEvent>,
 }
 
 fn io_error(action: &str, path: &Path, err: impl std::fmt::Display) -> AppError {
@@ -187,6 +202,14 @@ fn deployment_index_path(paths: &AppPaths) -> PathBuf {
     paths.skill_indexes_root.join("skill_deployments.json")
 }
 
+fn target_profiles_path(paths: &AppPaths) -> PathBuf {
+    paths.skill_indexes_root.join("skill_targets.json")
+}
+
+fn sync_events_path(paths: &AppPaths) -> PathBuf {
+    paths.skill_indexes_root.join("skill_sync_events.json")
+}
+
 fn entry_rel_path() -> &'static str {
     "SKILL.md"
 }
@@ -205,6 +228,20 @@ fn load_deployments(paths: &AppPaths) -> Result<SkillDeploymentStore, AppError> 
     serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
 }
 
+fn load_target_profiles(paths: &AppPaths) -> Result<SkillTargetProfileStore, AppError> {
+    ensure_skill_store_layout(paths)?;
+    let path = target_profiles_path(paths);
+    let raw = read_to_string(&path)?;
+    serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
+}
+
+fn load_sync_events(paths: &AppPaths) -> Result<SkillSyncEventStore, AppError> {
+    ensure_skill_store_layout(paths)?;
+    let path = sync_events_path(paths);
+    let raw = read_to_string(&path)?;
+    serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
+}
+
 fn save_index(paths: &AppPaths, store: &SkillIndexStore) -> Result<(), AppError> {
     let raw = serde_json::to_string_pretty(store)
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize skill index: {e}")))?;
@@ -215,6 +252,18 @@ fn save_deployments(paths: &AppPaths, store: &SkillDeploymentStore) -> Result<()
     let raw = serde_json::to_string_pretty(store)
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize deployment index: {e}")))?;
     write_atomic(&deployment_index_path(paths), &raw)
+}
+
+fn save_target_profiles(paths: &AppPaths, store: &SkillTargetProfileStore) -> Result<(), AppError> {
+    let raw = serde_json::to_string_pretty(store)
+        .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize target profile index: {e}")))?;
+    write_atomic(&target_profiles_path(paths), &raw)
+}
+
+fn save_sync_events(paths: &AppPaths, store: &SkillSyncEventStore) -> Result<(), AppError> {
+    let raw = serde_json::to_string_pretty(store)
+        .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize sync event index: {e}")))?;
+    write_atomic(&sync_events_path(paths), &raw)
 }
 
 fn sha256_text(s: &str) -> String {
@@ -286,6 +335,7 @@ fn map_entry_to_manifest(entry: &SkillCatalogEntry) -> SkillManifest {
         files_root: entry.files_root.clone(),
         entry_rel_path: entry.entry_rel_path.clone(),
         source: entry.source,
+        source_detail: entry.source_detail.clone(),
         content_hash: entry.content_hash.clone(),
         version: entry.version,
         created_at: entry.created_at.clone(),
@@ -302,6 +352,64 @@ fn update_catalog_entry(paths: &AppPaths, updated: &SkillCatalogEntry) -> Result
         .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {}", updated.skill_id)))?;
     *entry = updated.clone();
     save_index(paths, &store)
+}
+
+fn append_sync_event(
+    paths: &AppPaths,
+    skill_id: &str,
+    deployment_id: Option<String>,
+    event_type: SkillSyncEventType,
+    message: String,
+) -> Result<(), AppError> {
+    let mut store = load_sync_events(paths)?;
+    store.events.push(SkillSyncEvent {
+        event_id: Uuid::new_v4().to_string(),
+        skill_id: skill_id.to_string(),
+        deployment_id,
+        event_type,
+        message,
+        created_at: Utc::now().to_rfc3339(),
+    });
+    save_sync_events(paths, &store)
+}
+
+fn upsert_target_profile(
+    paths: &AppPaths,
+    target_type: DeploymentTargetType,
+    client: Client,
+    project_root: Option<String>,
+    target_root: String,
+) -> Result<(), AppError> {
+    if project_root.is_none() {
+        return Ok(());
+    }
+    let mut store = load_target_profiles(paths)?;
+    if let Some(existing) = store.targets.iter_mut().find(|target| {
+        target.target_type == target_type && target.project_root == project_root
+    }) {
+        existing.updated_at = Utc::now().to_rfc3339();
+        existing.target_root = target_root;
+    } else {
+        let project_root_value = project_root.clone();
+        store.targets.push(SkillTargetProfile {
+            target_profile_id: Uuid::new_v4().to_string(),
+            name: format!(
+                "{} {}",
+                match client {
+                    Client::ClaudeCode => "Claude",
+                    Client::Codex => "Codex",
+                },
+                project_root_value.clone().unwrap_or_default()
+            ),
+            target_type,
+            client,
+            project_root,
+            target_root,
+            created_at: Utc::now().to_rfc3339(),
+            updated_at: Utc::now().to_rfc3339(),
+        });
+    }
+    save_target_profiles(paths, &store)
 }
 
 fn build_tree_preview(from_root: &Path, to_root: &Path) -> Result<Vec<crate::model::FileChangePreview>, AppError> {
@@ -358,6 +466,26 @@ pub fn ensure_skill_store_layout(paths: &AppPaths) -> Result<(), AppError> {
         };
         save_deployments(paths, &store)?;
     }
+    let targets_path = target_profiles_path(paths);
+    if !targets_path.exists() {
+        save_target_profiles(
+            paths,
+            &SkillTargetProfileStore {
+                version: 1,
+                targets: Vec::new(),
+            },
+        )?;
+    }
+    let events_path = sync_events_path(paths);
+    if !events_path.exists() {
+        save_sync_events(
+            paths,
+            &SkillSyncEventStore {
+                version: 1,
+                events: Vec::new(),
+            },
+        )?;
+    }
     Ok(())
 }
 
@@ -386,6 +514,11 @@ pub fn preview_import_skill(paths: &AppPaths, client: Client, name: &str, source
         files_root: repo_root.join("files").to_string_lossy().to_string(),
         entry_rel_path: entry_rel_path().to_string(),
         source: SkillRepoSource::ImportedGlobal,
+        source_detail: SkillSourceDetail {
+            imported_from_client: Some(client),
+            imported_from_path: Some(source_dir.to_string_lossy().to_string()),
+            imported_at: Some(Utc::now().to_rfc3339()),
+        },
         content_hash: "sha256:pending".to_string(),
         version: 1,
         created_at: Utc::now().to_rfc3339(),
@@ -404,6 +537,7 @@ pub fn preview_import_skill(paths: &AppPaths, client: Client, name: &str, source
         files_root: manifest.files_root.clone(),
         entry_rel_path: manifest.entry_rel_path.clone(),
         source: manifest.source,
+        source_detail: manifest.source_detail.clone(),
         content_hash: manifest.content_hash.clone(),
         version: manifest.version,
         created_at: manifest.created_at.clone(),
@@ -478,6 +612,11 @@ pub fn apply_import_skill(
         files_root: files_root.to_string_lossy().to_string(),
         entry_rel_path: entry_rel_path().to_string(),
         source: SkillRepoSource::ImportedGlobal,
+        source_detail: SkillSourceDetail {
+            imported_from_client: Some(client),
+            imported_from_path: Some(source_dir.to_string_lossy().to_string()),
+            imported_at: Some(now.clone()),
+        },
         content_hash,
         version: 1,
         created_at: now.clone(),
@@ -488,6 +627,13 @@ pub fn apply_import_skill(
     write_manifest(&repo_root, &map_entry_to_manifest(&entry))?;
     store.skills.push(entry.clone());
     save_index(paths, &store)?;
+    append_sync_event(
+        paths,
+        &entry.skill_id,
+        None,
+        SkillSyncEventType::Imported,
+        format!("Imported skill from {}", source_dir.display()),
+    )?;
     Ok(entry)
 }
 
@@ -529,6 +675,7 @@ pub fn preview_create_repo_skill(
         files_root: repo_root.join("files").to_string_lossy().to_string(),
         entry_rel_path: entry_rel_path().to_string(),
         source: SkillRepoSource::CreatedInternal,
+        source_detail: SkillSourceDetail::default(),
         content_hash: "sha256:pending".to_string(),
         version: 1,
         created_at: Utc::now().to_rfc3339(),
@@ -547,6 +694,7 @@ pub fn preview_create_repo_skill(
         files_root: manifest.files_root.clone(),
         entry_rel_path: manifest.entry_rel_path.clone(),
         source: manifest.source,
+        source_detail: manifest.source_detail.clone(),
         content_hash: manifest.content_hash.clone(),
         version: manifest.version,
         created_at: manifest.created_at.clone(),
@@ -633,6 +781,7 @@ pub fn apply_create_repo_skill(
         files_root: files_root.to_string_lossy().to_string(),
         entry_rel_path: entry_rel_path().to_string(),
         source: SkillRepoSource::CreatedInternal,
+        source_detail: SkillSourceDetail::default(),
         content_hash,
         version: 1,
         created_at: now.clone(),
@@ -642,6 +791,13 @@ pub fn apply_create_repo_skill(
     write_manifest(&repo_root, &map_entry_to_manifest(&entry))?;
     store.skills.push(entry.clone());
     save_index(paths, &store)?;
+    append_sync_event(
+        paths,
+        &entry.skill_id,
+        None,
+        SkillSyncEventType::Created,
+        format!("Created repository skill {}", entry.slug),
+    )?;
     Ok(entry)
 }
 
@@ -726,7 +882,7 @@ pub fn preview_deployment_add(
         skill_id: skill.skill_id.clone(),
         target_type,
         client,
-        project_root,
+        project_root: project_root.clone(),
         target_root: target_root.to_string_lossy().to_string(),
         target_skill_path: target_skill_path.to_string_lossy().to_string(),
         deployed_name: skill.slug.clone(),
@@ -810,7 +966,7 @@ pub fn apply_deployment_add(
         skill_id: skill.skill_id.clone(),
         target_type,
         client,
-        project_root,
+        project_root: project_root.clone(),
         target_root: target_root.to_string_lossy().to_string(),
         target_skill_path: target_skill_path.to_string_lossy().to_string(),
         deployed_name: skill.slug.clone(),
@@ -821,6 +977,20 @@ pub fn apply_deployment_add(
     };
     deployments.deployments.push(deployment.clone());
     save_deployments(paths, &deployments)?;
+    upsert_target_profile(
+        paths,
+        target_type,
+        client,
+        project_root.clone(),
+        target_root.to_string_lossy().to_string(),
+    )?;
+    append_sync_event(
+        paths,
+        &deployment.skill_id,
+        Some(deployment.deployment_id.clone()),
+        SkillSyncEventType::Deployed,
+        format!("Deployed skill to {}", deployment.target_skill_path),
+    )?;
     Ok(deployment)
 }
 
@@ -900,6 +1070,13 @@ pub fn apply_deployment_remove(
     deployment.updated_at = Utc::now().to_rfc3339();
     let result = deployment.clone();
     save_deployments(paths, &deployments)?;
+    append_sync_event(
+        paths,
+        &result.skill_id,
+        Some(result.deployment_id.clone()),
+        SkillSyncEventType::Removed,
+        format!("Removed deployment from {}", result.target_skill_path),
+    )?;
     Ok(result)
 }
 
@@ -941,6 +1118,15 @@ pub fn check_deployment_status(paths: &AppPaths, deployment_id: &str) -> Result<
     deployment.updated_at = Utc::now().to_rfc3339();
     let result = deployment.clone();
     save_deployments(paths, &deployments)?;
+    if result.status == DeploymentStatus::Drifted {
+        append_sync_event(
+            paths,
+            &result.skill_id,
+            Some(result.deployment_id.clone()),
+            SkillSyncEventType::DriftDetected,
+            format!("Detected drift at {}", result.target_skill_path),
+        )?;
+    }
     Ok(result)
 }
 
@@ -1027,5 +1213,27 @@ pub fn apply_sync_from_deployment(
 
     let result = deployments.deployments[dep_index].clone();
     save_deployments(paths, &deployments)?;
+    append_sync_event(
+        paths,
+        &result.skill_id,
+        Some(result.deployment_id.clone()),
+        SkillSyncEventType::SyncedBack,
+        format!("Synced deployment back into repository from {}", result.target_skill_path),
+    )?;
     Ok(result)
+}
+
+pub fn list_target_profiles(paths: &AppPaths) -> Result<Vec<SkillTargetProfile>, AppError> {
+    let mut targets = load_target_profiles(paths)?.targets;
+    targets.sort_by(|a, b| a.updated_at.cmp(&b.updated_at));
+    Ok(targets)
+}
+
+pub fn list_sync_events(paths: &AppPaths, skill_id: Option<&str>) -> Result<Vec<SkillSyncEvent>, AppError> {
+    let mut events = load_sync_events(paths)?.events;
+    if let Some(skill_id) = skill_id {
+        events.retain(|event| event.skill_id == skill_id);
+    }
+    events.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    Ok(events)
 }
