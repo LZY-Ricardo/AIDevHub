@@ -2,30 +2,40 @@
 
 ## Purpose
 Define browsing and local management of Codex skills and Claude commands/skills that are exposed in the app.
-
 ## Requirements
-
 ### Requirement: Skill Inventory and Filtering
-The system SHALL provide a skill inventory with filtering and search across supported client and scope dimensions.
+The system SHALL provide both external skill discovery and repository-backed managed skill inventory views with filtering and search across supported client and scope dimensions.
 
-#### Scenario: User filters the skill list
-- **WHEN** the user applies client, scope, or text filters
-- **THEN** the application narrows the list based on skill name, description, or skill identifier
+#### Scenario: User filters discovered external skills
+- **WHEN** the user applies client, scope, or text filters in the discovery view
+- **THEN** the application narrows the discovery list based on skill name, description, or identifier derived from external paths
+
+#### Scenario: User filters managed repository skills
+- **WHEN** the user applies text or status filters in the managed repository view
+- **THEN** the application narrows the list based on repository metadata and deployment state summaries
 
 ### Requirement: Skill Detail Inspection
-The system SHALL provide a detail view for managed skills and commands.
+The system SHALL provide a detail view for managed skills that shows repository metadata, repository contents, and deployment state across all targets.
 
-#### Scenario: User opens skill details
-- **WHEN** the user selects a skill or command
-- **THEN** the application shows metadata sufficient to understand source, scope, and current enablement state
+#### Scenario: User opens a managed skill
+- **WHEN** the user selects a managed repository skill
+- **THEN** the application shows repository metadata, stored contents, and all known deployments with per-target status
 
 ### Requirement: Skill Creation and Toggle Preview
-The system SHALL support creating and enabling/disabling managed skills through preview-before-apply workflows.
+The system SHALL support repository-backed skill creation and deployment removal through preview-before-apply workflows.
 
-#### Scenario: User toggles a skill
-- **WHEN** the user enables or disables a skill
-- **THEN** the application previews the resulting filesystem change before applying it
-
-#### Scenario: User creates a new skill
+#### Scenario: User creates a new managed skill
 - **WHEN** the user completes the create skill flow
-- **THEN** the application previews the generated file changes before writing them
+- **THEN** the application previews the repository files and metadata that will be created before writing them
+
+#### Scenario: User disables a deployed skill target
+- **WHEN** the user disables a skill deployment target
+- **THEN** the application previews removal of the external deployed copy while preserving the repository copy
+
+### Requirement: Repository Import From External Discovery
+The system SHALL allow users to import discovered external skills into the internal repository through preview-before-apply.
+
+#### Scenario: User imports a discovered global skill
+- **WHEN** the user selects a discovered external skill and chooses import
+- **THEN** the application previews repository folder creation, manifest creation, and index updates before copying content into the internal repository
+
