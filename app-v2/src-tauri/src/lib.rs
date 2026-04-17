@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
 use aidevhub_core::model::{
-    AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
-    ConfigIgnoreUpdatesResponse, DeploymentTargetType, FilePrecondition, HealthCheckResult, ManagedSkillView,
-    McpRegistryExternalDiff, ProfileTargets, RuntimeGetInfoResponse, ServerNotes, SkillCatalogEntry, SkillDeployment,
-    SkillRepoGetResponse, SkillSyncEvent, SkillTargetProfile, Transport,
+    AppError, AppSettings, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse,
+    ConfigIgnoreCondition, ConfigIgnoreUpdatesResponse, DeploymentTargetType, FilePrecondition,
+    HealthCheckResult, ManagedSkillView, McpRegistryExternalDiff, ProfileTargets,
+    RuntimeGetInfoResponse, ServerNotes, SkillCatalogEntry, SkillDeployment, SkillRepoGetResponse,
+    SkillSyncEvent, SkillTargetProfile, Transport,
 };
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
@@ -49,7 +50,10 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -71,7 +75,10 @@ fn runtime_get_info(app: tauri::AppHandle) -> Result<RuntimeGetInfoResponse, App
 }
 
 #[tauri::command]
-fn server_list(app: tauri::AppHandle, client: Option<Client>) -> Result<Vec<aidevhub_core::model::ServerRecord>, AppError> {
+fn server_list(
+    app: tauri::AppHandle,
+    client: Option<Client>,
+) -> Result<Vec<aidevhub_core::model::ServerRecord>, AppError> {
     let paths = resolve_paths(&app)?;
     ops::server_list(&paths, client)
 }
@@ -374,7 +381,10 @@ fn skill_repo_list(app: tauri::AppHandle) -> Result<Vec<ManagedSkillView>, AppEr
 }
 
 #[tauri::command]
-fn skill_repo_get(app: tauri::AppHandle, skill_id: String) -> Result<SkillRepoGetResponse, AppError> {
+fn skill_repo_get(
+    app: tauri::AppHandle,
+    skill_id: String,
+) -> Result<SkillRepoGetResponse, AppError> {
     let paths = resolve_paths(&app)?;
     aidevhub_core::skill_repo::get_repo_skill(&paths, &skill_id)
 }
@@ -387,7 +397,12 @@ fn skill_repo_preview_import(
     source_path: String,
 ) -> Result<aidevhub_core::model::WritePreview, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::preview_import_skill(&paths, client, &name, &PathBuf::from(source_path))
+    aidevhub_core::skill_repo::preview_import_skill(
+        &paths,
+        client,
+        &name,
+        &PathBuf::from(source_path),
+    )
 }
 
 #[tauri::command]
@@ -399,7 +414,12 @@ fn skill_repo_apply_import(
     _expected_files: Vec<FilePrecondition>,
 ) -> Result<SkillCatalogEntry, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::apply_import_skill(&paths, client, &name, &PathBuf::from(source_path))
+    aidevhub_core::skill_repo::apply_import_skill(
+        &paths,
+        client,
+        &name,
+        &PathBuf::from(source_path),
+    )
 }
 
 #[tauri::command]
@@ -431,7 +451,13 @@ fn skill_deployment_apply_add(
     expected_files: Vec<FilePrecondition>,
 ) -> Result<SkillDeployment, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::skill_repo::apply_deployment_add(&paths, &skill_id, target_type, project_root, expected_files)
+    aidevhub_core::skill_repo::apply_deployment_add(
+        &paths,
+        &skill_id,
+        target_type,
+        project_root,
+        expected_files,
+    )
 }
 
 #[tauri::command]
@@ -460,6 +486,29 @@ fn skill_deployment_check_one(
 ) -> Result<SkillDeployment, AppError> {
     let paths = resolve_paths(&app)?;
     aidevhub_core::skill_repo::check_deployment_status(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_deployment_preview_redeploy(
+    app: tauri::AppHandle,
+    deployment_id: String,
+) -> Result<aidevhub_core::model::WritePreview, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::preview_redeploy_outdated_deployment(&paths, &deployment_id)
+}
+
+#[tauri::command]
+fn skill_deployment_apply_redeploy(
+    app: tauri::AppHandle,
+    deployment_id: String,
+    expected_files: Vec<FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
+    let paths = resolve_paths(&app)?;
+    aidevhub_core::skill_repo::apply_redeploy_outdated_deployment(
+        &paths,
+        &deployment_id,
+        expected_files,
+    )
 }
 
 #[tauri::command]
@@ -520,7 +569,13 @@ fn skill_apply_create(
 ) -> Result<aidevhub_core::model::ApplyResult, AppError> {
     let paths = resolve_paths(&app)?;
     let _ = (client, expected_files);
-    let created = aidevhub_core::skill_repo::apply_create_repo_skill(&paths, &name, &name, &description, body)?;
+    let created = aidevhub_core::skill_repo::apply_create_repo_skill(
+        &paths,
+        &name,
+        &name,
+        &description,
+        body,
+    )?;
     Ok(aidevhub_core::model::ApplyResult {
         backups: Vec::new(),
         summary: aidevhub_core::model::WriteSummary {
@@ -554,13 +609,19 @@ fn skill_apply_toggle(
 }
 
 #[tauri::command]
-fn mcp_health_check(app: tauri::AppHandle, server_id: String) -> Result<HealthCheckResult, AppError> {
+fn mcp_health_check(
+    app: tauri::AppHandle,
+    server_id: String,
+) -> Result<HealthCheckResult, AppError> {
     let paths = resolve_paths(&app)?;
     aidevhub_core::health_check::check_single(&paths, &server_id)
 }
 
 #[tauri::command]
-fn mcp_health_check_all(app: tauri::AppHandle, client: Client) -> Result<Vec<HealthCheckResult>, AppError> {
+fn mcp_health_check_all(
+    app: tauri::AppHandle,
+    client: Client,
+) -> Result<Vec<HealthCheckResult>, AppError> {
     let paths = resolve_paths(&app)?;
     aidevhub_core::health_check::check_all(&paths, client)
 }
@@ -569,9 +630,7 @@ fn mcp_health_check_all(app: tauri::AppHandle, client: Client) -> Result<Vec<Hea
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(
-            tauri_plugin_updater::Builder::new().build(),
-        )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             runtime_get_info,
@@ -615,6 +674,8 @@ pub fn run() {
             skill_deployment_preview_remove,
             skill_deployment_apply_remove,
             skill_deployment_check_one,
+            skill_deployment_preview_redeploy,
+            skill_deployment_apply_redeploy,
             skill_target_profile_list,
             skill_sync_event_list,
             skill_repo_preview_sync_from_deployment,

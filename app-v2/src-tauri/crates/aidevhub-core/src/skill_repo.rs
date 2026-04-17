@@ -11,9 +11,10 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        AppError, Client, DeploymentStatus, DeploymentTargetType, ManagedSkillView, SkillCatalogEntry, SkillDeployment,
-        SkillManifest, SkillRepoGetResponse, SkillRepoSource, SkillSourceDetail, SkillSupportMode, SkillSyncEvent,
-        SkillSyncEventType, SkillTargetProfile, Warning, WritePreview, WriteSummary,
+        AppError, Client, DeploymentStatus, DeploymentTargetType, ManagedSkillView,
+        SkillCatalogEntry, SkillDeployment, SkillManifest, SkillRepoGetResponse, SkillRepoSource,
+        SkillSourceDetail, SkillSupportMode, SkillSyncEvent, SkillSyncEventType,
+        SkillTargetProfile, Warning, WritePreview, WriteSummary,
     },
     ops::AppPaths,
 };
@@ -71,9 +72,12 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
     }
-    let parent = path
-        .parent()
-        .ok_or_else(|| AppError::new("INTERNAL_ERROR", format!("missing parent for {}", path.display())))?;
+    let parent = path.parent().ok_or_else(|| {
+        AppError::new(
+            "INTERNAL_ERROR",
+            format!("missing parent for {}", path.display()),
+        )
+    })?;
     let tmp = parent.join(format!(
         ".tmp-{}-{}.json",
         path.file_stem().and_then(|s| s.to_str()).unwrap_or("file"),
@@ -93,7 +97,9 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), AppError> {
         let entry = entry.map_err(|e| io_error("read_dir", from, e))?;
         let src = entry.path();
         let dst = to.join(entry.file_name());
-        let file_type = entry.file_type().map_err(|e| io_error("file_type", &src, e))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| io_error("file_type", &src, e))?;
         if file_type.is_dir() {
             copy_dir_recursive(&src, &dst)?;
         } else if file_type.is_file() {
@@ -119,7 +125,9 @@ fn collect_tree_files(root: &Path) -> Result<Vec<PathBuf>, AppError> {
         for entry in fs::read_dir(current).map_err(|e| io_error("read_dir", current, e))? {
             let entry = entry.map_err(|e| io_error("read_dir", current, e))?;
             let path = entry.path();
-            let file_type = entry.file_type().map_err(|e| io_error("file_type", &path, e))?;
+            let file_type = entry
+                .file_type()
+                .map_err(|e| io_error("file_type", &path, e))?;
             if file_type.is_dir() {
                 walk(root, &path, out)?;
             } else if file_type.is_file() {
@@ -157,7 +165,10 @@ fn parse_frontmatter(text: &str) -> BTreeMap<String, String> {
             break;
         }
         if let Some((k, v)) = trimmed.split_once(':') {
-            out.insert(k.trim().to_string(), v.trim().trim_matches('"').trim_matches('\'').to_string());
+            out.insert(
+                k.trim().to_string(),
+                v.trim().trim_matches('"').trim_matches('\'').to_string(),
+            );
         }
     }
     out
@@ -217,29 +228,36 @@ fn entry_rel_path() -> &'static str {
 fn load_index(paths: &AppPaths) -> Result<SkillIndexStore, AppError> {
     ensure_skill_store_layout(paths)?;
     let raw = read_to_string(&paths.skill_index_path)?;
-    serde_json::from_str(&raw)
-        .map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", paths.skill_index_path.display())))
+    serde_json::from_str(&raw).map_err(|e| {
+        AppError::new(
+            "PARSE_ERROR",
+            format!("parse {}: {e}", paths.skill_index_path.display()),
+        )
+    })
 }
 
 fn load_deployments(paths: &AppPaths) -> Result<SkillDeploymentStore, AppError> {
     ensure_skill_store_layout(paths)?;
     let path = deployment_index_path(paths);
     let raw = read_to_string(&path)?;
-    serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
+    serde_json::from_str(&raw)
+        .map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
 }
 
 fn load_target_profiles(paths: &AppPaths) -> Result<SkillTargetProfileStore, AppError> {
     ensure_skill_store_layout(paths)?;
     let path = target_profiles_path(paths);
     let raw = read_to_string(&path)?;
-    serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
+    serde_json::from_str(&raw)
+        .map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
 }
 
 fn load_sync_events(paths: &AppPaths) -> Result<SkillSyncEventStore, AppError> {
     ensure_skill_store_layout(paths)?;
     let path = sync_events_path(paths);
     let raw = read_to_string(&path)?;
-    serde_json::from_str(&raw).map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
+    serde_json::from_str(&raw)
+        .map_err(|e| AppError::new("PARSE_ERROR", format!("parse {}: {e}", path.display())))
 }
 
 fn save_index(paths: &AppPaths, store: &SkillIndexStore) -> Result<(), AppError> {
@@ -255,8 +273,12 @@ fn save_deployments(paths: &AppPaths, store: &SkillDeploymentStore) -> Result<()
 }
 
 fn save_target_profiles(paths: &AppPaths, store: &SkillTargetProfileStore) -> Result<(), AppError> {
-    let raw = serde_json::to_string_pretty(store)
-        .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize target profile index: {e}")))?;
+    let raw = serde_json::to_string_pretty(store).map_err(|e| {
+        AppError::new(
+            "INTERNAL_ERROR",
+            format!("serialize target profile index: {e}"),
+        )
+    })?;
     write_atomic(&target_profiles_path(paths), &raw)
 }
 
@@ -282,7 +304,9 @@ fn current_file_hash(path: &Path) -> Result<Option<String>, AppError> {
     Ok(Some(sha256_file(path)?))
 }
 
-fn verify_expected_files(expected_files: &[crate::model::FilePrecondition]) -> Result<(), AppError> {
+fn verify_expected_files(
+    expected_files: &[crate::model::FilePrecondition],
+) -> Result<(), AppError> {
     let mismatches: Vec<_> = expected_files
         .iter()
         .filter_map(|expected| {
@@ -349,7 +373,12 @@ fn update_catalog_entry(paths: &AppPaths, updated: &SkillCatalogEntry) -> Result
         .skills
         .iter_mut()
         .find(|skill| skill.skill_id == updated.skill_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {}", updated.skill_id)))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {}", updated.skill_id),
+            )
+        })?;
     *entry = updated.clone();
     save_index(paths, &store)
 }
@@ -384,9 +413,11 @@ fn upsert_target_profile(
         return Ok(());
     }
     let mut store = load_target_profiles(paths)?;
-    if let Some(existing) = store.targets.iter_mut().find(|target| {
-        target.target_type == target_type && target.project_root == project_root
-    }) {
+    if let Some(existing) = store
+        .targets
+        .iter_mut()
+        .find(|target| target.target_type == target_type && target.project_root == project_root)
+    {
         existing.updated_at = Utc::now().to_rfc3339();
         existing.target_root = target_root;
     } else {
@@ -412,7 +443,10 @@ fn upsert_target_profile(
     save_target_profiles(paths, &store)
 }
 
-fn build_tree_preview(from_root: &Path, to_root: &Path) -> Result<Vec<crate::model::FileChangePreview>, AppError> {
+fn build_tree_preview(
+    from_root: &Path,
+    to_root: &Path,
+) -> Result<Vec<crate::model::FileChangePreview>, AppError> {
     let mut rels = collect_tree_files(from_root)?;
     for rel in collect_tree_files(to_root)? {
         if !rels.contains(&rel) {
@@ -445,6 +479,28 @@ fn build_tree_preview(from_root: &Path, to_root: &Path) -> Result<Vec<crate::mod
             })
         })
         .collect()
+}
+
+fn detect_deployment_status(
+    target_root: &Path,
+    deployment: &SkillDeployment,
+    repo_hash: &str,
+) -> Result<DeploymentStatus, AppError> {
+    if deployment.status == DeploymentStatus::Disabled {
+        return Ok(DeploymentStatus::Disabled);
+    }
+    if !target_root.exists() {
+        return Ok(DeploymentStatus::Missing);
+    }
+
+    let current_hash = hash_tree(target_root)?;
+    if current_hash == repo_hash {
+        Ok(DeploymentStatus::Deployed)
+    } else if current_hash == deployment.source_hash {
+        Ok(DeploymentStatus::Outdated)
+    } else {
+        Ok(DeploymentStatus::Drifted)
+    }
 }
 
 pub fn ensure_skill_store_layout(paths: &AppPaths) -> Result<(), AppError> {
@@ -489,18 +545,30 @@ pub fn ensure_skill_store_layout(paths: &AppPaths) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn preview_import_skill(paths: &AppPaths, client: Client, name: &str, source_dir: &Path) -> Result<WritePreview, AppError> {
+pub fn preview_import_skill(
+    paths: &AppPaths,
+    client: Client,
+    name: &str,
+    source_dir: &Path,
+) -> Result<WritePreview, AppError> {
     ensure_skill_store_layout(paths)?;
     if !source_dir.join(entry_rel_path()).exists() {
-        return Err(validation_error("only directory-based skills with SKILL.md can be imported"));
+        return Err(validation_error(
+            "only directory-based skills with SKILL.md can be imported",
+        ));
     }
     let store = load_index(paths)?;
     if store.skills.iter().any(|s| s.slug == name && !s.archived) {
-        return Err(validation_error(format!("repository skill already exists: {name}")));
+        return Err(validation_error(format!(
+            "repository skill already exists: {name}"
+        )));
     }
     let content = read_to_string(&source_dir.join(entry_rel_path()))?;
     let fm = parse_frontmatter(&content);
-    let display_name = fm.get("name").cloned().unwrap_or_else(|| skill_dir_name(client, name));
+    let display_name = fm
+        .get("name")
+        .cloned()
+        .unwrap_or_else(|| skill_dir_name(client, name));
     let description = fm.get("description").cloned().unwrap_or_default();
     let tmp_skill_id = stable_skill_id(name);
     let repo_root = paths.skill_repo_root.join(&tmp_skill_id);
@@ -572,7 +640,8 @@ pub fn preview_import_skill(paths: &AppPaths, client: Client, name: &str, source
         },
         warnings: vec![Warning {
             code: "SKIPPED".to_string(),
-            message: "Repository preview does not list every copied file in the first phase.".to_string(),
+            message: "Repository preview does not list every copied file in the first phase."
+                .to_string(),
             details: None,
         }],
     })
@@ -586,11 +655,15 @@ pub fn apply_import_skill(
 ) -> Result<SkillCatalogEntry, AppError> {
     ensure_skill_store_layout(paths)?;
     if !source_dir.join(entry_rel_path()).exists() {
-        return Err(validation_error("only directory-based skills with SKILL.md can be imported"));
+        return Err(validation_error(
+            "only directory-based skills with SKILL.md can be imported",
+        ));
     }
     let mut store = load_index(paths)?;
     if store.skills.iter().any(|s| s.slug == name && !s.archived) {
-        return Err(validation_error(format!("repository skill already exists: {name}")));
+        return Err(validation_error(format!(
+            "repository skill already exists: {name}"
+        )));
     }
 
     let content = read_to_string(&source_dir.join(entry_rel_path()))?;
@@ -605,7 +678,10 @@ pub fn apply_import_skill(
     let entry = SkillCatalogEntry {
         skill_id: skill_id.clone(),
         slug: name.to_string(),
-        display_name: fm.get("name").cloned().unwrap_or_else(|| skill_dir_name(client, name)),
+        display_name: fm
+            .get("name")
+            .cloned()
+            .unwrap_or_else(|| skill_dir_name(client, name)),
         description: fm.get("description").cloned().unwrap_or_default(),
         support_mode: skill_support_mode_for_client(client),
         repo_root: repo_root.to_string_lossy().to_string(),
@@ -656,12 +732,15 @@ pub fn preview_create_repo_skill(
     }
     let store = load_index(paths)?;
     if store.skills.iter().any(|s| s.slug == slug && !s.archived) {
-        return Err(validation_error(format!("repository skill already exists: {slug}")));
+        return Err(validation_error(format!(
+            "repository skill already exists: {slug}"
+        )));
     }
 
     let tmp_skill_id = stable_skill_id(slug);
     let repo_root = paths.skill_repo_root.join(&tmp_skill_id);
-    let body_text = body.unwrap_or_else(|| "## Instructions\n\n- Describe when to use this skill.\n".to_string());
+    let body_text = body
+        .unwrap_or_else(|| "## Instructions\n\n- Describe when to use this skill.\n".to_string());
     let skill_md = format!(
         "---\nname: {display_name}\ndescription: {description}\n---\n\n# {display_name}\n\n{body_text}"
     );
@@ -707,7 +786,11 @@ pub fn preview_create_repo_skill(
     Ok(WritePreview {
         files: vec![
             crate::model::FileChangePreview {
-                path: repo_root.join("files").join(entry_rel_path()).to_string_lossy().to_string(),
+                path: repo_root
+                    .join("files")
+                    .join(entry_rel_path())
+                    .to_string_lossy()
+                    .to_string(),
                 will_create: true,
                 before_sha256: None,
                 after_sha256: format!("sha256:{:x}", Sha256::digest(skill_md.as_bytes())),
@@ -757,14 +840,17 @@ pub fn apply_create_repo_skill(
     }
     let mut store = load_index(paths)?;
     if store.skills.iter().any(|s| s.slug == slug && !s.archived) {
-        return Err(validation_error(format!("repository skill already exists: {slug}")));
+        return Err(validation_error(format!(
+            "repository skill already exists: {slug}"
+        )));
     }
 
     let skill_id = stable_skill_id(slug);
     let repo_root = paths.skill_repo_root.join(&skill_id);
     let files_root = repo_root.join("files");
     ensure_dir(&files_root)?;
-    let body_text = body.unwrap_or_else(|| "## Instructions\n\n- Describe when to use this skill.\n".to_string());
+    let body_text = body
+        .unwrap_or_else(|| "## Instructions\n\n- Describe when to use this skill.\n".to_string());
     let skill_md = format!(
         "---\nname: {display_name}\ndescription: {description}\n---\n\n# {display_name}\n\n{body_text}"
     );
@@ -808,7 +894,11 @@ pub fn list_repo_skills(paths: &AppPaths) -> Result<Vec<ManagedSkillView>, AppEr
         .filter(|skill| !skill.archived)
         .map(|skill| map_entry_to_view(&skill))
         .collect();
-    views.sort_by(|a, b| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()));
+    views.sort_by(|a, b| {
+        a.display_name
+            .to_lowercase()
+            .cmp(&b.display_name.to_lowercase())
+    });
     Ok(views)
 }
 
@@ -818,9 +908,15 @@ pub fn get_repo_skill(paths: &AppPaths, skill_id: &str) -> Result<SkillRepoGetRe
         .skills
         .into_iter()
         .find(|skill| skill.skill_id == skill_id && !skill.archived)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {skill_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {skill_id}"),
+            )
+        })?;
     let manifest = map_entry_to_manifest(&entry);
-    let content = read_to_string(&PathBuf::from(&manifest.files_root).join(&manifest.entry_rel_path))?;
+    let content =
+        read_to_string(&PathBuf::from(&manifest.files_root).join(&manifest.entry_rel_path))?;
     Ok(SkillRepoGetResponse { manifest, content })
 }
 
@@ -830,26 +926,37 @@ fn target_root_for(
     project_root: Option<&str>,
 ) -> Result<(Client, Option<String>, PathBuf), AppError> {
     match target_type {
-        DeploymentTargetType::ClaudeGlobal => Ok((Client::ClaudeCode, None, paths.claude_skills_dir.clone())),
-        DeploymentTargetType::CodexGlobal => Ok((Client::Codex, None, paths.codex_skills_dir.clone())),
+        DeploymentTargetType::ClaudeGlobal => {
+            Ok((Client::ClaudeCode, None, paths.claude_skills_dir.clone()))
+        }
+        DeploymentTargetType::CodexGlobal => {
+            Ok((Client::Codex, None, paths.codex_skills_dir.clone()))
+        }
         DeploymentTargetType::ClaudeProject => {
             let project_root = project_root
                 .filter(|v| !v.trim().is_empty())
-                .ok_or_else(|| validation_error("project_root is required for project deployment"))?;
+                .ok_or_else(|| {
+                    validation_error("project_root is required for project deployment")
+                })?;
             let root = PathBuf::from(project_root).join(".claude").join("skills");
             Ok((Client::ClaudeCode, Some(project_root.to_string()), root))
         }
         DeploymentTargetType::CodexProject => {
             let project_root = project_root
                 .filter(|v| !v.trim().is_empty())
-                .ok_or_else(|| validation_error("project_root is required for project deployment"))?;
+                .ok_or_else(|| {
+                    validation_error("project_root is required for project deployment")
+                })?;
             let root = PathBuf::from(project_root).join(".codex").join("skills");
             Ok((Client::Codex, Some(project_root.to_string()), root))
         }
     }
 }
 
-pub fn list_deployments(paths: &AppPaths, skill_id: Option<&str>) -> Result<Vec<SkillDeployment>, AppError> {
+pub fn list_deployments(
+    paths: &AppPaths,
+    skill_id: Option<&str>,
+) -> Result<Vec<SkillDeployment>, AppError> {
     let mut items = load_deployments(paths)?.deployments;
     if let Some(skill_id) = skill_id {
         items.retain(|deployment| deployment.skill_id == skill_id);
@@ -870,12 +977,21 @@ pub fn preview_deployment_add(
         .skills
         .into_iter()
         .find(|item| item.skill_id == skill_id && !item.archived)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {skill_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {skill_id}"),
+            )
+        })?;
     let mut deployments = load_deployments(paths)?;
-    let (client, project_root, target_root) = target_root_for(paths, target_type, project_root.as_deref())?;
+    let (client, project_root, target_root) =
+        target_root_for(paths, target_type, project_root.as_deref())?;
     let target_skill_path = target_root.join(&skill.slug);
     if target_skill_path.exists() {
-        return Err(validation_error(format!("deployment target already exists: {}", target_skill_path.display())));
+        return Err(validation_error(format!(
+            "deployment target already exists: {}",
+            target_skill_path.display()
+        )));
     }
     let deployment = SkillDeployment {
         deployment_id: Uuid::new_v4().to_string(),
@@ -898,7 +1014,10 @@ pub fn preview_deployment_add(
     let skill_md = read_to_string(&skill_md_path)?;
     let expected_files = vec![
         crate::model::FilePrecondition {
-            path: target_skill_path.join("SKILL.md").to_string_lossy().to_string(),
+            path: target_skill_path
+                .join("SKILL.md")
+                .to_string_lossy()
+                .to_string(),
             expected_before_sha256: None,
         },
         crate::model::FilePrecondition {
@@ -910,7 +1029,10 @@ pub fn preview_deployment_add(
     Ok(WritePreview {
         files: vec![
             crate::model::FileChangePreview {
-                path: target_skill_path.join("SKILL.md").to_string_lossy().to_string(),
+                path: target_skill_path
+                    .join("SKILL.md")
+                    .to_string_lossy()
+                    .to_string(),
                 will_create: true,
                 before_sha256: None,
                 after_sha256: sha256_text(&skill_md),
@@ -932,7 +1054,8 @@ pub fn preview_deployment_add(
         },
         warnings: vec![Warning {
             code: "SKIPPED".to_string(),
-            message: "Deployment preview lists the entry file and index update in this phase.".to_string(),
+            message: "Deployment preview lists the entry file and index update in this phase."
+                .to_string(),
             details: None,
         }],
     })
@@ -952,12 +1075,21 @@ pub fn apply_deployment_add(
         .skills
         .into_iter()
         .find(|item| item.skill_id == skill_id && !item.archived)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {skill_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {skill_id}"),
+            )
+        })?;
     let mut deployments = load_deployments(paths)?;
-    let (client, project_root, target_root) = target_root_for(paths, target_type, project_root.as_deref())?;
+    let (client, project_root, target_root) =
+        target_root_for(paths, target_type, project_root.as_deref())?;
     let target_skill_path = target_root.join(&skill.slug);
     if target_skill_path.exists() {
-        return Err(validation_error(format!("deployment target already exists: {}", target_skill_path.display())));
+        return Err(validation_error(format!(
+            "deployment target already exists: {}",
+            target_skill_path.display()
+        )));
     }
     copy_dir_recursive(Path::new(&skill.files_root), &target_skill_path)?;
     let now = Utc::now().to_rfc3339();
@@ -994,21 +1126,34 @@ pub fn apply_deployment_add(
     Ok(deployment)
 }
 
-pub fn preview_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Result<WritePreview, AppError> {
+pub fn preview_deployment_remove(
+    paths: &AppPaths,
+    deployment_id: &str,
+) -> Result<WritePreview, AppError> {
     ensure_skill_store_layout(paths)?;
     let current = load_deployments(paths)?;
     let deployment = current
         .deployments
         .iter()
         .find(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     let mut next = current.clone();
     let skill_id = deployment.skill_id.clone();
     let dep = next
         .deployments
         .iter_mut()
         .find(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     dep.status = DeploymentStatus::Disabled;
     dep.updated_at = Utc::now().to_rfc3339();
     let deployment_raw = serde_json::to_string_pretty(&next)
@@ -1019,7 +1164,9 @@ pub fn preview_deployment_remove(paths: &AppPaths, deployment_id: &str) -> Resul
                 .join("SKILL.md")
                 .to_string_lossy()
                 .to_string(),
-            expected_before_sha256: current_file_hash(&PathBuf::from(&deployment.target_skill_path).join("SKILL.md"))?,
+            expected_before_sha256: current_file_hash(
+                &PathBuf::from(&deployment.target_skill_path).join("SKILL.md"),
+            )?,
         },
         crate::model::FilePrecondition {
             path: deployment_index_path(paths).to_string_lossy().to_string(),
@@ -1061,7 +1208,12 @@ pub fn apply_deployment_remove(
         .deployments
         .iter_mut()
         .find(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     let target = PathBuf::from(&deployment.target_skill_path);
     if target.exists() {
         fs::remove_dir_all(&target).map_err(|e| io_error("remove_dir", &target, e))?;
@@ -1080,41 +1232,40 @@ pub fn apply_deployment_remove(
     Ok(result)
 }
 
-pub fn check_deployment_status(paths: &AppPaths, deployment_id: &str) -> Result<SkillDeployment, AppError> {
+pub fn check_deployment_status(
+    paths: &AppPaths,
+    deployment_id: &str,
+) -> Result<SkillDeployment, AppError> {
     ensure_skill_store_layout(paths)?;
     let mut deployments = load_deployments(paths)?;
     let deployment = deployments
         .deployments
         .iter_mut()
         .find(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     let store = load_index(paths)?;
     let skill = store
         .skills
         .into_iter()
         .find(|item| item.skill_id == deployment.skill_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found for deployment: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found for deployment: {deployment_id}"),
+            )
+        })?;
 
     if deployment.status == DeploymentStatus::Disabled {
         return Ok(deployment.clone());
     }
 
     let target = PathBuf::from(&deployment.target_skill_path);
-    if !target.exists() {
-        deployment.status = DeploymentStatus::Missing;
-        deployment.updated_at = Utc::now().to_rfc3339();
-        let result = deployment.clone();
-        save_deployments(paths, &deployments)?;
-        return Ok(result);
-    }
-    let current_hash = hash_tree(&target)?;
-    deployment.status = if current_hash == skill.content_hash {
-        DeploymentStatus::Deployed
-    } else if current_hash == deployment.source_hash {
-        DeploymentStatus::Outdated
-    } else {
-        DeploymentStatus::Drifted
-    };
+    deployment.status = detect_deployment_status(&target, deployment, &skill.content_hash)?;
     deployment.updated_at = Utc::now().to_rfc3339();
     let result = deployment.clone();
     save_deployments(paths, &deployments)?;
@@ -1130,14 +1281,86 @@ pub fn check_deployment_status(paths: &AppPaths, deployment_id: &str) -> Result<
     Ok(result)
 }
 
-pub fn preview_sync_from_deployment(paths: &AppPaths, deployment_id: &str) -> Result<WritePreview, AppError> {
+pub fn preview_redeploy_outdated_deployment(
+    paths: &AppPaths,
+    deployment_id: &str,
+) -> Result<WritePreview, AppError> {
     ensure_skill_store_layout(paths)?;
     let deployments = load_deployments(paths)?;
     let deployment = deployments
         .deployments
         .iter()
         .find(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
+    let repo = get_repo_skill(paths, &deployment.skill_id)?;
+    let target_root = PathBuf::from(&deployment.target_skill_path);
+    if detect_deployment_status(&target_root, deployment, &repo.manifest.content_hash)?
+        != DeploymentStatus::Outdated
+    {
+        return Err(validation_error(
+            "only outdated deployments can be redeployed",
+        ));
+    }
+    let repo_root = PathBuf::from(&repo.manifest.files_root);
+    let deployment_index = deployment_index_path(paths);
+
+    let mut expected_files = collect_tree_files(&target_root)?
+        .into_iter()
+        .map(|rel| {
+            let full = target_root.join(&rel);
+            Ok(crate::model::FilePrecondition {
+                path: full.to_string_lossy().to_string(),
+                expected_before_sha256: current_file_hash(&full)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+    expected_files.extend(
+        collect_tree_files(&repo_root)?
+            .into_iter()
+            .map(|rel| {
+                let full = repo_root.join(&rel);
+                Ok(crate::model::FilePrecondition {
+                    path: full.to_string_lossy().to_string(),
+                    expected_before_sha256: current_file_hash(&full)?,
+                })
+            })
+            .collect::<Result<Vec<_>, AppError>>()?,
+    );
+    expected_files.push(crate::model::FilePrecondition {
+        path: deployment_index.to_string_lossy().to_string(),
+        expected_before_sha256: current_file_hash(&deployment_index)?,
+    });
+
+    Ok(WritePreview {
+        files: build_tree_preview(&repo_root, &target_root)?,
+        moves: Vec::new(),
+        expected_files,
+        summary: WriteSummary::default(),
+        warnings: Vec::new(),
+    })
+}
+
+pub fn preview_sync_from_deployment(
+    paths: &AppPaths,
+    deployment_id: &str,
+) -> Result<WritePreview, AppError> {
+    ensure_skill_store_layout(paths)?;
+    let deployments = load_deployments(paths)?;
+    let deployment = deployments
+        .deployments
+        .iter()
+        .find(|item| item.deployment_id == deployment_id)
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     let repo = get_repo_skill(paths, &deployment.skill_id)?;
     let target_root = PathBuf::from(&deployment.target_skill_path);
     let repo_root = PathBuf::from(&repo.manifest.files_root);
@@ -1169,6 +1392,71 @@ pub fn preview_sync_from_deployment(paths: &AppPaths, deployment_id: &str) -> Re
     })
 }
 
+pub fn apply_redeploy_outdated_deployment(
+    paths: &AppPaths,
+    deployment_id: &str,
+    expected_files: Vec<crate::model::FilePrecondition>,
+) -> Result<SkillDeployment, AppError> {
+    ensure_skill_store_layout(paths)?;
+    verify_expected_files(&expected_files)?;
+    let mut deployments = load_deployments(paths)?;
+    let dep_index = deployments
+        .deployments
+        .iter()
+        .position(|item| item.deployment_id == deployment_id)
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
+
+    let skill_id = deployments.deployments[dep_index].skill_id.clone();
+    let target_root = PathBuf::from(&deployments.deployments[dep_index].target_skill_path);
+    let store = load_index(paths)?;
+    let skill = store
+        .skills
+        .into_iter()
+        .find(|item| item.skill_id == skill_id)
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {skill_id}"),
+            )
+        })?;
+    if detect_deployment_status(
+        &target_root,
+        &deployments.deployments[dep_index],
+        &skill.content_hash,
+    )? != DeploymentStatus::Outdated
+    {
+        return Err(validation_error(
+            "only outdated deployments can be redeployed",
+        ));
+    }
+
+    replace_dir_contents(Path::new(&skill.files_root), &target_root)?;
+
+    let deployment = &mut deployments.deployments[dep_index];
+    deployment.status = DeploymentStatus::Deployed;
+    deployment.source_hash = skill.content_hash.clone();
+    deployment.updated_at = Utc::now().to_rfc3339();
+
+    let result = deployment.clone();
+    save_deployments(paths, &deployments)?;
+    append_sync_event(
+        paths,
+        &result.skill_id,
+        Some(result.deployment_id.clone()),
+        SkillSyncEventType::Deployed,
+        format!(
+            "Redeployed latest repository version to {}",
+            result.target_skill_path
+        ),
+    )?;
+    Ok(result)
+}
+
 pub fn apply_sync_from_deployment(
     paths: &AppPaths,
     deployment_id: &str,
@@ -1181,7 +1469,12 @@ pub fn apply_sync_from_deployment(
         .deployments
         .iter()
         .position(|item| item.deployment_id == deployment_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("deployment not found: {deployment_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("deployment not found: {deployment_id}"),
+            )
+        })?;
     let skill_id = deployments.deployments[dep_index].skill_id.clone();
     let source_target = PathBuf::from(&deployments.deployments[dep_index].target_skill_path);
 
@@ -1190,7 +1483,12 @@ pub fn apply_sync_from_deployment(
         .skills
         .into_iter()
         .find(|item| item.skill_id == skill_id)
-        .ok_or_else(|| AppError::new("NOT_FOUND", format!("repository skill not found: {skill_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "NOT_FOUND",
+                format!("repository skill not found: {skill_id}"),
+            )
+        })?;
 
     let files_root = PathBuf::from(&entry.files_root);
     replace_dir_contents(&source_target, &files_root)?;
@@ -1201,7 +1499,11 @@ pub fn apply_sync_from_deployment(
     write_manifest(Path::new(&entry.repo_root), &map_entry_to_manifest(&entry))?;
     update_catalog_entry(paths, &entry)?;
 
-    for deployment in deployments.deployments.iter_mut().filter(|d| d.skill_id == skill_id) {
+    for deployment in deployments
+        .deployments
+        .iter_mut()
+        .filter(|d| d.skill_id == skill_id)
+    {
         if deployment.deployment_id == deployment_id {
             deployment.status = DeploymentStatus::Deployed;
             deployment.source_hash = new_hash.clone();
@@ -1218,7 +1520,10 @@ pub fn apply_sync_from_deployment(
         &result.skill_id,
         Some(result.deployment_id.clone()),
         SkillSyncEventType::SyncedBack,
-        format!("Synced deployment back into repository from {}", result.target_skill_path),
+        format!(
+            "Synced deployment back into repository from {}",
+            result.target_skill_path
+        ),
     )?;
     Ok(result)
 }
@@ -1229,7 +1534,10 @@ pub fn list_target_profiles(paths: &AppPaths) -> Result<Vec<SkillTargetProfile>,
     Ok(targets)
 }
 
-pub fn list_sync_events(paths: &AppPaths, skill_id: Option<&str>) -> Result<Vec<SkillSyncEvent>, AppError> {
+pub fn list_sync_events(
+    paths: &AppPaths,
+    skill_id: Option<&str>,
+) -> Result<Vec<SkillSyncEvent>, AppError> {
     let mut events = load_sync_events(paths)?.events;
     if let Some(skill_id) = skill_id {
         events.retain(|event| event.skill_id == skill_id);

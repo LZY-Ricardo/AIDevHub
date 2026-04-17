@@ -27,7 +27,8 @@ type PendingAction =
   | { type: "import"; client: Client; name: string; source_path: string }
   | { type: "deploy_add"; skill_id: string; target_type: DeploymentTargetType; project_root?: string }
   | { type: "deploy_remove"; deployment_id: string }
-  | { type: "sync_back"; deployment_id: string };
+  | { type: "sync_back"; deployment_id: string }
+  | { type: "redeploy"; deployment_id: string };
 
 function formatSkillName(skillId: string): string {
   if (skillId.includes(":")) {
@@ -218,6 +219,23 @@ export function SkillsPage() {
     }
   }
 
+  async function redeployOutdatedDeployment(deploymentId: string) {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    setPending({ type: "redeploy", deployment_id: deploymentId });
+    setPreviewTitle("重新投放最新仓库版本");
+    try {
+      const preview = await api.skillDeploymentPreviewRedeploy({ deployment_id: deploymentId });
+      setPreview(preview);
+      setPreviewOpen(true);
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function requestToggle(s: SkillRecord, enabled: boolean) {
     if (s.scope === "system") return;
     setBusy(true);
@@ -311,6 +329,11 @@ export function SkillsPage() {
         });
       } else if (pending.type === "sync_back") {
         await api.skillRepoApplySyncFromDeployment({
+          deployment_id: pending.deployment_id,
+          expected_files,
+        });
+      } else if (pending.type === "redeploy") {
+        await api.skillDeploymentApplyRedeploy({
           deployment_id: pending.deployment_id,
           expected_files,
         });
@@ -631,6 +654,7 @@ export function SkillsPage() {
         onRemoveDeployment={removeDeployment}
         onCheckDeployment={checkDeployment}
         onSyncBack={syncBackDeployment}
+        onRedeploy={redeployOutdatedDeployment}
         claudeProjectRoot={claudeProjectRoot}
         codexProjectRoot={codexProjectRoot}
         setClaudeProjectRoot={setClaudeProjectRoot}
@@ -665,6 +689,7 @@ function RepoDetailsDrawer({
   onRemoveDeployment,
   onCheckDeployment,
   onSyncBack,
+  onRedeploy,
   claudeProjectRoot,
   codexProjectRoot,
   setClaudeProjectRoot,
@@ -682,6 +707,7 @@ function RepoDetailsDrawer({
   onRemoveDeployment: (deploymentId: string) => Promise<void>;
   onCheckDeployment: (deploymentId: string) => Promise<void>;
   onSyncBack: (deploymentId: string) => Promise<void>;
+  onRedeploy: (deploymentId: string) => Promise<void>;
   claudeProjectRoot: string;
   codexProjectRoot: string;
   setClaudeProjectRoot: (value: string) => void;
@@ -867,6 +893,16 @@ function RepoDetailsDrawer({
                           onClick={() => onSyncBack(deployment.deployment_id)}
                         >
                           回流到仓库
+                        </button>
+                      ) : null}
+                      {deployment.status === "outdated" ? (
+                        <button
+                          type="button"
+                          className="ui-btn"
+                          disabled={busy}
+                          onClick={() => onRedeploy(deployment.deployment_id)}
+                        >
+                          重新投放
                         </button>
                       ) : null}
                       <button

@@ -230,7 +230,7 @@ export interface SkillRepoGetResponse {
 }
 
 export type DeploymentTargetType = "claude_global" | "codex_global" | "claude_project" | "codex_project";
-export type DeploymentStatus = "deployed" | "disabled" | "drifted" | "outdated";
+export type DeploymentStatus = "deployed" | "disabled" | "drifted" | "outdated" | "missing";
 
 export interface SkillDeployment {
   deployment_id: string;

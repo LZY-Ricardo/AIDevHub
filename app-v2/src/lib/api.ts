@@ -296,6 +296,22 @@ export const api = {
     });
   },
 
+  skillDeploymentPreviewRedeploy(payload: { deployment_id: string }): Promise<WritePreview> {
+    return invokeCmd("skill_deployment_preview_redeploy", {
+      deploymentId: payload.deployment_id,
+    });
+  },
+
+  skillDeploymentApplyRedeploy(payload: {
+    deployment_id: string;
+    expected_files: FilePrecondition[];
+  }): Promise<SkillDeployment> {
+    return invokeCmd("skill_deployment_apply_redeploy", {
+      deploymentId: payload.deployment_id,
+      expectedFiles: payload.expected_files,
+    });
+  },
+
   skillTargetProfileList(): Promise<SkillTargetProfile[]> {
     return invokeCmd("skill_target_profile_list");
   },
