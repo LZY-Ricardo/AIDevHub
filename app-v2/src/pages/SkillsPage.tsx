@@ -16,6 +16,12 @@ import type {
 import { api } from "../lib/api";
 import { clientLabel, enabledLabel, skillKindLabel, skillScopeLabel } from "../lib/format";
 import { getProjectRootDraftError } from "../lib/projectRootValidation";
+import {
+  canInstallRepoSkillToTargetType,
+  canInstallRepoSkillToClient,
+  repoSkillInstallStatusText,
+  summarizeRepoSkillInstallState,
+} from "../lib/repoSkillInstallState";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
@@ -100,6 +106,7 @@ export function SkillsPage() {
   const [scope, setScope] = useState<ScopeFilter>("user");
   const [skills, setSkills] = useState<SkillRecord[] | null>(null);
   const [repoSkills, setRepoSkills] = useState<ManagedSkillView[] | null>(null);
+  const [repoDeployments, setRepoDeployments] = useState<SkillDeployment[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -143,9 +150,14 @@ export function SkillsPage() {
   async function load() {
     setError(null);
     try {
-      const [list, repoList] = await Promise.all([api.skillList({ client, scope }), api.skillRepoList()]);
+      const [list, repoList, deployments] = await Promise.all([
+        api.skillList({ client, scope }),
+        api.skillRepoList(),
+        api.skillDeploymentList(),
+      ]);
       setSkills(list);
       setRepoSkills(repoList);
+      setRepoDeployments(deployments);
     } catch (e) {
       setError(e as AppError);
     }
@@ -163,6 +175,10 @@ export function SkillsPage() {
       return hay.includes(q);
     });
   }, [skills, query]);
+
+  const repoDeploymentState = useMemo(() => {
+    return summarizeRepoSkillInstallState(repoDeployments ?? []);
+  }, [repoDeployments]);
 
   async function openDetails(s: SkillRecord) {
     setSelected(s);
@@ -702,16 +718,72 @@ export function SkillsPage() {
         </div>
         <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
           {(repoSkills ?? []).map((skill) => (
-            <button
+            <div
               key={skill.skill_id}
-              type="button"
-              className="ui-btn"
-              style={{ justifyContent: "space-between" }}
-              onClick={() => openRepoDetails(skill)}
+              className="ui-card"
+              style={{
+                padding: "12px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "12px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
             >
-              <span className="ui-code">{skill.display_name}</span>
-              <span className="ui-help">v{skill.version}</span>
-            </button>
+              {(() => {
+                const deploymentState = repoDeploymentState.get(skill.skill_id) ?? {
+                  claudeInstalled: false,
+                  codexInstalled: false,
+                  claudeMissing: false,
+                  codexMissing: false,
+                };
+                const installStatus = repoSkillInstallStatusText(deploymentState);
+                const canInstallClaude = canInstallRepoSkillToClient(deploymentState, "claude_code");
+                const canInstallCodex = canInstallRepoSkillToClient(deploymentState, "codex");
+                const hasInstalledTarget = deploymentState.claudeInstalled || deploymentState.codexInstalled;
+                return (
+                  <>
+              <div style={{ display: "grid", gap: "6px", minWidth: 0, flex: "1 1 240px" }}>
+                <div className="ui-code ui-ellipsis" title={skill.display_name}>
+                  {skill.display_name}
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="ui-help">v{skill.version}</div>
+                  <span className="ui-pill ui-skillMetaPill" title={installStatus}>
+                    <span
+                      className={`ui-pillDot ${hasInstalledTarget ? "ui-pillDotOn" : "ui-pillDotOff"}`}
+                    />
+                    <span className="ui-code ui-ellipsis ui-pillText">{installStatus}</span>
+                  </span>
+                </div>
+              </div>
+              <div className="ui-btnRow" style={{ flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="ui-btn"
+                  disabled={busy || !canInstallClaude}
+                  onClick={() => deployRepoSkill(skill.skill_id, "claude_global")}
+                  title={canInstallClaude ? "安装到 Claude 全局目录" : "已经安装到 Claude 全局目录"}
+                >
+                  安装到 Claude
+                </button>
+                <button
+                  type="button"
+                  className="ui-btn"
+                  disabled={busy || !canInstallCodex}
+                  onClick={() => deployRepoSkill(skill.skill_id, "codex_global")}
+                  title={canInstallCodex ? "安装到 Codex 全局目录" : "已经安装到 Codex 全局目录"}
+                >
+                  安装到 Codex
+                </button>
+                <button type="button" className="ui-btn" disabled={busy} onClick={() => openRepoDetails(skill)}>
+                  详情 <Icon name="chevronRight" />
+                </button>
+              </div>
+                  </>
+                );
+              })()}
+            </div>
           ))}
           {repoSkills && repoSkills.length === 0 ? <div className="ui-help">仓库中还没有 Skill。</div> : null}
         </div>
@@ -723,6 +795,21 @@ export function SkillsPage() {
         basic={selectedRepo}
         full={selectedRepoDetails}
         deployments={selectedRepoDeployments}
+        deploymentState={
+          selectedRepo
+            ? repoDeploymentState.get(selectedRepo.skill_id) ?? {
+                claudeInstalled: false,
+                codexInstalled: false,
+                claudeMissing: false,
+                codexMissing: false,
+              }
+            : {
+                claudeInstalled: false,
+                codexInstalled: false,
+                claudeMissing: false,
+                codexMissing: false,
+              }
+        }
         targetProfiles={selectedRepoProfiles}
         syncEvents={selectedRepoEvents}
         busy={busy}
@@ -761,6 +848,7 @@ function RepoDetailsDrawer({
   basic,
   full,
   deployments,
+  deploymentState,
   targetProfiles,
   syncEvents,
   busy,
@@ -782,6 +870,12 @@ function RepoDetailsDrawer({
   basic: ManagedSkillView | null;
   full: SkillRepoGetResponse | null;
   deployments: SkillDeployment[] | null;
+  deploymentState: {
+    claudeInstalled: boolean;
+    codexInstalled: boolean;
+    claudeMissing: boolean;
+    codexMissing: boolean;
+  };
   targetProfiles: SkillTargetProfile[] | null;
   syncEvents: SkillSyncEvent[] | null;
   busy: boolean;
@@ -848,16 +942,26 @@ function RepoDetailsDrawer({
                   <button
                     type="button"
                     className="ui-btn"
-                    disabled={busy || !basic}
+                    disabled={busy || !basic || !canInstallRepoSkillToTargetType(deploymentState, "claude_global")}
                     onClick={() => basic && onDeploy(basic.skill_id, "claude_global")}
+                    title={
+                      canInstallRepoSkillToTargetType(deploymentState, "claude_global")
+                        ? "安装到 Claude 全局目录"
+                        : "已经安装到 Claude 全局目录"
+                    }
                   >
                     投放到 Claude 全局
                   </button>
                   <button
                     type="button"
                     className="ui-btn"
-                    disabled={busy || !basic}
+                    disabled={busy || !basic || !canInstallRepoSkillToTargetType(deploymentState, "codex_global")}
                     onClick={() => basic && onDeploy(basic.skill_id, "codex_global")}
+                    title={
+                      canInstallRepoSkillToTargetType(deploymentState, "codex_global")
+                        ? "安装到 Codex 全局目录"
+                        : "已经安装到 Codex 全局目录"
+                    }
                   >
                     投放到 Codex 全局
                   </button>
@@ -873,7 +977,7 @@ function RepoDetailsDrawer({
                           key={profile.target_profile_id}
                           type="button"
                           className="ui-btn"
-                          disabled={busy}
+                          disabled={busy || !canInstallRepoSkillToTargetType(deploymentState, profile.target_type)}
                           onClick={() => basic && onDeploy(basic.skill_id, profile.target_type, profile.project_root)}
                           title={profile.target_root}
                         >
