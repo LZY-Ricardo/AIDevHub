@@ -840,28 +840,6 @@ function RepoDetailsDrawer({
                 {full?.manifest.description ?? basic?.description ?? "（无）"}
               </div>
             </div>
-            <div className="ui-card" style={{ padding: "16px" }}>
-              <div className="ui-label">仓库目录</div>
-              <div className="ui-code" style={{ marginTop: "8px" }}>
-                {full?.manifest.repo_root ?? "（未加载）"}
-              </div>
-              {full?.manifest.source_detail.imported_from_path ? (
-                <>
-                  <div className="ui-label" style={{ marginTop: "14px" }}>
-                    导入来源
-                  </div>
-                  <div className="ui-code" style={{ marginTop: "8px" }}>
-                    {full.manifest.source_detail.imported_from_path}
-                  </div>
-                </>
-              ) : null}
-              <div className="ui-label" style={{ marginTop: "14px" }}>
-                内容（只读）
-              </div>
-              <div style={{ marginTop: "10px" }}>
-                <pre className="ui-pre">{full?.content ?? "（未加载）"}</pre>
-              </div>
-            </div>
 
             <div className="ui-card" style={{ padding: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
@@ -1026,6 +1004,29 @@ function RepoDetailsDrawer({
                   </div>
                 ))}
                 {deployments && deployments.length === 0 ? <div className="ui-help">暂无投放。</div> : null}
+              </div>
+            </div>
+
+            <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-label">仓库目录</div>
+              <div className="ui-code" style={{ marginTop: "8px" }}>
+                {full?.manifest.repo_root ?? "（未加载）"}
+              </div>
+              {full?.manifest.source_detail.imported_from_path ? (
+                <>
+                  <div className="ui-label" style={{ marginTop: "14px" }}>
+                    导入来源
+                  </div>
+                  <div className="ui-code" style={{ marginTop: "8px" }}>
+                    {full.manifest.source_detail.imported_from_path}
+                  </div>
+                </>
+              ) : null}
+              <div className="ui-label" style={{ marginTop: "14px" }}>
+                内容（只读）
+              </div>
+              <div style={{ marginTop: "10px" }}>
+                <pre className="ui-pre">{full?.content ?? "（未加载）"}</pre>
               </div>
             </div>
 
