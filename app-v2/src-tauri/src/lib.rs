@@ -11,6 +11,16 @@ use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
 use tauri::Manager;
 
+async fn run_blocking_command<T, F>(job: F) -> Result<T, AppError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, AppError> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(job)
+        .await
+        .map_err(|e| AppError::new("INTERNAL_ERROR", format!("blocking task join error: {e}")))?
+}
+
 fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
     let home = app
         .path()
@@ -75,12 +85,12 @@ fn runtime_get_info(app: tauri::AppHandle) -> Result<RuntimeGetInfoResponse, App
 }
 
 #[tauri::command]
-fn server_list(
+async fn server_list(
     app: tauri::AppHandle,
     client: Option<Client>,
 ) -> Result<Vec<aidevhub_core::model::ServerRecord>, AppError> {
     let paths = resolve_paths(&app)?;
-    ops::server_list(&paths, client)
+    run_blocking_command(move || ops::server_list(&paths, client)).await
 }
 
 #[tauri::command]
@@ -262,12 +272,12 @@ fn profile_apply(
 }
 
 #[tauri::command]
-fn backup_list(
+async fn backup_list(
     app: tauri::AppHandle,
     target_path: Option<String>,
 ) -> Result<Vec<aidevhub_core::model::BackupRecord>, AppError> {
     let paths = resolve_paths(&app)?;
-    ops::backup_list(&paths, target_path)
+    run_blocking_command(move || ops::backup_list(&paths, target_path)).await
 }
 
 #[tauri::command]
@@ -290,9 +300,9 @@ fn backup_apply_rollback(
 }
 
 #[tauri::command]
-fn config_check_updates(app: tauri::AppHandle) -> Result<ConfigCheckUpdatesResponse, AppError> {
+async fn config_check_updates(app: tauri::AppHandle) -> Result<ConfigCheckUpdatesResponse, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::config_sync::config_check_updates(&paths)
+    run_blocking_command(move || aidevhub_core::config_sync::config_check_updates(&paths)).await
 }
 
 #[tauri::command]
@@ -344,9 +354,9 @@ fn mcp_apply_sync_registry_to_external(
 }
 
 #[tauri::command]
-fn settings_get(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
+async fn settings_get(app: tauri::AppHandle) -> Result<AppSettings, AppError> {
     let paths = resolve_paths(&app)?;
-    aidevhub_core::app_settings::load_settings(&paths)
+    run_blocking_command(move || aidevhub_core::app_settings::load_settings(&paths)).await
 }
 
 #[tauri::command]
@@ -356,13 +366,13 @@ fn settings_put(app: tauri::AppHandle, settings: AppSettings) -> Result<AppSetti
 }
 
 #[tauri::command]
-fn skill_list(
+async fn skill_list(
     app: tauri::AppHandle,
     client: Option<Client>,
     scope: Option<String>,
 ) -> Result<Vec<aidevhub_core::model::SkillRecord>, AppError> {
     let paths = resolve_paths(&app)?;
-    ops::skill_list(&paths, client, scope)
+    run_blocking_command(move || ops::skill_list(&paths, client, scope)).await
 }
 
 #[tauri::command]
@@ -689,4 +699,31 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_blocking_command;
+    use aidevhub_core::model::AppError;
+
+    #[test]
+    fn run_blocking_command_returns_ok_result() {
+        let result = tauri::async_runtime::block_on(async {
+            run_blocking_command(|| Ok::<_, AppError>(42)).await
+        })
+        .unwrap();
+
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn run_blocking_command_preserves_app_error() {
+        let err = tauri::async_runtime::block_on(async {
+            run_blocking_command(|| Err::<(), _>(AppError::new("VALIDATION_ERROR", "boom"))).await
+        })
+        .unwrap_err();
+
+        assert_eq!(err.code, "VALIDATION_ERROR");
+        assert_eq!(err.message, "boom");
+    }
 }
