@@ -10,6 +10,7 @@ use aidevhub_core::model::{
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 async fn run_blocking_command<T, F>(job: F) -> Result<T, AppError>
 where
@@ -82,6 +83,24 @@ struct OkResponse {
 fn runtime_get_info(app: tauri::AppHandle) -> Result<RuntimeGetInfoResponse, AppError> {
     let paths = resolve_paths(&app)?;
     ops::runtime_get_info(&paths)
+}
+
+#[tauri::command]
+fn pick_directory(app: tauri::AppHandle, initial: Option<String>) -> Result<Option<String>, AppError> {
+    let mut dialog = app.dialog().file();
+    if let Some(initial) = initial.as_deref().filter(|value| !value.trim().is_empty()) {
+        dialog = dialog.set_directory(initial);
+    }
+
+    Ok(dialog
+        .blocking_pick_folder()
+        .and_then(|path| path.into_path().ok())
+        .map(|path| path.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+fn validate_project_root(project_root: String) -> Result<String, AppError> {
+    aidevhub_core::skill_repo::validate_project_root_input(&project_root)
 }
 
 #[tauri::command]
@@ -300,7 +319,9 @@ fn backup_apply_rollback(
 }
 
 #[tauri::command]
-async fn config_check_updates(app: tauri::AppHandle) -> Result<ConfigCheckUpdatesResponse, AppError> {
+async fn config_check_updates(
+    app: tauri::AppHandle,
+) -> Result<ConfigCheckUpdatesResponse, AppError> {
     let paths = resolve_paths(&app)?;
     run_blocking_command(move || aidevhub_core::config_sync::config_check_updates(&paths)).await
 }
@@ -642,8 +663,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             runtime_get_info,
+            pick_directory,
+            validate_project_root,
             server_list,
             server_get,
             server_get_edit_session,

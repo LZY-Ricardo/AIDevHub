@@ -15,6 +15,7 @@ import type {
 } from "../lib/types";
 import { api } from "../lib/api";
 import { clientLabel, enabledLabel, skillKindLabel, skillScopeLabel } from "../lib/format";
+import { getProjectRootDraftError } from "../lib/projectRootValidation";
 import { Icon } from "../components/Icon";
 import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
@@ -30,11 +31,68 @@ type PendingAction =
   | { type: "sync_back"; deployment_id: string }
   | { type: "redeploy"; deployment_id: string };
 
+type ProjectRootValidation = {
+  status: "idle" | "checking" | "valid" | "invalid";
+  message: string | null;
+  normalizedRoot?: string;
+};
+
+const IDLE_PROJECT_ROOT_VALIDATION: ProjectRootValidation = {
+  status: "idle",
+  message: null,
+};
+
 function formatSkillName(skillId: string): string {
   if (skillId.includes(":")) {
     return skillId.split(":").slice(1).join(":");
   }
   return skillId.replace(/^(mcp__|claudecode__|codex__|claude_code__)/, "");
+}
+
+function useProjectRootValidation(root: string) {
+  const [validation, setValidation] = useState<ProjectRootValidation>(IDLE_PROJECT_ROOT_VALIDATION);
+
+  useEffect(() => {
+    const trimmed = root.trim();
+    if (!trimmed) {
+      setValidation(IDLE_PROJECT_ROOT_VALIDATION);
+      return;
+    }
+
+    const draftError = getProjectRootDraftError(trimmed);
+    if (draftError) {
+      setValidation({ status: "invalid", message: draftError });
+      return;
+    }
+
+    let cancelled = false;
+    setValidation({ status: "checking", message: "正在校验目录..." });
+    const timer = window.setTimeout(async () => {
+      try {
+        const normalizedRoot = await api.validateProjectRoot({ project_root: trimmed });
+        if (cancelled) return;
+        setValidation({
+          status: "valid",
+          message: "目录可用",
+          normalizedRoot,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        const err = e as AppError;
+        setValidation({
+          status: "invalid",
+          message: err.message,
+        });
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [root]);
+
+  return validation;
 }
 
 export function SkillsPage() {
@@ -57,6 +115,8 @@ export function SkillsPage() {
   const [selectedRepoEvents, setSelectedRepoEvents] = useState<SkillSyncEvent[] | null>(null);
   const [claudeProjectRoot, setClaudeProjectRoot] = useState("");
   const [codexProjectRoot, setCodexProjectRoot] = useState("");
+  const claudeProjectValidation = useProjectRootValidation(claudeProjectRoot);
+  const codexProjectValidation = useProjectRootValidation(codexProjectRoot);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createClient, setCreateClient] = useState<Client>("codex");
@@ -136,6 +196,22 @@ export function SkillsPage() {
       setSelectedRepoEvents(events);
     } catch {
       // best-effort
+    }
+  }
+
+  async function chooseProjectRoot(target: "claude" | "codex") {
+    setError(null);
+    try {
+      const current = target === "claude" ? claudeProjectRoot.trim() : codexProjectRoot.trim();
+      const selected = await api.pickDirectory({ initial: current || undefined });
+      if (!selected) return;
+      if (target === "claude") {
+        setClaudeProjectRoot(selected);
+      } else {
+        setCodexProjectRoot(selected);
+      }
+    } catch (e) {
+      setError(e as AppError);
     }
   }
 
@@ -657,8 +733,11 @@ export function SkillsPage() {
         onRedeploy={redeployOutdatedDeployment}
         claudeProjectRoot={claudeProjectRoot}
         codexProjectRoot={codexProjectRoot}
+        claudeProjectValidation={claudeProjectValidation}
+        codexProjectValidation={codexProjectValidation}
         setClaudeProjectRoot={setClaudeProjectRoot}
         setCodexProjectRoot={setCodexProjectRoot}
+        onPickProjectRoot={chooseProjectRoot}
       />
 
       <WritePreviewDialog
@@ -692,8 +771,11 @@ function RepoDetailsDrawer({
   onRedeploy,
   claudeProjectRoot,
   codexProjectRoot,
+  claudeProjectValidation,
+  codexProjectValidation,
   setClaudeProjectRoot,
   setCodexProjectRoot,
+  onPickProjectRoot,
 }: {
   open: boolean;
   onClose: () => void;
@@ -710,8 +792,11 @@ function RepoDetailsDrawer({
   onRedeploy: (deploymentId: string) => Promise<void>;
   claudeProjectRoot: string;
   codexProjectRoot: string;
+  claudeProjectValidation: ProjectRootValidation;
+  codexProjectValidation: ProjectRootValidation;
   setClaudeProjectRoot: (value: string) => void;
   setCodexProjectRoot: (value: string) => void;
+  onPickProjectRoot: (target: "claude" | "codex") => Promise<void>;
 }) {
   if (!open) return null;
   return (
@@ -833,12 +918,24 @@ function RepoDetailsDrawer({
                     <button
                       type="button"
                       className="ui-btn"
-                      disabled={busy || !basic || !claudeProjectRoot.trim()}
+                      disabled={busy}
+                      onClick={() => onPickProjectRoot("claude")}
+                    >
+                      选择目录
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || !basic || claudeProjectValidation.status !== "valid"}
                       onClick={() => basic && onDeploy(basic.skill_id, "claude_project", claudeProjectRoot.trim())}
                     >
                       投放到 Claude 项目
                     </button>
                   </div>
+                  <ProjectRootFeedback
+                    validation={claudeProjectValidation}
+                    targetRootSuffix=".claude/skills"
+                  />
                 </div>
                 <div className="ui-field ui-fieldFull">
                   <div className="ui-label">Codex 项目目录</div>
@@ -853,12 +950,24 @@ function RepoDetailsDrawer({
                     <button
                       type="button"
                       className="ui-btn"
-                      disabled={busy || !basic || !codexProjectRoot.trim()}
+                      disabled={busy}
+                      onClick={() => onPickProjectRoot("codex")}
+                    >
+                      选择目录
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-btn"
+                      disabled={busy || !basic || codexProjectValidation.status !== "valid"}
                       onClick={() => basic && onDeploy(basic.skill_id, "codex_project", codexProjectRoot.trim())}
                     >
                       投放到 Codex 项目
                     </button>
                   </div>
+                  <ProjectRootFeedback
+                    validation={codexProjectValidation}
+                    targetRootSuffix=".codex/skills"
+                  />
                 </div>
               </div>
               <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
@@ -937,6 +1046,35 @@ function RepoDetailsDrawer({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProjectRootFeedback({
+  validation,
+  targetRootSuffix,
+}: {
+  validation: ProjectRootValidation;
+  targetRootSuffix: string;
+}) {
+  if (validation.status === "idle" || !validation.message) return null;
+
+  const content =
+    validation.status === "valid" && validation.normalizedRoot
+      ? `${validation.message} · ${validation.normalizedRoot}/${targetRootSuffix}`
+      : validation.message;
+
+  if (validation.status === "invalid") {
+    return (
+      <div className="ui-error" style={{ marginTop: "10px", padding: "10px 12px" }}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="ui-help" style={{ marginTop: "10px" }}>
+      {content}
     </div>
   );
 }

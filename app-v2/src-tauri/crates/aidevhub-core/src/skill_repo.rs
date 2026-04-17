@@ -481,6 +481,45 @@ fn build_tree_preview(
         .collect()
 }
 
+fn build_target_preconditions_for_copy(
+    from_root: &Path,
+    to_root: &Path,
+) -> Result<Vec<crate::model::FilePrecondition>, AppError> {
+    collect_tree_files(from_root)?
+        .into_iter()
+        .map(|rel| {
+            let full = to_root.join(rel);
+            Ok(crate::model::FilePrecondition {
+                path: full.to_string_lossy().to_string(),
+                expected_before_sha256: current_file_hash(&full)?,
+            })
+        })
+        .collect()
+}
+
+fn validate_project_root(project_root: &str) -> Result<PathBuf, AppError> {
+    let root = PathBuf::from(project_root.trim());
+    if !root.exists() {
+        return Err(validation_error(format!(
+            "project_root does not exist: {}",
+            root.display()
+        )));
+    }
+    if !root.is_dir() {
+        return Err(validation_error(format!(
+            "project_root is not a directory: {}",
+            root.display()
+        )));
+    }
+    Ok(root)
+}
+
+pub fn validate_project_root_input(project_root: &str) -> Result<String, AppError> {
+    Ok(validate_project_root(project_root)?
+        .to_string_lossy()
+        .to_string())
+}
+
 fn detect_deployment_status(
     target_root: &Path,
     deployment: &SkillDeployment,
@@ -938,7 +977,9 @@ fn target_root_for(
                 .ok_or_else(|| {
                     validation_error("project_root is required for project deployment")
                 })?;
-            let root = PathBuf::from(project_root).join(".claude").join("skills");
+            let root = validate_project_root(project_root)?
+                .join(".claude")
+                .join("skills");
             Ok((Client::ClaudeCode, Some(project_root.to_string()), root))
         }
         DeploymentTargetType::CodexProject => {
@@ -947,7 +988,9 @@ fn target_root_for(
                 .ok_or_else(|| {
                     validation_error("project_root is required for project deployment")
                 })?;
-            let root = PathBuf::from(project_root).join(".codex").join("skills");
+            let root = validate_project_root(project_root)?
+                .join(".codex")
+                .join("skills");
             Ok((Client::Codex, Some(project_root.to_string()), root))
         }
     }
@@ -986,6 +1029,7 @@ pub fn preview_deployment_add(
     let mut deployments = load_deployments(paths)?;
     let (client, project_root, target_root) =
         target_root_for(paths, target_type, project_root.as_deref())?;
+    let files_root = PathBuf::from(&skill.files_root);
     let target_skill_path = target_root.join(&skill.slug);
     if target_skill_path.exists() {
         return Err(validation_error(format!(
@@ -1010,54 +1054,31 @@ pub fn preview_deployment_add(
     deployments.deployments.push(deployment);
     let deployment_raw = serde_json::to_string_pretty(&deployments)
         .map_err(|e| AppError::new("INTERNAL_ERROR", format!("serialize deployment index: {e}")))?;
-    let skill_md_path = PathBuf::from(&skill.files_root).join(&skill.entry_rel_path);
-    let skill_md = read_to_string(&skill_md_path)?;
-    let expected_files = vec![
-        crate::model::FilePrecondition {
-            path: target_skill_path
-                .join("SKILL.md")
-                .to_string_lossy()
-                .to_string(),
-            expected_before_sha256: None,
-        },
-        crate::model::FilePrecondition {
-            path: deployment_index_path(paths).to_string_lossy().to_string(),
-            expected_before_sha256: current_file_hash(&deployment_index_path(paths))?,
-        },
-    ];
+    let mut expected_files = build_target_preconditions_for_copy(&files_root, &target_skill_path)?;
+    expected_files.push(crate::model::FilePrecondition {
+        path: deployment_index_path(paths).to_string_lossy().to_string(),
+        expected_before_sha256: current_file_hash(&deployment_index_path(paths))?,
+    });
 
     Ok(WritePreview {
-        files: vec![
-            crate::model::FileChangePreview {
-                path: target_skill_path
-                    .join("SKILL.md")
-                    .to_string_lossy()
-                    .to_string(),
-                will_create: true,
-                before_sha256: None,
-                after_sha256: sha256_text(&skill_md),
-                diff_unified: skill_md,
-            },
-            crate::model::FileChangePreview {
+        files: {
+            let mut files = build_tree_preview(&files_root, &target_skill_path)?;
+            files.push(crate::model::FileChangePreview {
                 path: deployment_index_path(paths).to_string_lossy().to_string(),
                 will_create: !deployment_index_path(paths).exists(),
                 before_sha256: None,
                 after_sha256: sha256_text(&deployment_raw),
                 diff_unified: deployment_raw,
-            },
-        ],
+            });
+            files
+        },
         moves: Vec::new(),
         expected_files,
         summary: WriteSummary {
             will_enable: vec![skill.skill_id.clone()],
             ..WriteSummary::default()
         },
-        warnings: vec![Warning {
-            code: "SKIPPED".to_string(),
-            message: "Deployment preview lists the entry file and index update in this phase."
-                .to_string(),
-            details: None,
-        }],
+        warnings: Vec::new(),
     })
 }
 

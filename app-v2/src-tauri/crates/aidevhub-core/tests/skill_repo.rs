@@ -311,6 +311,7 @@ fn deploying_repo_skill_to_claude_project_uses_project_skill_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     let project_root = tmp.path().join("project-a");
+    fs::create_dir_all(&project_root).unwrap();
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(
@@ -360,6 +361,7 @@ fn deploying_repo_skill_to_codex_project_uses_project_skill_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     let project_root = tmp.path().join("project-b");
+    fs::create_dir_all(&project_root).unwrap();
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(
@@ -421,6 +423,7 @@ fn sync_back_updates_repository_and_marks_sibling_deployment_outdated() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     let project_root = tmp.path().join("project-c");
+    fs::create_dir_all(&project_root).unwrap();
 
     ensure_skill_store_layout(&paths).unwrap();
     let created =
@@ -474,6 +477,7 @@ fn redeploy_outdated_deployment_refreshes_target_and_restores_deployed_status() 
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     let project_root = tmp.path().join("project-d");
+    fs::create_dir_all(&project_root).unwrap();
 
     ensure_skill_store_layout(&paths).unwrap();
     let created =
@@ -511,9 +515,16 @@ fn redeploy_outdated_deployment_refreshes_target_and_restores_deployed_status() 
     let preview_skill_md = preview
         .files
         .iter()
-        .find(|file| file.path == PathBuf::from(&project.target_skill_path).join("SKILL.md").to_string_lossy())
+        .find(|file| {
+            file.path
+                == PathBuf::from(&project.target_skill_path)
+                    .join("SKILL.md")
+                    .to_string_lossy()
+        })
         .unwrap();
-    assert!(preview_skill_md.diff_unified.contains("updated via deployment"));
+    assert!(preview_skill_md
+        .diff_unified
+        .contains("updated via deployment"));
 
     let redeployed =
         apply_redeploy_outdated_deployment(&paths, &project.deployment_id, Vec::new()).unwrap();
@@ -543,6 +554,7 @@ fn redeploy_requires_deployment_to_still_be_outdated_at_apply_time() {
     let tmp = tempfile::tempdir().unwrap();
     let paths = mk_paths(&tmp);
     let project_root = tmp.path().join("project-e");
+    fs::create_dir_all(&project_root).unwrap();
 
     ensure_skill_store_layout(&paths).unwrap();
     let created = apply_create_repo_skill(
@@ -707,6 +719,100 @@ fn sync_back_preview_lists_non_entry_files_that_will_change() {
     write(&target_asset, "echo changed");
 
     let preview = preview_sync_from_deployment(&paths, &deployment.deployment_id).unwrap();
+    assert!(preview
+        .files
+        .iter()
+        .any(|f| f.path.ends_with("scripts\\run.sh") || f.path.ends_with("scripts/run.sh")));
+}
+
+#[test]
+fn project_deployment_preview_rejects_missing_project_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+    let missing_root = tmp.path().join("missing-project");
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(
+        &paths,
+        "missing-project-root",
+        "Missing Project Root",
+        "Missing project root test",
+        None,
+    )
+    .unwrap();
+
+    let err = preview_deployment_add(
+        &paths,
+        &created.skill_id,
+        DeploymentTargetType::CodexProject,
+        Some(missing_root.to_string_lossy().to_string()),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "VALIDATION_ERROR");
+}
+
+#[test]
+fn project_deployment_apply_rejects_file_path_as_project_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+    let file_root = tmp.path().join("not-a-directory.txt");
+    write(&file_root, "not a directory");
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(
+        &paths,
+        "file-project-root",
+        "File Project Root",
+        "File project root test",
+        None,
+    )
+    .unwrap();
+
+    let err = apply_deployment_add(
+        &paths,
+        &created.skill_id,
+        DeploymentTargetType::ClaudeProject,
+        Some(file_root.to_string_lossy().to_string()),
+        Vec::new(),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "VALIDATION_ERROR");
+}
+
+#[test]
+fn project_deployment_preview_lists_nested_skill_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+    let project_root = tmp.path().join("project-preview");
+    fs::create_dir_all(&project_root).unwrap();
+
+    ensure_skill_store_layout(&paths).unwrap();
+    let created = apply_create_repo_skill(
+        &paths,
+        "preview-nested-files",
+        "Preview Nested Files",
+        "Preview nested files test",
+        None,
+    )
+    .unwrap();
+    let repo_asset = PathBuf::from(
+        &get_repo_skill(&paths, &created.skill_id)
+            .unwrap()
+            .manifest
+            .files_root,
+    )
+    .join("scripts")
+    .join("run.sh");
+    write(&repo_asset, "echo preview");
+
+    let preview = preview_deployment_add(
+        &paths,
+        &created.skill_id,
+        DeploymentTargetType::CodexProject,
+        Some(project_root.to_string_lossy().to_string()),
+    )
+    .unwrap();
+
     assert!(preview
         .files
         .iter()

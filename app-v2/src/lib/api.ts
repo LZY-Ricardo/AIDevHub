@@ -48,6 +48,18 @@ export const api = {
     return invokeCmd("runtime_get_info");
   },
 
+  pickDirectory(payload?: { initial?: string }): Promise<string | null> {
+    return invokeCmd("pick_directory", {
+      initial: payload?.initial,
+    });
+  },
+
+  validateProjectRoot(payload: { project_root: string }): Promise<string> {
+    return invokeCmd("validate_project_root", {
+      projectRoot: payload.project_root,
+    });
+  },
+
   serverList(payload?: { client?: Client }): Promise<ServerRecord[]> {
     return invokeCmd("server_list", payload ?? {});
   },
