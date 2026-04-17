@@ -11,11 +11,11 @@ use similar::TextDiff;
 use toml_edit::DocumentMut;
 
 use crate::{
-    model::{
-        AppError, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse, ConfigIgnoreCondition,
-        ConfigIgnoreUpdatesResponse, ConfigSourceKind, ConfigUpdateItem,
-    },
     mcp_registry,
+    model::{
+        AppError, Client, ConfigAcceptMcpResponse, ConfigCheckUpdatesResponse,
+        ConfigIgnoreCondition, ConfigIgnoreUpdatesResponse, ConfigSourceKind, ConfigUpdateItem,
+    },
     ops::AppPaths,
 };
 
@@ -132,13 +132,11 @@ pub fn config_ignore_updates(
     }
 
     if !stale_sources.is_empty() {
-        return Err(
-            AppError::new(
-                "PRECONDITION_FAILED",
-                "Some config sources changed before ignore was applied. Please refresh updates.",
-            )
-            .with_details(serde_json::json!({ "stale_source_ids": stale_sources })),
-        );
+        return Err(AppError::new(
+            "PRECONDITION_FAILED",
+            "Some config sources changed before ignore was applied. Please refresh updates.",
+        )
+        .with_details(serde_json::json!({ "stale_source_ids": stale_sources })));
     }
 
     if touched {
@@ -158,7 +156,12 @@ pub fn config_accept_mcp_updates(
     let current_state = current_states
         .into_iter()
         .find(|state| state.source_id == source_id)
-        .ok_or_else(|| AppError::new("VALIDATION_ERROR", format!("unknown source_id: {source_id}")))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "VALIDATION_ERROR",
+                format!("unknown source_id: {source_id}"),
+            )
+        })?;
 
     if current_state.kind != ConfigSourceKind::Mcp {
         return Err(AppError::new(
@@ -173,13 +176,11 @@ pub fn config_accept_mcp_updates(
         ));
     }
     if current_state.content_sha256 != current_sha256 {
-        return Err(
-            AppError::new(
-                "PRECONDITION_FAILED",
-                "Config source changed before accept was applied. Please refresh updates.",
-            )
-            .with_details(serde_json::json!({ "stale_source_ids": [source_id.clone()] })),
-        );
+        return Err(AppError::new(
+            "PRECONDITION_FAILED",
+            "Config source changed before accept was applied. Please refresh updates.",
+        )
+        .with_details(serde_json::json!({ "stale_source_ids": [source_id.clone()] })));
     }
 
     let registry_before = read_to_string_opt(&paths.mcp_registry_path)?;
@@ -187,7 +188,8 @@ pub fn config_accept_mcp_updates(
 
     let snapshot_result: Result<(), AppError> = (|| {
         let snapshot_path = snapshot_path(paths);
-        let (mut store, _was_corrupted, _used_legacy_path) = load_snapshot_store_with_fallback(paths)?;
+        let (mut store, _was_corrupted, _used_legacy_path) =
+            load_snapshot_store_with_fallback(paths)?;
         store.sources.insert(
             source_id.clone(),
             ConfigSnapshotEntry {
@@ -200,16 +202,14 @@ pub fn config_accept_mcp_updates(
 
     if let Err(snapshot_err) = snapshot_result {
         if let Err(rollback_err) = restore_registry_to_previous(paths, registry_before) {
-            return Err(
-                AppError::new(
-                    "INTERNAL_ERROR",
-                    "Failed to update snapshot and rollback MCP registry",
-                )
-                .with_details(serde_json::json!({
-                    "snapshot_error": { "code": snapshot_err.code, "message": snapshot_err.message },
-                    "rollback_error": { "code": rollback_err.code, "message": rollback_err.message }
-                })),
-            );
+            return Err(AppError::new(
+                "INTERNAL_ERROR",
+                "Failed to update snapshot and rollback MCP registry",
+            )
+            .with_details(serde_json::json!({
+                "snapshot_error": { "code": snapshot_err.code, "message": snapshot_err.message },
+                "rollback_error": { "code": rollback_err.code, "message": rollback_err.message }
+            })));
         }
         return Err(snapshot_err);
     }
@@ -231,8 +231,12 @@ fn legacy_snapshot_path(paths: &AppPaths) -> PathBuf {
 fn collect_current_source_states(paths: &AppPaths) -> Result<Vec<ConfigSourceState>, AppError> {
     let claude_mcp = read_to_string_opt(&paths.claude_config_path)?.unwrap_or_default();
     let codex_mcp = read_to_string_opt(&paths.codex_config_path)?.unwrap_or_default();
-    let claude_skill = build_skill_snapshot_text(&paths.claude_commands_dir, &paths.claude_commands_disabled_dir)?;
-    let codex_skill = build_skill_snapshot_text(&paths.codex_skills_dir, &paths.codex_skills_disabled_dir)?;
+    let claude_skill = build_skill_snapshot_text(
+        &paths.claude_commands_dir,
+        &paths.claude_commands_disabled_dir,
+    )?;
+    let codex_skill =
+        build_skill_snapshot_text(&paths.codex_skills_dir, &paths.codex_skills_disabled_dir)?;
 
     Ok(vec![
         ConfigSourceState {
@@ -296,7 +300,9 @@ fn load_snapshot_store(path: &Path) -> Result<(ConfigSnapshotStore, bool), AppEr
     }
 }
 
-fn load_snapshot_store_with_fallback(paths: &AppPaths) -> Result<(ConfigSnapshotStore, bool, bool), AppError> {
+fn load_snapshot_store_with_fallback(
+    paths: &AppPaths,
+) -> Result<(ConfigSnapshotStore, bool, bool), AppError> {
     let primary = snapshot_path(paths);
     if primary.exists() {
         let (store, was_corrupted) = load_snapshot_store(&primary)?;
@@ -323,7 +329,10 @@ fn save_snapshot_store(path: &Path, store: &ConfigSnapshotStore) -> Result<(), A
     write_atomic(path, &text)
 }
 
-fn restore_registry_to_previous(paths: &AppPaths, previous: Option<String>) -> Result<(), AppError> {
+fn restore_registry_to_previous(
+    paths: &AppPaths,
+    previous: Option<String>,
+) -> Result<(), AppError> {
     match previous {
         Some(content) => write_atomic(&paths.mcp_registry_path, &content),
         None => match fs::remove_file(&paths.mcp_registry_path) {
@@ -345,23 +354,39 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), AppError> {
         )
     })?;
 
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|e| AppError::new("IO_ERROR", format!("create temp file in {}: {e}", parent.display())))?;
-    tmp.write_all(content.as_bytes())
-        .map_err(|e| AppError::new("IO_ERROR", format!("write temp file in {}: {e}", parent.display())))?;
-    tmp.flush()
-        .map_err(|e| AppError::new("IO_ERROR", format!("flush temp file in {}: {e}", parent.display())))?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent).map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("create temp file in {}: {e}", parent.display()),
+        )
+    })?;
+    tmp.write_all(content.as_bytes()).map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("write temp file in {}: {e}", parent.display()),
+        )
+    })?;
+    tmp.flush().map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("flush temp file in {}: {e}", parent.display()),
+        )
+    })?;
 
-    let (_file, tmp_path) = tmp
-        .keep()
-        .map_err(|e| AppError::new("IO_ERROR", format!("keep temp file in {}: {e}", parent.display())))?;
+    let (_file, tmp_path) = tmp.keep().map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("keep temp file in {}: {e}", parent.display()),
+        )
+    })?;
     drop(_file);
 
     #[cfg(windows)]
     {
         if path.exists() {
-            fs::remove_file(path)
-                .map_err(|e| AppError::new("IO_ERROR", format!("remove {}: {e}", path.display())))?;
+            fs::remove_file(path).map_err(|e| {
+                AppError::new("IO_ERROR", format!("remove {}: {e}", path.display()))
+            })?;
         }
     }
 
@@ -379,7 +404,10 @@ fn read_to_string_opt(path: &Path) -> Result<Option<String>, AppError> {
     match fs::read_to_string(path) {
         Ok(content) => Ok(Some(content)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(AppError::new("IO_ERROR", format!("read {}: {e}", path.display()))),
+        Err(e) => Err(AppError::new(
+            "IO_ERROR",
+            format!("read {}: {e}", path.display()),
+        )),
     }
 }
 
@@ -428,8 +456,9 @@ fn collect_skill_files(base_dir: &Path) -> Result<Vec<(String, String)>, AppErro
         let entries = fs::read_dir(&dir)
             .map_err(|e| AppError::new("IO_ERROR", format!("read_dir {}: {e}", dir.display())))?;
         for entry in entries {
-            let entry =
-                entry.map_err(|e| AppError::new("IO_ERROR", format!("read_dir entry {}: {e}", dir.display())))?;
+            let entry = entry.map_err(|e| {
+                AppError::new("IO_ERROR", format!("read_dir entry {}: {e}", dir.display()))
+            })?;
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
@@ -446,13 +475,17 @@ fn collect_skill_files(base_dir: &Path) -> Result<Vec<(String, String)>, AppErro
             .map_err(|e| {
                 AppError::new(
                     "INTERNAL_ERROR",
-                    format!("strip_prefix {} from {}: {e}", base_dir.display(), file.display()),
+                    format!(
+                        "strip_prefix {} from {}: {e}",
+                        base_dir.display(),
+                        file.display()
+                    ),
                 )
             })?
             .to_string_lossy()
             .replace('\\', "/");
-        let bytes =
-            fs::read(&file).map_err(|e| AppError::new("IO_ERROR", format!("read {}: {e}", file.display())))?;
+        let bytes = fs::read(&file)
+            .map_err(|e| AppError::new("IO_ERROR", format!("read {}: {e}", file.display())))?;
         let content = match String::from_utf8(bytes) {
             Ok(text) => text,
             Err(err) => {

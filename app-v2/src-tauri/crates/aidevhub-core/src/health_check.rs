@@ -15,10 +15,7 @@ const STEP_TIMEOUT_SECS: u64 = 5;
 const TOTAL_TIMEOUT_SECS: u64 = 15;
 const MAX_CONCURRENT: usize = 5;
 
-pub fn check_single(
-    paths: &AppPaths,
-    server_id: &str,
-) -> Result<HealthCheckResult, AppError> {
+pub fn check_single(paths: &AppPaths, server_id: &str) -> Result<HealthCheckResult, AppError> {
     let server = mcp_registry::get_registry_server(paths, server_id)?
         .ok_or_else(|| AppError::new("NOT_FOUND", format!("server not found: {server_id}")))?;
 
@@ -27,10 +24,7 @@ pub fn check_single(
     Ok(rt.block_on(check_server(&server)))
 }
 
-pub fn check_all(
-    paths: &AppPaths,
-    client: Client,
-) -> Result<Vec<HealthCheckResult>, AppError> {
+pub fn check_all(paths: &AppPaths, client: Client) -> Result<Vec<HealthCheckResult>, AppError> {
     let servers = mcp_registry::list_registry_servers(paths, Some(client))?;
     let enabled: Vec<_> = servers.into_iter().filter(|s| s.enabled).collect();
 
@@ -155,10 +149,13 @@ async fn check_stdio(payload: &Map<String, Value>) -> Result<(), String> {
         });
         send_json_rpc(stdin, &init_req).await?;
 
-        let init_resp = timeout(Duration::from_secs(STEP_TIMEOUT_SECS), read_response(&mut reader))
-            .await
-            .map_err(|_| "initialize timeout (5s)".to_string())?
-            .map_err(|e| format!("initialize read error: {e}"))?;
+        let init_resp = timeout(
+            Duration::from_secs(STEP_TIMEOUT_SECS),
+            read_response(&mut reader),
+        )
+        .await
+        .map_err(|_| "initialize timeout (5s)".to_string())?
+        .map_err(|e| format!("initialize read error: {e}"))?;
 
         if init_resp.get("error").is_some() {
             let msg = init_resp["error"]["message"].as_str().unwrap_or("unknown");
@@ -180,10 +177,13 @@ async fn check_stdio(payload: &Map<String, Value>) -> Result<(), String> {
         });
         send_json_rpc(stdin, &ping_req).await?;
 
-        let ping_resp = timeout(Duration::from_secs(STEP_TIMEOUT_SECS), read_response(&mut reader))
-            .await
-            .map_err(|_| "ping timeout (5s)".to_string())?
-            .map_err(|e| format!("ping read error: {e}"))?;
+        let ping_resp = timeout(
+            Duration::from_secs(STEP_TIMEOUT_SECS),
+            read_response(&mut reader),
+        )
+        .await
+        .map_err(|_| "ping timeout (5s)".to_string())?
+        .map_err(|e| format!("ping read error: {e}"))?;
 
         if ping_resp.get("error").is_some() {
             let msg = ping_resp["error"]["message"].as_str().unwrap_or("unknown");
@@ -225,7 +225,8 @@ async fn check_http(payload: &Map<String, Value>) -> Result<(), String> {
             }
         });
 
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .json(&init_req)
             .send()
             .await
@@ -235,7 +236,9 @@ async fn check_http(payload: &Map<String, Value>) -> Result<(), String> {
             return Err(format!("initialize HTTP {}", resp.status()));
         }
 
-        let init_resp: Value = resp.json().await
+        let init_resp: Value = resp
+            .json()
+            .await
             .map_err(|e| format!("initialize response parse error: {e}"))?;
 
         if init_resp.get("error").is_some() {
@@ -250,7 +253,8 @@ async fn check_http(payload: &Map<String, Value>) -> Result<(), String> {
             "method": "ping"
         });
 
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .json(&ping_req)
             .send()
             .await
@@ -260,7 +264,9 @@ async fn check_http(payload: &Map<String, Value>) -> Result<(), String> {
             return Err(format!("ping HTTP {}", resp.status()));
         }
 
-        let ping_resp: Value = resp.json().await
+        let ping_resp: Value = resp
+            .json()
+            .await
             .map_err(|e| format!("ping response parse error: {e}"))?;
 
         if ping_resp.get("error").is_some() {
@@ -274,10 +280,7 @@ async fn check_http(payload: &Map<String, Value>) -> Result<(), String> {
     .map_err(|_| "total timeout (15s)".to_string())?
 }
 
-async fn send_json_rpc(
-    stdin: &mut tokio::process::ChildStdin,
-    msg: &Value,
-) -> Result<(), String> {
+async fn send_json_rpc(stdin: &mut tokio::process::ChildStdin, msg: &Value) -> Result<(), String> {
     let mut line = serde_json::to_string(msg).map_err(|e| format!("serialize error: {e}"))?;
     line.push('\n');
     stdin

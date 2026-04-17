@@ -23,7 +23,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -108,12 +111,19 @@ enabled = false
     )
     .unwrap();
     assert!(accepted.accepted);
-    assert_eq!(fs::read_to_string(&paths.codex_config_path).unwrap(), before_external);
+    assert_eq!(
+        fs::read_to_string(&paths.codex_config_path).unwrap(),
+        before_external
+    );
 
     let registry = read_registry(&paths.mcp_registry_path);
     let servers = registry.get("servers").and_then(Value::as_array).unwrap();
-    assert!(servers.iter().any(|s| s.get("server_id").and_then(Value::as_str) == Some("codex:alpha")));
-    assert!(servers.iter().any(|s| s.get("server_id").and_then(Value::as_str) == Some("codex:bravo")));
+    assert!(servers
+        .iter()
+        .any(|s| s.get("server_id").and_then(Value::as_str) == Some("codex:alpha")));
+    assert!(servers
+        .iter()
+        .any(|s| s.get("server_id").and_then(Value::as_str) == Some("codex:bravo")));
 }
 
 #[test]
@@ -160,7 +170,10 @@ fn accepting_claude_source_writes_claude_slice_into_registry() {
         .iter()
         .find(|s| s.get("server_id").and_then(Value::as_str) == Some("claude_code:demo"))
         .unwrap();
-    assert_eq!(demo.get("client").and_then(Value::as_str), Some("claude_code"));
+    assert_eq!(
+        demo.get("client").and_then(Value::as_str),
+        Some("claude_code")
+    );
 }
 
 #[test]
@@ -200,7 +213,10 @@ args = ["demo.js", "--new"]
     )
     .unwrap();
 
-    assert_eq!(fs::read_to_string(&paths.codex_config_path).unwrap(), before_external);
+    assert_eq!(
+        fs::read_to_string(&paths.codex_config_path).unwrap(),
+        before_external
+    );
     let after_accept = config_check_updates(&paths).unwrap();
     assert!(!after_accept
         .updates

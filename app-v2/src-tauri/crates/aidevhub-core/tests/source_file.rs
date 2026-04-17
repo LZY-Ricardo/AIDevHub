@@ -19,7 +19,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),

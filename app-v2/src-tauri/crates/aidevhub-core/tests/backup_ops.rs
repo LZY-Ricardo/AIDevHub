@@ -2,11 +2,14 @@ use aidevhub_core::{
     model::{BackupOp, Client, FilePrecondition, ProfileTargets, Transport},
     ops::{
         profile_apply, profile_create, profile_preview_apply, server_apply_add, server_apply_edit,
-        server_apply_toggle, server_preview_add, server_preview_edit, server_preview_toggle, AppPaths,
+        server_apply_toggle, server_preview_add, server_preview_edit, server_preview_toggle,
+        AppPaths,
     },
 };
 
-fn preconditions_from_preview(preview: &aidevhub_core::model::WritePreview) -> Vec<FilePrecondition> {
+fn preconditions_from_preview(
+    preview: &aidevhub_core::model::WritePreview,
+) -> Vec<FilePrecondition> {
     preview
         .files
         .iter()
@@ -33,7 +36,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         disabled_pool_path: app_local_data_dir.join("disabled_pool.json"),
         backups_dir: app_local_data_dir.join("backups"),
@@ -158,7 +164,7 @@ fn toggle_and_profile_apply_keep_external_backup_op_kinds() {
                 "payload": { "command": "node", "args": ["other.js"] },
                 "source_origin": "claudecode.mcp.json",
                 "updated_at": "2026-03-23T00:00:00Z"
-            })
+            }),
         ],
     );
     write(
@@ -167,8 +173,13 @@ fn toggle_and_profile_apply_keep_external_backup_op_kinds() {
     );
 
     let toggle_preview = server_preview_toggle(&paths, "claude_code:demo", false).unwrap();
-    let toggle_result =
-        server_apply_toggle(&paths, "claude_code:demo", false, preconditions_from_preview(&toggle_preview)).unwrap();
+    let toggle_result = server_apply_toggle(
+        &paths,
+        "claude_code:demo",
+        false,
+        preconditions_from_preview(&toggle_preview),
+    )
+    .unwrap();
     assert_eq!(toggle_result.backups.len(), 1);
     assert!(matches!(toggle_result.backups[0].op, BackupOp::Toggle));
 
@@ -181,7 +192,8 @@ fn toggle_and_profile_apply_keep_external_backup_op_kinds() {
         },
     )
     .unwrap();
-    let profile_preview = profile_preview_apply(&paths, &profile.profile_id, Client::ClaudeCode).unwrap();
+    let profile_preview =
+        profile_preview_apply(&paths, &profile.profile_id, Client::ClaudeCode).unwrap();
     let profile_result = profile_apply(
         &paths,
         &profile.profile_id,
@@ -190,5 +202,8 @@ fn toggle_and_profile_apply_keep_external_backup_op_kinds() {
     )
     .unwrap();
     assert_eq!(profile_result.backups.len(), 1);
-    assert!(matches!(profile_result.backups[0].op, BackupOp::ApplyProfile));
+    assert!(matches!(
+        profile_result.backups[0].op,
+        BackupOp::ApplyProfile
+    ));
 }

@@ -3,15 +3,17 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 use aidevhub_core::{
     model::{Client, FilePrecondition, ProfileTargets, ServerNotes, Transport},
     ops::{
-        backup_apply_rollback, backup_list, backup_preview_rollback, profile_apply,
-        profile_create, profile_delete, profile_list, profile_preview_apply, profile_update,
-        mcp_notes_get, mcp_notes_put, runtime_get_info, server_apply_add, server_apply_toggle,
-        server_apply_edit, server_get, server_get_edit_session, server_list,
-        server_preview_add, server_preview_edit, server_preview_toggle, AppPaths,
+        backup_apply_rollback, backup_list, backup_preview_rollback, mcp_notes_get, mcp_notes_put,
+        profile_apply, profile_create, profile_delete, profile_list, profile_preview_apply,
+        profile_update, runtime_get_info, server_apply_add, server_apply_edit, server_apply_toggle,
+        server_get, server_get_edit_session, server_list, server_preview_add, server_preview_edit,
+        server_preview_toggle, AppPaths,
     },
 };
 
-fn preconditions_from_preview(preview: &aidevhub_core::model::WritePreview) -> Vec<FilePrecondition> {
+fn preconditions_from_preview(
+    preview: &aidevhub_core::model::WritePreview,
+) -> Vec<FilePrecondition> {
     preview
         .files
         .iter()
@@ -38,7 +40,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -210,27 +215,54 @@ fn claude_toggle_exports_enabled_state_from_registry() {
     );
 
     let p1 = server_preview_toggle(&paths, "claude_code:s1", false).unwrap();
-    assert!(p1.summary.will_disable.contains(&"claude_code:s1".to_string()));
-    let r1 = server_apply_toggle(&paths, "claude_code:s1", false, preconditions_from_preview(&p1)).unwrap();
-    assert!(r1.summary.will_disable.contains(&"claude_code:s1".to_string()));
+    assert!(p1
+        .summary
+        .will_disable
+        .contains(&"claude_code:s1".to_string()));
+    let r1 = server_apply_toggle(
+        &paths,
+        "claude_code:s1",
+        false,
+        preconditions_from_preview(&p1),
+    )
+    .unwrap();
+    assert!(r1
+        .summary
+        .will_disable
+        .contains(&"claude_code:s1".to_string()));
     let cfg_after_disable = fs::read_to_string(&paths.claude_config_path).unwrap();
     assert!(cfg_after_disable.contains("\"other\": 123"));
     assert!(!cfg_after_disable.contains("\"s1\""));
 
     let list1 = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
-    let s1 = list1.iter().find(|s| s.server_id == "claude_code:s1").unwrap();
+    let s1 = list1
+        .iter()
+        .find(|s| s.server_id == "claude_code:s1")
+        .unwrap();
     assert!(!s1.enabled);
 
     let p2 = server_preview_toggle(&paths, "claude_code:s1", true).unwrap();
-    assert!(p2.summary.will_enable.contains(&"claude_code:s1".to_string()));
-    let _r2 = server_apply_toggle(&paths, "claude_code:s1", true, preconditions_from_preview(&p2)).unwrap();
+    assert!(p2
+        .summary
+        .will_enable
+        .contains(&"claude_code:s1".to_string()));
+    let _r2 = server_apply_toggle(
+        &paths,
+        "claude_code:s1",
+        true,
+        preconditions_from_preview(&p2),
+    )
+    .unwrap();
     let cfg_after_enable = fs::read_to_string(&paths.claude_config_path).unwrap();
     assert!(cfg_after_enable.contains("\"other\": 123"));
     assert!(cfg_after_enable.contains("\"s1\""));
     assert!(cfg_after_enable.contains("\"a.js\""));
 
     let list2 = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
-    let s1b = list2.iter().find(|s| s.server_id == "claude_code:s1").unwrap();
+    let s1b = list2
+        .iter()
+        .find(|s| s.server_id == "claude_code:s1")
+        .unwrap();
     assert!(s1b.enabled);
 }
 
@@ -265,14 +297,23 @@ name = "demo"
 
     let p1 = server_preview_toggle(&paths, "codex:alpha", false).unwrap();
     assert!(p1.summary.will_disable.contains(&"codex:alpha".to_string()));
-    server_apply_toggle(&paths, "codex:alpha", false, preconditions_from_preview(&p1)).unwrap();
+    server_apply_toggle(
+        &paths,
+        "codex:alpha",
+        false,
+        preconditions_from_preview(&p1),
+    )
+    .unwrap();
 
     let s = fs::read_to_string(&paths.codex_config_path).unwrap();
     assert!(!s.contains("[mcp_servers.alpha]"));
     assert!(s.contains("[workspace]"));
 
     let list1 = server_list(&paths, Some(Client::Codex)).unwrap();
-    let alpha = list1.iter().find(|server| server.server_id == "codex:alpha").unwrap();
+    let alpha = list1
+        .iter()
+        .find(|server| server.server_id == "codex:alpha")
+        .unwrap();
     assert!(!alpha.enabled);
 
     let p2 = server_preview_toggle(&paths, "codex:alpha", true).unwrap();
@@ -322,7 +363,13 @@ enabled = true
 "#,
     );
 
-    let err = server_apply_toggle(&paths, "codex:alpha", false, preconditions_from_preview(&p1)).unwrap_err();
+    let err = server_apply_toggle(
+        &paths,
+        "codex:alpha",
+        false,
+        preconditions_from_preview(&p1),
+    )
+    .unwrap_err();
     assert_eq!(err.code, "PRECONDITION_FAILED");
 }
 
@@ -369,7 +416,11 @@ fn profile_apply_converges_claude_enabled_set_from_registry() {
         &paths,
         "p1",
         ProfileTargets {
-            claude_code: vec!["claude_code:b".to_string(), "claude_code:c".to_string(), "claude_code:missing".to_string()],
+            claude_code: vec![
+                "claude_code:b".to_string(),
+                "claude_code:c".to_string(),
+                "claude_code:missing".to_string(),
+            ],
             codex: vec![],
         },
     )
@@ -377,12 +428,27 @@ fn profile_apply_converges_claude_enabled_set_from_registry() {
 
     let prev = profile_preview_apply(&paths, &prof.profile_id, Client::ClaudeCode).unwrap();
     assert!(prev.warnings.iter().any(|w| w.code == "MISSING_SERVER"));
-    profile_apply(&paths, &prof.profile_id, Client::ClaudeCode, preconditions_from_preview(&prev)).unwrap();
+    profile_apply(
+        &paths,
+        &prof.profile_id,
+        Client::ClaudeCode,
+        preconditions_from_preview(&prev),
+    )
+    .unwrap();
 
     let list = server_list(&paths, Some(Client::ClaudeCode)).unwrap();
-    let a = list.iter().find(|s| s.server_id == "claude_code:a").unwrap();
-    let b = list.iter().find(|s| s.server_id == "claude_code:b").unwrap();
-    let c = list.iter().find(|s| s.server_id == "claude_code:c").unwrap();
+    let a = list
+        .iter()
+        .find(|s| s.server_id == "claude_code:a")
+        .unwrap();
+    let b = list
+        .iter()
+        .find(|s| s.server_id == "claude_code:b")
+        .unwrap();
+    let c = list
+        .iter()
+        .find(|s| s.server_id == "claude_code:c")
+        .unwrap();
     assert!(!a.enabled);
     assert!(b.enabled);
     assert!(c.enabled);
@@ -415,14 +481,26 @@ fn apply_creates_backup_and_backup_list_filters() {
     );
 
     let prev = server_preview_toggle(&paths, "claude_code:s1", false).unwrap();
-    let _ = server_apply_toggle(&paths, "claude_code:s1", false, preconditions_from_preview(&prev)).unwrap();
+    let _ = server_apply_toggle(
+        &paths,
+        "claude_code:s1",
+        false,
+        preconditions_from_preview(&prev),
+    )
+    .unwrap();
 
     let all = backup_list(&paths, None).unwrap();
     assert!(!all.is_empty());
 
-    let only_claude = backup_list(&paths, Some(paths.claude_config_path.to_string_lossy().to_string())).unwrap();
+    let only_claude = backup_list(
+        &paths,
+        Some(paths.claude_config_path.to_string_lossy().to_string()),
+    )
+    .unwrap();
     assert!(!only_claude.is_empty());
-    assert!(only_claude.iter().all(|r| r.target_path.ends_with("claude.json")));
+    assert!(only_claude
+        .iter()
+        .all(|r| r.target_path.ends_with("claude.json")));
 }
 
 #[test]
@@ -446,8 +524,18 @@ fn rollback_preview_and_apply_restores_file() {
         r#"{"mcpServers":{"s1":{"command":"node"}}}"#,
     );
     let prev = server_preview_toggle(&paths, "claude_code:s1", false).unwrap();
-    let _ = server_apply_toggle(&paths, "claude_code:s1", false, preconditions_from_preview(&prev)).unwrap();
-    let backups = backup_list(&paths, Some(paths.claude_config_path.to_string_lossy().to_string())).unwrap();
+    let _ = server_apply_toggle(
+        &paths,
+        "claude_code:s1",
+        false,
+        preconditions_from_preview(&prev),
+    )
+    .unwrap();
+    let backups = backup_list(
+        &paths,
+        Some(paths.claude_config_path.to_string_lossy().to_string()),
+    )
+    .unwrap();
     let b0 = backups.first().unwrap().backup_id.clone();
 
     let prev_rb = backup_preview_rollback(&paths, &b0).unwrap();
@@ -617,7 +705,10 @@ fn server_get_reads_mcp_from_registry_even_without_external_config_files() {
 
     let got = server_get(&paths, "codex:alpha", false).unwrap();
     assert_eq!(got.server_id, "codex:alpha");
-    assert_eq!(got.source_file, paths.mcp_registry_path.to_string_lossy().to_string());
+    assert_eq!(
+        got.source_file,
+        paths.mcp_registry_path.to_string_lossy().to_string()
+    );
 }
 
 #[test]
@@ -668,8 +759,16 @@ fn claude_edit_preview_and_apply_updates_only_target_server() {
     payload.insert("args".into(), serde_json::json!(["b"]));
     payload.insert("x_extra".into(), serde_json::json!("keep"));
 
-    let preview = server_preview_edit(&paths, "claude_code:demo", Transport::Stdio, payload.clone()).unwrap();
-    assert!(preview.files[0].diff_unified.contains("\"command\": \"new\""));
+    let preview = server_preview_edit(
+        &paths,
+        "claude_code:demo",
+        Transport::Stdio,
+        payload.clone(),
+    )
+    .unwrap();
+    assert!(preview.files[0]
+        .diff_unified
+        .contains("\"command\": \"new\""));
 
     server_apply_edit(
         &paths,
@@ -737,7 +836,8 @@ enabled = false
     payload.insert("command".into(), serde_json::json!("new"));
     payload.insert("args".into(), serde_json::json!(["b"]));
 
-    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    let preview =
+        server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
     server_apply_edit(
         &paths,
         "codex:alpha",
@@ -780,7 +880,8 @@ fn editing_disabled_codex_server_updates_registry_without_touching_external_file
     payload.insert("command".into(), serde_json::json!("new"));
     payload.insert("args".into(), serde_json::json!(["b"]));
 
-    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    let preview =
+        server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
     server_apply_edit(
         &paths,
         "codex:alpha",
@@ -830,7 +931,8 @@ enabled = true
     payload.insert("command".into(), serde_json::json!("new"));
     payload.insert("nested".into(), serde_json::json!({"bad": true}));
 
-    let preview = server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
+    let preview =
+        server_preview_edit(&paths, "codex:alpha", Transport::Stdio, payload.clone()).unwrap();
     server_apply_edit(
         &paths,
         "codex:alpha",

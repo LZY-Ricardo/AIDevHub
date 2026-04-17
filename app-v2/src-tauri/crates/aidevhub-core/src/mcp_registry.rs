@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::Write,
-    path::Path,
-};
+use std::{fs, io::Write, path::Path};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -44,7 +40,8 @@ pub fn import_external_source(
     let imported = parse_external_source(source_id, client, content)?;
     let mut store = load_registry_store(&paths.mcp_registry_path)?;
 
-    let imported_ids: std::collections::HashSet<_> = imported.iter().map(|s| s.server_id.clone()).collect();
+    let imported_ids: std::collections::HashSet<_> =
+        imported.iter().map(|s| s.server_id.clone()).collect();
     // Mark registry entries that belong to this client but are absent from
     // the external source as disabled (instead of deleting them).
     for entry in store.servers.iter_mut() {
@@ -55,17 +52,24 @@ pub fn import_external_source(
     // Remove entries that are present in the external source so they can be
     // replaced with fresh data. Entries absent from the external source are
     // kept (with enabled=false from above).
-    store.servers.retain(|entry| entry.client != client || !imported_ids.contains(&entry.server_id));
-    store.servers.extend(imported.clone());
     store
         .servers
-        .sort_by(|a, b| a.server_id.cmp(&b.server_id).then_with(|| a.updated_at.cmp(&b.updated_at)));
+        .retain(|entry| entry.client != client || !imported_ids.contains(&entry.server_id));
+    store.servers.extend(imported.clone());
+    store.servers.sort_by(|a, b| {
+        a.server_id
+            .cmp(&b.server_id)
+            .then_with(|| a.updated_at.cmp(&b.updated_at))
+    });
     save_registry_store(&paths.mcp_registry_path, &store)?;
 
     Ok(imported.into_iter().map(|item| item.server_id).collect())
 }
 
-pub fn list_registry_servers(paths: &AppPaths, client: Option<Client>) -> Result<Vec<McpRegistryServer>, AppError> {
+pub fn list_registry_servers(
+    paths: &AppPaths,
+    client: Option<Client>,
+) -> Result<Vec<McpRegistryServer>, AppError> {
     let mut servers = load_registry_store(&paths.mcp_registry_path)?.servers;
     if let Some(client) = client {
         servers.retain(|server| server.client == client);
@@ -74,7 +78,10 @@ pub fn list_registry_servers(paths: &AppPaths, client: Option<Client>) -> Result
     Ok(servers)
 }
 
-pub fn get_registry_server(paths: &AppPaths, server_id: &str) -> Result<Option<McpRegistryServer>, AppError> {
+pub fn get_registry_server(
+    paths: &AppPaths,
+    server_id: &str,
+) -> Result<Option<McpRegistryServer>, AppError> {
     let server = load_registry_store(&paths.mcp_registry_path)?
         .servers
         .into_iter()
@@ -82,14 +89,20 @@ pub fn get_registry_server(paths: &AppPaths, server_id: &str) -> Result<Option<M
     Ok(server)
 }
 
-fn parse_external_source(source_id: &str, client: Client, content: &str) -> Result<Vec<McpRegistryServer>, AppError> {
+fn parse_external_source(
+    source_id: &str,
+    client: Client,
+    content: &str,
+) -> Result<Vec<McpRegistryServer>, AppError> {
     match (source_id, client) {
         (CLAUDE_MCP_SOURCE_ID, Client::ClaudeCode) => parse_claude_source(content, source_id),
         (CODEX_MCP_SOURCE_ID, Client::Codex) => parse_codex_source(content, source_id),
-        (CLAUDE_MCP_SOURCE_ID, Client::Codex) | (CODEX_MCP_SOURCE_ID, Client::ClaudeCode) => Err(AppError::new(
-            "VALIDATION_ERROR",
-            format!("source_id/client mismatch: {source_id}"),
-        )),
+        (CLAUDE_MCP_SOURCE_ID, Client::Codex) | (CODEX_MCP_SOURCE_ID, Client::ClaudeCode) => {
+            Err(AppError::new(
+                "VALIDATION_ERROR",
+                format!("source_id/client mismatch: {source_id}"),
+            ))
+        }
         _ => Err(AppError::new(
             "VALIDATION_ERROR",
             format!("source is not MCP-compatible: {source_id}"),
@@ -111,18 +124,26 @@ fn parse_claude_source(content: &str, source_id: &str) -> Result<Vec<McpRegistry
     let Some(servers_item) = servers_item else {
         return Ok(Vec::new());
     };
-    let servers_obj = servers_item
-        .as_object()
-        .ok_or_else(|| AppError::new("PARSE_ERROR", "claude mcp json mcpServers must be an object"))?;
+    let servers_obj = servers_item.as_object().ok_or_else(|| {
+        AppError::new(
+            "PARSE_ERROR",
+            "claude mcp json mcpServers must be an object",
+        )
+    })?;
 
     let updated_at = now_iso();
     let mut out = Vec::new();
     for (name, cfg) in servers_obj {
-        let payload = cfg
-            .as_object()
-            .cloned()
-            .ok_or_else(|| AppError::new("PARSE_ERROR", format!("claude server config must be object: {name}")))?;
-        let enabled = payload.get("enabled").and_then(Value::as_bool).unwrap_or(true);
+        let payload = cfg.as_object().cloned().ok_or_else(|| {
+            AppError::new(
+                "PARSE_ERROR",
+                format!("claude server config must be object: {name}"),
+            )
+        })?;
+        let enabled = payload
+            .get("enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
         out.push(McpRegistryServer {
             server_id: format!("claude_code:{name}"),
             client: Client::ClaudeCode,
@@ -158,9 +179,12 @@ fn parse_codex_source(content: &str, source_id: &str) -> Result<Vec<McpRegistryS
     let updated_at = now_iso();
     let mut out = Vec::new();
     for (name, item) in servers_table.iter() {
-        let server_table = item
-            .as_table()
-            .ok_or_else(|| AppError::new("PARSE_ERROR", format!("codex server config must be table: {name}")))?;
+        let server_table = item.as_table().ok_or_else(|| {
+            AppError::new(
+                "PARSE_ERROR",
+                format!("codex server config must be table: {name}"),
+            )
+        })?;
         let payload = toml_table_to_json_map(server_table);
         let enabled = server_table
             .get("enabled")
@@ -204,7 +228,10 @@ fn read_to_string_opt(path: &Path) -> Result<Option<String>, AppError> {
     match fs::read_to_string(path) {
         Ok(content) => Ok(Some(content)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(AppError::new("IO_ERROR", format!("read {}: {e}", path.display()))),
+        Err(e) => Err(AppError::new(
+            "IO_ERROR",
+            format!("read {}: {e}", path.display()),
+        )),
     }
 }
 
@@ -216,23 +243,39 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), AppError> {
         )
     })?;
 
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|e| AppError::new("IO_ERROR", format!("create temp file in {}: {e}", parent.display())))?;
-    tmp.write_all(content.as_bytes())
-        .map_err(|e| AppError::new("IO_ERROR", format!("write temp file in {}: {e}", parent.display())))?;
-    tmp.flush()
-        .map_err(|e| AppError::new("IO_ERROR", format!("flush temp file in {}: {e}", parent.display())))?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent).map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("create temp file in {}: {e}", parent.display()),
+        )
+    })?;
+    tmp.write_all(content.as_bytes()).map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("write temp file in {}: {e}", parent.display()),
+        )
+    })?;
+    tmp.flush().map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("flush temp file in {}: {e}", parent.display()),
+        )
+    })?;
 
-    let (_file, tmp_path) = tmp
-        .keep()
-        .map_err(|e| AppError::new("IO_ERROR", format!("keep temp file in {}: {e}", parent.display())))?;
+    let (_file, tmp_path) = tmp.keep().map_err(|e| {
+        AppError::new(
+            "IO_ERROR",
+            format!("keep temp file in {}: {e}", parent.display()),
+        )
+    })?;
     drop(_file);
 
     #[cfg(windows)]
     {
         if path.exists() {
-            fs::remove_file(path)
-                .map_err(|e| AppError::new("IO_ERROR", format!("remove {}: {e}", path.display())))?;
+            fs::remove_file(path).map_err(|e| {
+                AppError::new("IO_ERROR", format!("remove {}: {e}", path.display()))
+            })?;
         }
     }
 

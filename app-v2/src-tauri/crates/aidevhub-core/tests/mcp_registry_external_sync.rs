@@ -24,7 +24,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -45,7 +48,9 @@ fn write_registry(path: &PathBuf, content: serde_json::Value) {
     write(path, &serde_json::to_string_pretty(&content).unwrap());
 }
 
-fn preconditions_from_preview(preview: &aidevhub_core::model::WritePreview) -> Vec<FilePrecondition> {
+fn preconditions_from_preview(
+    preview: &aidevhub_core::model::WritePreview,
+) -> Vec<FilePrecondition> {
     preview
         .files
         .iter()
@@ -309,14 +314,22 @@ enabled = true
         paths.codex_config_path.to_string_lossy().to_string()
     );
 
-    mcp_apply_sync_registry_to_external(&paths, Client::Codex, preconditions_from_preview(&preview)).unwrap();
+    mcp_apply_sync_registry_to_external(
+        &paths,
+        Client::Codex,
+        preconditions_from_preview(&preview),
+    )
+    .unwrap();
 
     let codex = fs::read_to_string(&paths.codex_config_path).unwrap();
     assert!(codex.contains("[workspace]"));
     assert!(codex.contains("name = \"demo\""));
     assert!(codex.contains("[mcp_servers.alpha]"));
     assert!(!codex.contains("[mcp_servers.beta]"));
-    assert_eq!(fs::read_to_string(&paths.mcp_registry_path).unwrap(), before_registry);
+    assert_eq!(
+        fs::read_to_string(&paths.mcp_registry_path).unwrap(),
+        before_registry
+    );
 }
 
 #[test]

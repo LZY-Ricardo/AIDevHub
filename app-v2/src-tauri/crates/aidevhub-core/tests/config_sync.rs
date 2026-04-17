@@ -22,7 +22,10 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         skill_store_root: app_local_data_dir.join("skill-store"),
         skill_repo_root: app_local_data_dir.join("skill-store").join("repo"),
         skill_indexes_root: app_local_data_dir.join("skill-store").join("indexes"),
-        skill_index_path: app_local_data_dir.join("skill-store").join("indexes").join("skill_index.json"),
+        skill_index_path: app_local_data_dir
+            .join("skill-store")
+            .join("indexes")
+            .join("skill_index.json"),
         profiles_path: app_local_data_dir.join("profiles.json"),
         mcp_notes_path: app_local_data_dir.join("mcp_notes.json"),
         mcp_registry_path: app_local_data_dir.join("mcp_registry.json"),
@@ -103,14 +106,23 @@ fn first_check_auto_saves_baseline_without_reporting_updates() {
     seed_all_sources(&paths);
 
     let first = config_check_updates(&paths).unwrap();
-    assert!(first.updates.is_empty(), "first run should not report updates");
     assert!(
-        paths.app_local_data_dir.join("config_snapshots.json").exists(),
+        first.updates.is_empty(),
+        "first run should not report updates"
+    );
+    assert!(
+        paths
+            .app_local_data_dir
+            .join("config_snapshots.json")
+            .exists(),
         "snapshot file should be created on first run"
     );
 
     let second = config_check_updates(&paths).unwrap();
-    assert!(second.updates.is_empty(), "no changes since baseline, should still be empty");
+    assert!(
+        second.updates.is_empty(),
+        "no changes since baseline, should still be empty"
+    );
 }
 
 #[test]
@@ -120,7 +132,10 @@ fn first_check_with_empty_sources_creates_empty_snapshot_without_updates() {
 
     let first = config_check_updates(&paths).unwrap();
     assert!(first.updates.is_empty());
-    assert!(paths.app_local_data_dir.join("config_snapshots.json").exists());
+    assert!(paths
+        .app_local_data_dir
+        .join("config_snapshots.json")
+        .exists());
 
     let second = config_check_updates(&paths).unwrap();
     assert!(second.updates.is_empty());
@@ -345,6 +360,8 @@ fn skill_snapshot_keeps_binary_assets_as_text_placeholders() {
         .find(|u| u.source_id == "codex.skill.json")
         .unwrap();
 
-    assert!(codex_skill.diff_unified.contains("openai-docs/assets/openai.png"));
+    assert!(codex_skill
+        .diff_unified
+        .contains("openai-docs/assets/openai.png"));
     assert!(codex_skill.diff_unified.contains("[binary file omitted"));
 }

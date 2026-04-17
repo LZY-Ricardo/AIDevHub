@@ -162,8 +162,13 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), CoreError> {
         }
     }
 
-    fs::rename(&tmp_path, path)
-        .map_err(|e| CoreError::Io(format!("rename {} -> {}: {e}", tmp_path.display(), path.display())))?;
+    fs::rename(&tmp_path, path).map_err(|e| {
+        CoreError::Io(format!(
+            "rename {} -> {}: {e}",
+            tmp_path.display(),
+            path.display()
+        ))
+    })?;
     Ok(())
 }
 
@@ -176,7 +181,10 @@ fn unified_diff(path: &Path, before: &str, after: &str) -> String {
         .to_string()
 }
 
-fn mask_payload(mut obj: serde_json::Map<String, Value>, reveal_secrets: bool) -> serde_json::Map<String, Value> {
+fn mask_payload(
+    mut obj: serde_json::Map<String, Value>,
+    reveal_secrets: bool,
+) -> serde_json::Map<String, Value> {
     if reveal_secrets {
         return obj;
     }
@@ -195,7 +203,10 @@ fn mask_payload(mut obj: serde_json::Map<String, Value>, reveal_secrets: bool) -
     for (k, v) in obj.iter_mut() {
         let lk = k.to_lowercase();
         if lk.contains("secret") || lk.contains("token") || lk.contains("password") {
-            if lk.ends_with("_env_var") || lk.ends_with("_env_var_name") || lk.ends_with("_env_var_var") {
+            if lk.ends_with("_env_var")
+                || lk.ends_with("_env_var_name")
+                || lk.ends_with("_env_var_var")
+            {
                 continue;
             }
             if v.is_string() {
@@ -221,7 +232,11 @@ fn parse_server_id(id: &str) -> Result<(Client, String), CoreError> {
     let client = match c {
         "claude_code" => Client::ClaudeCode,
         "codex" => Client::Codex,
-        _ => return Err(CoreError::Validation(format!("invalid server_id client: {id}"))),
+        _ => {
+            return Err(CoreError::Validation(format!(
+                "invalid server_id client: {id}"
+            )))
+        }
     };
     Ok((client, name.to_string()))
 }
@@ -231,20 +246,33 @@ fn validate_simple_name(name: &str, label: &str) -> Result<(), CoreError> {
         return Err(CoreError::Validation(format!("{label} is required")));
     }
     if name != name.trim() {
-        return Err(CoreError::Validation(format!("{label} must not have leading/trailing spaces")));
+        return Err(CoreError::Validation(format!(
+            "{label} must not have leading/trailing spaces"
+        )));
     }
     if name.contains('/') || name.contains('\\') {
-        return Err(CoreError::Validation(format!("{label} must not contain path separators")));
+        return Err(CoreError::Validation(format!(
+            "{label} must not contain path separators"
+        )));
     }
     if name == "." || name == ".." || name.contains("..") {
-        return Err(CoreError::Validation(format!("{label} must not contain '..'")));
+        return Err(CoreError::Validation(format!(
+            "{label} must not contain '..'"
+        )));
     }
     if name.ends_with('.') || name.ends_with(' ') {
-        return Err(CoreError::Validation(format!("{label} must not end with '.' or space")));
+        return Err(CoreError::Validation(format!(
+            "{label} must not end with '.' or space"
+        )));
     }
     let forbidden = ['<', '>', '"', ':', '|', '?', '*'];
-    if name.chars().any(|c| forbidden.contains(&c) || c.is_control()) {
-        return Err(CoreError::Validation(format!("{label} contains invalid characters")));
+    if name
+        .chars()
+        .any(|c| forbidden.contains(&c) || c.is_control())
+    {
+        return Err(CoreError::Validation(format!(
+            "{label} contains invalid characters"
+        )));
     }
     Ok(())
 }
@@ -343,7 +371,10 @@ fn planned_expected_files(planned: &PlannedWrite) -> Vec<FilePrecondition> {
         .collect()
 }
 
-fn validate_preconditions(required: &[FilePrecondition], expected: &[FilePrecondition]) -> Result<(), CoreError> {
+fn validate_preconditions(
+    required: &[FilePrecondition],
+    expected: &[FilePrecondition],
+) -> Result<(), CoreError> {
     let provided: BTreeMap<&str, &Option<String>> = expected
         .iter()
         .map(|item| (item.path.as_str(), &item.expected_before_sha256))
@@ -376,12 +407,15 @@ fn validate_preconditions(required: &[FilePrecondition], expected: &[FilePrecond
 
 fn load_profiles(path: &Path) -> Result<Vec<Profile>, CoreError> {
     let s = read_to_string_opt(path)?;
-    let Some(s) = s else { return Ok(vec![]); };
+    let Some(s) = s else {
+        return Ok(vec![]);
+    };
     serde_json::from_str(&s).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))
 }
 
 fn save_profiles(v: &[Profile]) -> Result<String, CoreError> {
-    serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize profiles: {e}")))
+    serde_json::to_string_pretty(v)
+        .map_err(|e| CoreError::Internal(format!("serialize profiles: {e}")))
 }
 
 fn load_mcp_notes(path: &Path) -> Result<BTreeMap<String, ServerNotes>, CoreError> {
@@ -393,29 +427,44 @@ fn load_mcp_notes(path: &Path) -> Result<BTreeMap<String, ServerNotes>, CoreErro
 }
 
 fn save_mcp_notes(v: &BTreeMap<String, ServerNotes>) -> Result<String, CoreError> {
-    serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize mcp_notes: {e}")))
+    serde_json::to_string_pretty(v)
+        .map_err(|e| CoreError::Internal(format!("serialize mcp_notes: {e}")))
 }
 
 fn load_backup_index(path: &Path) -> Result<Vec<BackupRecord>, CoreError> {
     let s = read_to_string_opt(path)?;
-    let Some(s) = s else { return Ok(vec![]); };
+    let Some(s) = s else {
+        return Ok(vec![]);
+    };
     serde_json::from_str(&s).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))
 }
 
 fn save_backup_index(v: &[BackupRecord]) -> Result<String, CoreError> {
-    serde_json::to_string_pretty(v).map_err(|e| CoreError::Internal(format!("serialize backup_index: {e}")))
+    serde_json::to_string_pretty(v)
+        .map_err(|e| CoreError::Internal(format!("serialize backup_index: {e}")))
 }
 
-fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str, affected_ids: Vec<String>) -> Result<BackupRecord, CoreError> {
+fn backup_file(
+    backups_dir: &Path,
+    target: &Path,
+    op: BackupOp,
+    summary: &str,
+    affected_ids: Vec<String>,
+) -> Result<BackupRecord, CoreError> {
     fs::create_dir_all(backups_dir)
         .map_err(|e| CoreError::Io(format!("mkdir {}: {e}", backups_dir.display())))?;
 
     let before = read_to_string_opt(target)?;
     let Some(before) = before else {
-        return Err(CoreError::NotFound(format!("backup target missing: {}", target.display())));
+        return Err(CoreError::NotFound(format!(
+            "backup target missing: {}",
+            target.display()
+        )));
     };
 
-    let ts = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true).replace(':', "-");
+    let ts = Utc::now()
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+        .replace(':', "-");
     let backup_id = Uuid::new_v4().to_string();
     let name_hash = sha256_hex(&target.to_string_lossy());
     let backup_path = backups_dir.join(format!("{ts}_{name_hash}_{backup_id}.bak"));
@@ -433,22 +482,30 @@ fn backup_file(backups_dir: &Path, target: &Path, op: BackupOp, summary: &str, a
     })
 }
 
-fn parse_claude_config_text(text: &str, path: &Path) -> Result<(Value, serde_json::Map<String, Value>), CoreError> {
+fn parse_claude_config_text(
+    text: &str,
+    path: &Path,
+) -> Result<(Value, serde_json::Map<String, Value>), CoreError> {
     if text.trim().is_empty() {
         return Ok((serde_json::json!({}), serde_json::Map::new()));
     }
 
-    let root: Value =
-        serde_json::from_str(text).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))?;
-    let root_obj = root
-        .as_object()
-        .ok_or_else(|| CoreError::Parse(format!("claude config root must be an object: {}", path.display())))?;
+    let root: Value = serde_json::from_str(text)
+        .map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))?;
+    let root_obj = root.as_object().ok_or_else(|| {
+        CoreError::Parse(format!(
+            "claude config root must be an object: {}",
+            path.display()
+        ))
+    })?;
 
     let servers = match root_obj.get("mcpServers") {
-        Some(item) => item
-            .as_object()
-            .cloned()
-            .ok_or_else(|| CoreError::Parse(format!("claude mcpServers must be an object: {}", path.display())))?,
+        Some(item) => item.as_object().cloned().ok_or_else(|| {
+            CoreError::Parse(format!(
+                "claude mcpServers must be an object: {}",
+                path.display()
+            ))
+        })?,
         None => serde_json::Map::new(),
     };
 
@@ -463,7 +520,10 @@ fn parse_claude_config(path: &Path) -> Result<(Value, serde_json::Map<String, Va
     parse_claude_config_text(&s, path)
 }
 
-fn write_claude_config(mut root: Value, servers: serde_json::Map<String, Value>) -> Result<String, CoreError> {
+fn write_claude_config(
+    mut root: Value,
+    servers: serde_json::Map<String, Value>,
+) -> Result<String, CoreError> {
     if let Value::Object(map) = &mut root {
         if servers.is_empty() {
             map.remove("mcpServers");
@@ -471,9 +531,12 @@ fn write_claude_config(mut root: Value, servers: serde_json::Map<String, Value>)
             map.insert("mcpServers".to_string(), Value::Object(servers));
         }
     } else {
-        return Err(CoreError::Parse("claude config root is not JSON object".to_string()));
+        return Err(CoreError::Parse(
+            "claude config root is not JSON object".to_string(),
+        ));
     }
-    serde_json::to_string_pretty(&root).map_err(|e| CoreError::Internal(format!("serialize claude config: {e}")))
+    serde_json::to_string_pretty(&root)
+        .map_err(|e| CoreError::Internal(format!("serialize claude config: {e}")))
 }
 
 fn mcp_source_origin(client: Client) -> &'static str {
@@ -500,9 +563,11 @@ fn serialize_registry_store(store: &McpRegistryStore) -> Result<String, CoreErro
 }
 
 fn sort_registry_servers(store: &mut McpRegistryStore) {
-    store
-        .servers
-        .sort_by(|a, b| a.server_id.cmp(&b.server_id).then_with(|| a.updated_at.cmp(&b.updated_at)));
+    store.servers.sort_by(|a, b| {
+        a.server_id
+            .cmp(&b.server_id)
+            .then_with(|| a.updated_at.cmp(&b.updated_at))
+    });
 }
 
 fn enabled_from_payload(
@@ -511,7 +576,9 @@ fn enabled_from_payload(
 ) -> Result<bool, CoreError> {
     match payload.get("enabled") {
         Some(Value::Bool(enabled)) => Ok(*enabled),
-        Some(_) => Err(CoreError::Validation("enabled must be a boolean".to_string())),
+        Some(_) => Err(CoreError::Validation(
+            "enabled must be a boolean".to_string(),
+        )),
         None => Ok(default_enabled),
     }
 }
@@ -597,7 +664,9 @@ fn json_scalar_to_toml_value(value: &Value) -> Result<TomlValue, CoreError> {
             } else if let Some(f) = v.as_f64() {
                 Ok(toml_edit::value(f).into_value().unwrap())
             } else {
-                Err(CoreError::Validation("unsupported numeric value".to_string()))
+                Err(CoreError::Validation(
+                    "unsupported numeric value".to_string(),
+                ))
             }
         }
         Value::Array(items) => {
@@ -607,7 +676,9 @@ fn json_scalar_to_toml_value(value: &Value) -> Result<TomlValue, CoreError> {
             }
             Ok(TomlValue::Array(arr))
         }
-        Value::Null => Err(CoreError::Validation("null values are not supported in codex MCP".to_string())),
+        Value::Null => Err(CoreError::Validation(
+            "null values are not supported in codex MCP".to_string(),
+        )),
         Value::Object(_) => Err(CoreError::Validation(
             "nested object must be handled as a table when exporting codex MCP".to_string(),
         )),
@@ -630,13 +701,19 @@ fn json_map_to_toml_table(map: &serde_json::Map<String, Value>) -> Result<Table,
     Ok(table)
 }
 
-fn export_claude_registry_config(paths: &AppPaths, store: &McpRegistryStore) -> Result<String, CoreError> {
+fn export_claude_registry_config(
+    paths: &AppPaths,
+    store: &McpRegistryStore,
+) -> Result<String, CoreError> {
     let (root, _) = parse_claude_config(&paths.claude_config_path)?;
     let servers = claude_registry_servers_map(store);
     write_claude_config(root, servers)
 }
 
-fn export_codex_registry_config(paths: &AppPaths, store: &McpRegistryStore) -> Result<String, CoreError> {
+fn export_codex_registry_config(
+    paths: &AppPaths,
+    store: &McpRegistryStore,
+) -> Result<String, CoreError> {
     let mut doc = parse_codex_doc(&paths.codex_config_path)?;
     doc.as_table_mut().remove("mcp_servers");
 
@@ -701,16 +778,21 @@ fn parse_claude_fragment_from_text(text: &str, path: &Path) -> Result<String, Co
         return serialize_json_object_fragment(serde_json::Map::new(), "claude mcpServers");
     }
 
-    let root: Value =
-        serde_json::from_str(text).map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))?;
-    let root_obj = root
-        .as_object()
-        .ok_or_else(|| CoreError::Parse(format!("claude config root must be an object: {}", path.display())))?;
+    let root: Value = serde_json::from_str(text)
+        .map_err(|e| CoreError::Parse(format!("parse {}: {e}", path.display())))?;
+    let root_obj = root.as_object().ok_or_else(|| {
+        CoreError::Parse(format!(
+            "claude config root must be an object: {}",
+            path.display()
+        ))
+    })?;
     let servers = match root_obj.get("mcpServers") {
-        Some(item) => item
-            .as_object()
-            .cloned()
-            .ok_or_else(|| CoreError::Parse(format!("claude mcpServers must be an object: {}", path.display())))?,
+        Some(item) => item.as_object().cloned().ok_or_else(|| {
+            CoreError::Parse(format!(
+                "claude mcpServers must be an object: {}",
+                path.display()
+            ))
+        })?,
         None => serde_json::Map::new(),
     };
     serialize_json_object_fragment(servers, "claude mcpServers")
@@ -755,7 +837,11 @@ fn find_json_value_end(bytes: &[u8], start: usize) -> Result<usize, CoreError> {
     }
 
     if byte == b'{' || byte == b'[' {
-        let (open, close) = if byte == b'{' { (b'{', b'}') } else { (b'[', b']') };
+        let (open, close) = if byte == b'{' {
+            (b'{', b'}')
+        } else {
+            (b'[', b']')
+        };
         let mut idx = start;
         let mut depth = 0usize;
         let mut in_string = false;
@@ -800,16 +886,23 @@ fn find_root_json_object_end(text: &str) -> Result<usize, CoreError> {
     let bytes = text.as_bytes();
     let start = skip_json_whitespace(bytes, 0);
     if bytes.get(start) != Some(&b'{') {
-        return Err(CoreError::Parse("claude config root must be an object".to_string()));
+        return Err(CoreError::Parse(
+            "claude config root must be an object".to_string(),
+        ));
     }
     find_json_value_end(bytes, start)
 }
 
-fn find_top_level_json_field_value_span(text: &str, field_name: &str) -> Result<Option<(usize, usize)>, CoreError> {
+fn find_top_level_json_field_value_span(
+    text: &str,
+    field_name: &str,
+) -> Result<Option<(usize, usize)>, CoreError> {
     let bytes = text.as_bytes();
     let mut idx = skip_json_whitespace(bytes, 0);
     if bytes.get(idx) != Some(&b'{') {
-        return Err(CoreError::Parse("claude config root must be an object".to_string()));
+        return Err(CoreError::Parse(
+            "claude config root must be an object".to_string(),
+        ));
     }
     idx += 1;
 
@@ -845,7 +938,11 @@ fn find_top_level_json_field_value_span(text: &str, field_name: &str) -> Result<
         match bytes.get(idx) {
             Some(b',') => idx += 1,
             Some(b'}') => return Ok(None),
-            _ => return Err(CoreError::Parse("expected ',' or '}' after JSON value".to_string())),
+            _ => {
+                return Err(CoreError::Parse(
+                    "expected ',' or '}' after JSON value".to_string(),
+                ))
+            }
         }
     }
 }
@@ -869,7 +966,8 @@ fn render_claude_external_with_registry_fragment(
 
     let _ = parse_claude_config_text(before_text, path)?;
     if let Some((start, end)) = find_top_level_json_field_value_span(before_text, "mcpServers")? {
-        let mut rendered = String::with_capacity(before_text.len() - (end - start) + new_fragment.len());
+        let mut rendered =
+            String::with_capacity(before_text.len() - (end - start) + new_fragment.len());
         rendered.push_str(&before_text[..start]);
         rendered.push_str(&new_fragment);
         rendered.push_str(&before_text[end..]);
@@ -941,7 +1039,11 @@ fn payload_identity(payload: &serde_json::Map<String, Value>) -> String {
     "unknown".to_string()
 }
 
-fn to_server_record_registry(paths: &AppPaths, server: McpRegistryServer, reveal: bool) -> ServerRecord {
+fn to_server_record_registry(
+    paths: &AppPaths,
+    server: McpRegistryServer,
+    reveal: bool,
+) -> ServerRecord {
     let payload = mask_payload(server.payload.clone(), reveal);
     ServerRecord {
         server_id: server.server_id,
@@ -957,18 +1059,13 @@ fn to_server_record_registry(paths: &AppPaths, server: McpRegistryServer, reveal
 
 fn server_field_meta(client: Client, transport: Transport) -> ServerFieldMeta {
     let (known_fields, readonly_fields) = match (client, transport) {
-        (Client::ClaudeCode, Transport::Stdio) => (
-            vec!["command", "args", "env"],
-            Vec::<&str>::new(),
-        ),
-        (Client::ClaudeCode, Transport::Http) => (
-            vec!["type", "url", "headers"],
-            vec!["type"],
-        ),
-        (Client::Codex, Transport::Stdio) => (
-            vec!["command", "args", "enabled"],
-            Vec::<&str>::new(),
-        ),
+        (Client::ClaudeCode, Transport::Stdio) => {
+            (vec!["command", "args", "env"], Vec::<&str>::new())
+        }
+        (Client::ClaudeCode, Transport::Http) => (vec!["type", "url", "headers"], vec!["type"]),
+        (Client::Codex, Transport::Stdio) => {
+            (vec!["command", "args", "enabled"], Vec::<&str>::new())
+        }
         (Client::Codex, Transport::Http) => (
             vec!["url", "bearer_token_env_var", "enabled"],
             Vec::<&str>::new(),
@@ -977,7 +1074,10 @@ fn server_field_meta(client: Client, transport: Transport) -> ServerFieldMeta {
     };
 
     ServerFieldMeta {
-        known_fields: known_fields.iter().map(|field| (*field).to_string()).collect(),
+        known_fields: known_fields
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect(),
         secret_fields: ["env", "headers"]
             .iter()
             .map(|field| (*field).to_string())
@@ -986,7 +1086,10 @@ fn server_field_meta(client: Client, transport: Transport) -> ServerFieldMeta {
             .iter()
             .map(|field| (*field).to_string())
             .collect(),
-        available_fields: known_fields.iter().map(|field| (*field).to_string()).collect(),
+        available_fields: known_fields
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect(),
     }
 }
 
@@ -1004,10 +1107,16 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
                 .to_string_lossy()
                 .to_string(),
             claude_skills_dir: paths.claude_skills_dir.to_string_lossy().to_string(),
-            claude_skills_disabled_dir: paths.claude_skills_disabled_dir.to_string_lossy().to_string(),
+            claude_skills_disabled_dir: paths
+                .claude_skills_disabled_dir
+                .to_string_lossy()
+                .to_string(),
             codex_config_path: paths.codex_config_path.to_string_lossy().to_string(),
             codex_skills_dir: paths.codex_skills_dir.to_string_lossy().to_string(),
-            codex_skills_disabled_dir: paths.codex_skills_disabled_dir.to_string_lossy().to_string(),
+            codex_skills_disabled_dir: paths
+                .codex_skills_disabled_dir
+                .to_string_lossy()
+                .to_string(),
             app_local_data_dir: paths.app_local_data_dir.to_string_lossy().to_string(),
             skill_store_root: paths.skill_store_root.to_string_lossy().to_string(),
             skill_repo_root: paths.skill_repo_root.to_string_lossy().to_string(),
@@ -1023,7 +1132,10 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
     Ok(resp)
 }
 
-pub fn server_list(paths: &AppPaths, client: Option<Client>) -> Result<Vec<ServerRecord>, AppError> {
+pub fn server_list(
+    paths: &AppPaths,
+    client: Option<Client>,
+) -> Result<Vec<ServerRecord>, AppError> {
     let servers = mcp_registry::list_registry_servers(paths, client)?;
     Ok(servers
         .into_iter()
@@ -1031,14 +1143,21 @@ pub fn server_list(paths: &AppPaths, client: Option<Client>) -> Result<Vec<Serve
         .collect())
 }
 
-pub fn server_get(paths: &AppPaths, server_id_str: &str, reveal: bool) -> Result<ServerRecord, AppError> {
+pub fn server_get(
+    paths: &AppPaths,
+    server_id_str: &str,
+    reveal: bool,
+) -> Result<ServerRecord, AppError> {
     parse_server_id(server_id_str).map_err(AppError::from)?;
     let server = mcp_registry::get_registry_server(paths, server_id_str)?
         .ok_or_else(|| AppError::new("NOT_FOUND", format!("server not found: {server_id_str}")))?;
     Ok(to_server_record_registry(paths, server, reveal))
 }
 
-pub fn server_get_edit_session(paths: &AppPaths, server_id_str: &str) -> Result<ServerEditSession, AppError> {
+pub fn server_get_edit_session(
+    paths: &AppPaths,
+    server_id_str: &str,
+) -> Result<ServerEditSession, AppError> {
     let record = server_get(paths, server_id_str, true)?;
     let field_meta = server_field_meta(record.client, record.transport);
     let mut unknown_fields = record
@@ -1067,7 +1186,11 @@ pub fn mcp_notes_get(paths: &AppPaths, server_id_str: &str) -> Result<ServerNote
     Ok(all.get(server_id_str).cloned().unwrap_or_default())
 }
 
-pub fn mcp_notes_put(paths: &AppPaths, server_id_str: &str, notes: ServerNotes) -> Result<ServerNotes, AppError> {
+pub fn mcp_notes_put(
+    paths: &AppPaths,
+    server_id_str: &str,
+    notes: ServerNotes,
+) -> Result<ServerNotes, AppError> {
     parse_server_id(server_id_str).map_err(AppError::from)?;
     let mut all = load_mcp_notes(&paths.mcp_notes_path).map_err(AppError::from)?;
     let normalized = normalize_server_notes(notes);
@@ -1131,7 +1254,10 @@ fn build_skill_record_codex(
 ) -> Result<(SkillRecord, String), CoreError> {
     let entry_path = dir_path.join("SKILL.md");
     let Some(content) = read_to_string_opt(&entry_path)? else {
-        return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_path.display())));
+        return Err(CoreError::NotFound(format!(
+            "missing SKILL.md: {}",
+            entry_path.display()
+        )));
     };
     let fm = parse_yaml_frontmatter(&content);
     let fallback = dir_path
@@ -1163,7 +1289,10 @@ fn build_skill_record_claude(
     enabled: bool,
 ) -> Result<(SkillRecord, String), CoreError> {
     let Some(content) = read_to_string_opt(file_path)? else {
-        return Err(CoreError::NotFound(format!("missing command file: {}", file_path.display())));
+        return Err(CoreError::NotFound(format!(
+            "missing command file: {}",
+            file_path.display()
+        )));
     };
     let fm = parse_yaml_frontmatter(&content);
     let description = fm.get("description").cloned().unwrap_or_default();
@@ -1197,7 +1326,10 @@ fn build_skill_record_claude_skill(
 ) -> Result<(SkillRecord, String), CoreError> {
     let entry_path = dir_path.join("SKILL.md");
     let Some(content) = read_to_string_opt(&entry_path)? else {
-        return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_path.display())));
+        return Err(CoreError::NotFound(format!(
+            "missing SKILL.md: {}",
+            entry_path.display()
+        )));
     };
     let fm = parse_yaml_frontmatter(&content);
     let fallback = dir_path
@@ -1286,7 +1418,9 @@ pub fn skill_list(
             if !entry.exists() {
                 continue;
             }
-            if let Ok((rec, _content)) = build_skill_record_claude_skill(dir_name, &p, true, SkillScope::User) {
+            if let Ok((rec, _content)) =
+                build_skill_record_claude_skill(dir_name, &p, true, SkillScope::User)
+            {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1307,7 +1441,9 @@ pub fn skill_list(
             if !entry.exists() {
                 continue;
             }
-            if let Ok((rec, _content)) = build_skill_record_claude_skill(dir_name, &p, false, SkillScope::User) {
+            if let Ok((rec, _content)) =
+                build_skill_record_claude_skill(dir_name, &p, false, SkillScope::User)
+            {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1333,7 +1469,9 @@ pub fn skill_list(
             if !entry.exists() {
                 continue;
             }
-            if let Ok((rec, _content)) = build_skill_record_codex(dir_name, &p, true, SkillScope::User) {
+            if let Ok((rec, _content)) =
+                build_skill_record_codex(dir_name, &p, true, SkillScope::User)
+            {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1356,7 +1494,9 @@ pub fn skill_list(
             if !entry.exists() {
                 continue;
             }
-            if let Ok((rec, _content)) = build_skill_record_codex(&id_name, &p, true, SkillScope::System) {
+            if let Ok((rec, _content)) =
+                build_skill_record_codex(&id_name, &p, true, SkillScope::System)
+            {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1377,7 +1517,9 @@ pub fn skill_list(
             if !entry.exists() {
                 continue;
             }
-            if let Ok((rec, _content)) = build_skill_record_codex(dir_name, &p, false, SkillScope::User) {
+            if let Ok((rec, _content)) =
+                build_skill_record_codex(dir_name, &p, false, SkillScope::User)
+            {
                 if skill_filter_match(filter, &rec) {
                     out.push(rec);
                 }
@@ -1410,39 +1552,63 @@ pub fn skill_get(paths: &AppPaths, skill_id_str: &str) -> Result<SkillGetRespons
         Client::ClaudeCode => {
             // Try commands first (file-based)
             let command_enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
-            let command_disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            let command_disabled_path = paths
+                .claude_commands_disabled_dir
+                .join(format!("{name}.md"));
             // Then try skills (directory-based)
             let skill_enabled_path = paths.claude_skills_dir.join(&name);
             let skill_disabled_path = paths.claude_skills_disabled_dir.join(&name);
 
             if command_enabled_path.exists() {
-                build_skill_record_claude(&name, &command_enabled_path, true).map_err(AppError::from)?
+                build_skill_record_claude(&name, &command_enabled_path, true)
+                    .map_err(AppError::from)?
             } else if command_disabled_path.exists() {
-                build_skill_record_claude(&name, &command_disabled_path, false).map_err(AppError::from)?
+                build_skill_record_claude(&name, &command_disabled_path, false)
+                    .map_err(AppError::from)?
             } else if skill_enabled_path.exists() && skill_enabled_path.join("SKILL.md").exists() {
-                build_skill_record_claude_skill(&name, &skill_enabled_path, true, SkillScope::User).map_err(AppError::from)?
-            } else if skill_disabled_path.exists() && skill_disabled_path.join("SKILL.md").exists() {
-                build_skill_record_claude_skill(&name, &skill_disabled_path, false, SkillScope::User).map_err(AppError::from)?
+                build_skill_record_claude_skill(&name, &skill_enabled_path, true, SkillScope::User)
+                    .map_err(AppError::from)?
+            } else if skill_disabled_path.exists() && skill_disabled_path.join("SKILL.md").exists()
+            {
+                build_skill_record_claude_skill(
+                    &name,
+                    &skill_disabled_path,
+                    false,
+                    SkillScope::User,
+                )
+                .map_err(AppError::from)?
             } else {
-                return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+                return Err(AppError::new(
+                    "NOT_FOUND",
+                    format!("skill not found: {skill_id_str}"),
+                ));
             }
         }
         Client::Codex => {
             if name.starts_with(".system/") {
                 let dir = paths.codex_skills_dir.join(&name);
                 if !dir.exists() {
-                    return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+                    return Err(AppError::new(
+                        "NOT_FOUND",
+                        format!("skill not found: {skill_id_str}"),
+                    ));
                 }
-                build_skill_record_codex(&name, &dir, true, SkillScope::System).map_err(AppError::from)?
+                build_skill_record_codex(&name, &dir, true, SkillScope::System)
+                    .map_err(AppError::from)?
             } else {
                 let enabled_dir = paths.codex_skills_dir.join(&name);
                 let disabled_dir = paths.codex_skills_disabled_dir.join(&name);
                 if enabled_dir.exists() {
-                    build_skill_record_codex(&name, &enabled_dir, true, SkillScope::User).map_err(AppError::from)?
+                    build_skill_record_codex(&name, &enabled_dir, true, SkillScope::User)
+                        .map_err(AppError::from)?
                 } else if disabled_dir.exists() {
-                    build_skill_record_codex(&name, &disabled_dir, false, SkillScope::User).map_err(AppError::from)?
+                    build_skill_record_codex(&name, &disabled_dir, false, SkillScope::User)
+                        .map_err(AppError::from)?
                 } else {
-                    return Err(AppError::new("NOT_FOUND", format!("skill not found: {skill_id_str}")));
+                    return Err(AppError::new(
+                        "NOT_FOUND",
+                        format!("skill not found: {skill_id_str}"),
+                    ));
                 }
             }
         }
@@ -1480,7 +1646,9 @@ fn plan_create_skill(
             let dir_enabled = paths.codex_skills_dir.join(name);
             let dir_disabled = paths.codex_skills_disabled_dir.join(name);
             if dir_enabled.exists() || dir_disabled.exists() {
-                return Err(CoreError::Validation(format!("skill already exists: {name}")));
+                return Err(CoreError::Validation(format!(
+                    "skill already exists: {name}"
+                )));
             }
             let entry = dir_enabled.join("SKILL.md");
             let body_text = body.unwrap_or_else(|| {
@@ -1502,13 +1670,18 @@ fn plan_create_skill(
         }
         Client::ClaudeCode => {
             let file_enabled = paths.claude_commands_dir.join(format!("{name}.md"));
-            let file_disabled = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            let file_disabled = paths
+                .claude_commands_disabled_dir
+                .join(format!("{name}.md"));
             if file_enabled.exists() || file_disabled.exists() {
-                return Err(CoreError::Validation(format!("command already exists: {name}")));
+                return Err(CoreError::Validation(format!(
+                    "command already exists: {name}"
+                )));
             }
 
             let body_text = body.unwrap_or_else(|| {
-                "## Instructions\n\n- 在这里写下该命令要执行的动作、参数说明与注意事项。\n".to_string()
+                "## Instructions\n\n- 在这里写下该命令要执行的动作、参数说明与注意事项。\n"
+                    .to_string()
             });
             let content = format!(
                 "---\ndescription: \"{desc}\"\n---\n\n# /{name}\n\n{body_text}",
@@ -1529,7 +1702,11 @@ fn plan_create_skill(
     Ok(planned)
 }
 
-fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Result<PlannedWrite, CoreError> {
+fn plan_toggle_skill(
+    paths: &AppPaths,
+    skill_id_str: &str,
+    enabled: bool,
+) -> Result<PlannedWrite, CoreError> {
     let (client, name) = parse_server_id(skill_id_str)?;
     let mut planned = PlannedWrite {
         files: vec![],
@@ -1543,7 +1720,9 @@ fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Res
     match client {
         Client::Codex => {
             if name == ".system" || name.starts_with(".system/") {
-                return Err(CoreError::Validation("system skills cannot be toggled".to_string()));
+                return Err(CoreError::Validation(
+                    "system skills cannot be toggled".to_string(),
+                ));
             }
 
             let enabled_dir = paths.codex_skills_dir.join(&name);
@@ -1569,10 +1748,15 @@ fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Res
 
             let entry_from = from.join("SKILL.md");
             if !entry_from.exists() {
-                return Err(CoreError::NotFound(format!("missing SKILL.md: {}", entry_from.display())));
+                return Err(CoreError::NotFound(format!(
+                    "missing SKILL.md: {}",
+                    entry_from.display()
+                )));
             }
 
-            planned.expected_files.push(file_precondition_from_disk(&entry_from)?);
+            planned
+                .expected_files
+                .push(file_precondition_from_disk(&entry_from)?);
             planned.moves.push(PlannedMove {
                 from,
                 to,
@@ -1581,7 +1765,9 @@ fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Res
         }
         Client::ClaudeCode => {
             let enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
-            let disabled_path = paths.claude_commands_disabled_dir.join(format!("{name}.md"));
+            let disabled_path = paths
+                .claude_commands_disabled_dir
+                .join(format!("{name}.md"));
             let exists_enabled = enabled_path.exists();
             let exists_disabled = disabled_path.exists();
             if exists_enabled && exists_disabled {
@@ -1602,10 +1788,15 @@ fn plan_toggle_skill(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Res
             };
 
             if !from.exists() {
-                return Err(CoreError::NotFound(format!("command file missing: {}", from.display())));
+                return Err(CoreError::NotFound(format!(
+                    "command file missing: {}",
+                    from.display()
+                )));
             }
 
-            planned.expected_files.push(file_precondition_from_disk(&from)?);
+            planned
+                .expected_files
+                .push(file_precondition_from_disk(&from)?);
             planned.moves.push(PlannedMove {
                 from,
                 to,
@@ -1630,7 +1821,8 @@ pub fn skill_preview_create(
     description: &str,
     body: Option<String>,
 ) -> Result<WritePreview, AppError> {
-    let planned = plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
+    let planned =
+        plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
 
@@ -1642,11 +1834,16 @@ pub fn skill_apply_create(
     body: Option<String>,
     expected: Vec<FilePrecondition>,
 ) -> Result<ApplyResult, AppError> {
-    let planned = plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
+    let planned =
+        plan_create_skill(paths, client, name, description, body).map_err(AppError::from)?;
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
-pub fn skill_preview_toggle(paths: &AppPaths, skill_id_str: &str, enabled: bool) -> Result<WritePreview, AppError> {
+pub fn skill_preview_toggle(
+    paths: &AppPaths,
+    skill_id_str: &str,
+    enabled: bool,
+) -> Result<WritePreview, AppError> {
     let planned = plan_toggle_skill(paths, skill_id_str, enabled).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
@@ -1661,7 +1858,11 @@ pub fn skill_apply_toggle(
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
-fn plan_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<PlannedWrite, CoreError> {
+fn plan_toggle(
+    paths: &AppPaths,
+    server_id_str: &str,
+    enabled: bool,
+) -> Result<PlannedWrite, CoreError> {
     let (client, name) = parse_server_id(server_id_str)?;
     let mut planned = PlannedWrite {
         files: vec![],
@@ -1678,11 +1879,15 @@ fn plan_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<P
         .iter_mut()
         .find(|server| server.server_id == server_id_str)
     else {
-        return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
+        return Err(CoreError::NotFound(format!(
+            "server not found: {server_id_str}"
+        )));
     };
 
     if server.client != client || server.name != name {
-        return Err(CoreError::Validation(format!("server_id/client mismatch: {server_id_str}")));
+        return Err(CoreError::Validation(format!(
+            "server_id/client mismatch: {server_id_str}"
+        )));
     }
     if server.enabled == enabled {
         return Ok(planned);
@@ -1690,7 +1895,8 @@ fn plan_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<P
 
     server.enabled = enabled;
     server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    server.payload = registry_payload_for_storage(client, server.transport, server.payload.clone(), enabled);
+    server.payload =
+        registry_payload_for_storage(client, server.transport, server.payload.clone(), enabled);
     sort_registry_servers(&mut store);
 
     let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
@@ -1752,7 +1958,9 @@ fn plan_add_server(
         .iter()
         .any(|server| server.client == client && server.name == name)
     {
-        return Err(CoreError::Validation(format!("server already exists: {name}")));
+        return Err(CoreError::Validation(format!(
+            "server already exists: {name}"
+        )));
     }
 
     store.servers.push(McpRegistryServer {
@@ -1796,17 +2004,24 @@ fn plan_add_server(
     Ok(planned)
 }
 
-fn ensure_string_array(payload: &serde_json::Map<String, Value>, key: &str) -> Result<(), CoreError> {
+fn ensure_string_array(
+    payload: &serde_json::Map<String, Value>,
+    key: &str,
+) -> Result<(), CoreError> {
     let Some(value) = payload.get(key) else {
         return Ok(());
     };
     let Some(items) = value.as_array() else {
-        return Err(CoreError::Validation(format!("{key} must be an array of strings")));
+        return Err(CoreError::Validation(format!(
+            "{key} must be an array of strings"
+        )));
     };
     if items.iter().all(|item| item.as_str().is_some()) {
         Ok(())
     } else {
-        Err(CoreError::Validation(format!("{key} must be an array of strings")))
+        Err(CoreError::Validation(format!(
+            "{key} must be an array of strings"
+        )))
     }
 }
 
@@ -1815,16 +2030,23 @@ fn ensure_string_map(payload: &serde_json::Map<String, Value>, key: &str) -> Res
         return Ok(());
     };
     let Some(map) = value.as_object() else {
-        return Err(CoreError::Validation(format!("{key} must be an object of strings")));
+        return Err(CoreError::Validation(format!(
+            "{key} must be an object of strings"
+        )));
     };
     if map.values().all(|item| item.as_str().is_some()) {
         Ok(())
     } else {
-        Err(CoreError::Validation(format!("{key} must be an object of strings")))
+        Err(CoreError::Validation(format!(
+            "{key} must be an object of strings"
+        )))
     }
 }
 
-fn require_non_empty_string(payload: &serde_json::Map<String, Value>, key: &str) -> Result<(), CoreError> {
+fn require_non_empty_string(
+    payload: &serde_json::Map<String, Value>,
+    key: &str,
+) -> Result<(), CoreError> {
     let value = payload
         .get(key)
         .and_then(|value| value.as_str())
@@ -1863,7 +2085,12 @@ fn normalize_server_payload(
                 }
                 Client::Codex => {
                     if let Some(value) = payload.get("bearer_token_env_var") {
-                        if value.as_str().map(str::trim).filter(|value| !value.is_empty()).is_none() {
+                        if value
+                            .as_str()
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .is_none()
+                        {
                             return Err(CoreError::Validation(
                                 "bearer_token_env_var must be a non-empty string".to_string(),
                             ));
@@ -1873,7 +2100,9 @@ fn normalize_server_payload(
             }
         }
         Transport::Unknown => {
-            return Err(CoreError::Validation("transport cannot be unknown".to_string()));
+            return Err(CoreError::Validation(
+                "transport cannot be unknown".to_string(),
+            ));
         }
     }
 
@@ -1884,7 +2113,11 @@ fn normalize_server_payload(
     Ok(payload)
 }
 
-fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraft) -> Result<PlannedWrite, CoreError> {
+fn plan_edit_server(
+    paths: &AppPaths,
+    server_id_str: &str,
+    draft: ServerEditDraft,
+) -> Result<PlannedWrite, CoreError> {
     let (client, name) = parse_server_id(server_id_str)?;
     let mut planned = PlannedWrite {
         files: vec![],
@@ -1901,11 +2134,15 @@ fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraf
         .iter_mut()
         .find(|server| server.server_id == server_id_str)
     else {
-        return Err(CoreError::NotFound(format!("server not found: {server_id_str}")));
+        return Err(CoreError::NotFound(format!(
+            "server not found: {server_id_str}"
+        )));
     };
 
     if server.client != client || server.name != name {
-        return Err(CoreError::Validation(format!("server_id/client mismatch: {server_id_str}")));
+        return Err(CoreError::Validation(format!(
+            "server_id/client mismatch: {server_id_str}"
+        )));
     }
     if server.transport != draft.transport {
         return Err(CoreError::Validation("transport cannot change".to_string()));
@@ -1916,7 +2153,8 @@ fn plan_edit_server(paths: &AppPaths, server_id_str: &str, draft: ServerEditDraf
     let previous_enabled = server.enabled;
     server.enabled = requested_enabled;
     server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    server.payload = registry_payload_for_storage(client, draft.transport, normalized, requested_enabled);
+    server.payload =
+        registry_payload_for_storage(client, draft.transport, normalized, requested_enabled);
     sort_registry_servers(&mut store);
 
     let before_registry = read_to_string_opt(&paths.mcp_registry_path)?;
@@ -1994,7 +2232,11 @@ fn build_preview(planned: PlannedWrite) -> Result<WritePreview, CoreError> {
     })
 }
 
-fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecondition]) -> Result<ApplyResult, CoreError> {
+fn apply_planned(
+    paths: &AppPaths,
+    planned: PlannedWrite,
+    expected: &[FilePrecondition],
+) -> Result<ApplyResult, CoreError> {
     let required = planned_expected_files(&planned);
     validate_preconditions(&required, expected)?;
 
@@ -2009,16 +2251,26 @@ fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecon
     let mut backups = Vec::new();
     // Backup only user config files, not app storage.
     for f in &planned.files {
-        let is_user_config = f.path == paths.claude_config_path || f.path == paths.codex_config_path;
+        let is_user_config =
+            f.path == paths.claude_config_path || f.path == paths.codex_config_path;
         if is_user_config && f.before.is_some() {
-            let rec = backup_file(&paths.backups_dir, &f.path, planned.backup_op.clone(), "auto backup", affected_ids.clone())?;
+            let rec = backup_file(
+                &paths.backups_dir,
+                &f.path,
+                planned.backup_op.clone(),
+                "auto backup",
+                affected_ids.clone(),
+            )?;
             backups.push(rec);
         }
     }
 
     for m in &planned.moves {
         if !m.from.exists() {
-            return Err(CoreError::NotFound(format!("move source missing: {}", m.from.display())));
+            return Err(CoreError::NotFound(format!(
+                "move source missing: {}",
+                m.from.display()
+            )));
         }
         if m.to.exists() {
             return Err(CoreError::Validation(format!(
@@ -2027,8 +2279,13 @@ fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecon
             )));
         }
         ensure_parent_dir(&m.to)?;
-        fs::rename(&m.from, &m.to)
-            .map_err(|e| CoreError::Io(format!("rename {} -> {}: {e}", m.from.display(), m.to.display())))?;
+        fs::rename(&m.from, &m.to).map_err(|e| {
+            CoreError::Io(format!(
+                "rename {} -> {}: {e}",
+                m.from.display(),
+                m.to.display()
+            ))
+        })?;
     }
 
     for f in &planned.files {
@@ -2050,7 +2307,11 @@ fn apply_planned(paths: &AppPaths, planned: PlannedWrite, expected: &[FilePrecon
     })
 }
 
-pub fn server_preview_toggle(paths: &AppPaths, server_id_str: &str, enabled: bool) -> Result<WritePreview, AppError> {
+pub fn server_preview_toggle(
+    paths: &AppPaths,
+    server_id_str: &str,
+    enabled: bool,
+) -> Result<WritePreview, AppError> {
     let planned = plan_toggle(paths, server_id_str, enabled).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
@@ -2072,7 +2333,8 @@ pub fn server_preview_add(
     transport: Transport,
     config: serde_json::Map<String, Value>,
 ) -> Result<WritePreview, AppError> {
-    let planned = plan_add_server(paths, client, name, transport, config).map_err(AppError::from)?;
+    let planned =
+        plan_add_server(paths, client, name, transport, config).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
 
@@ -2084,7 +2346,8 @@ pub fn server_apply_add(
     config: serde_json::Map<String, Value>,
     expected: Vec<FilePrecondition>,
 ) -> Result<ApplyResult, AppError> {
-    let planned = plan_add_server(paths, client, name, transport, config).map_err(AppError::from)?;
+    let planned =
+        plan_add_server(paths, client, name, transport, config).map_err(AppError::from)?;
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
@@ -2094,12 +2357,8 @@ pub fn server_preview_edit(
     transport: Transport,
     payload: serde_json::Map<String, Value>,
 ) -> Result<WritePreview, AppError> {
-    let planned = plan_edit_server(
-        paths,
-        server_id_str,
-        ServerEditDraft { transport, payload },
-    )
-    .map_err(AppError::from)?;
+    let planned = plan_edit_server(paths, server_id_str, ServerEditDraft { transport, payload })
+        .map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
 
@@ -2110,16 +2369,15 @@ pub fn server_apply_edit(
     payload: serde_json::Map<String, Value>,
     expected: Vec<FilePrecondition>,
 ) -> Result<ApplyResult, AppError> {
-    let planned = plan_edit_server(
-        paths,
-        server_id_str,
-        ServerEditDraft { transport, payload },
-    )
-    .map_err(AppError::from)?;
+    let planned = plan_edit_server(paths, server_id_str, ServerEditDraft { transport, payload })
+        .map_err(AppError::from)?;
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
-fn plan_sync_registry_to_external(paths: &AppPaths, client: Client) -> Result<PlannedWrite, CoreError> {
+fn plan_sync_registry_to_external(
+    paths: &AppPaths,
+    client: Client,
+) -> Result<PlannedWrite, CoreError> {
     let mut planned = PlannedWrite {
         files: vec![],
         moves: vec![],
@@ -2133,9 +2391,11 @@ fn plan_sync_registry_to_external(paths: &AppPaths, client: Client) -> Result<Pl
     let external_path = mcp_external_path(paths, client).to_path_buf();
     let before_external = read_to_string_opt(&external_path)?;
     let after_external = match client {
-        Client::ClaudeCode => {
-            render_claude_external_with_registry_fragment(before_external.as_deref(), &store, &external_path)?
-        }
+        Client::ClaudeCode => render_claude_external_with_registry_fragment(
+            before_external.as_deref(),
+            &store,
+            &external_path,
+        )?,
         Client::Codex => export_registry_client_config(paths, &store, client)?,
     };
     if should_write_external(&before_external, &after_external, client) {
@@ -2205,10 +2465,14 @@ pub fn mcp_check_registry_external_diff(
     };
 
     let store = load_registry_store(paths).map_err(AppError::from)?;
-    let after_external = export_registry_client_config(paths, &store, client).map_err(AppError::from)?;
+    let after_external =
+        export_registry_client_config(paths, &store, client).map_err(AppError::from)?;
     let after_fragment = match client {
-        Client::ClaudeCode => parse_claude_fragment_from_text(&after_external, &target_path).map_err(AppError::from)?,
-        Client::Codex => parse_codex_fragment_from_text(&after_external, &target_path).map_err(AppError::from)?,
+        Client::ClaudeCode => parse_claude_fragment_from_text(&after_external, &target_path)
+            .map_err(AppError::from)?,
+        Client::Codex => {
+            parse_codex_fragment_from_text(&after_external, &target_path).map_err(AppError::from)?
+        }
     };
 
     let has_diff = before_fragment != after_fragment;
@@ -2228,7 +2492,10 @@ pub fn mcp_check_registry_external_diff(
     })
 }
 
-pub fn mcp_preview_sync_registry_to_external(paths: &AppPaths, client: Client) -> Result<WritePreview, AppError> {
+pub fn mcp_preview_sync_registry_to_external(
+    paths: &AppPaths,
+    client: Client,
+) -> Result<WritePreview, AppError> {
     let planned = plan_sync_registry_to_external(paths, client).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
 }
@@ -2246,7 +2513,11 @@ pub fn profile_list(paths: &AppPaths) -> Result<Vec<Profile>, AppError> {
     load_profiles(&paths.profiles_path).map_err(AppError::from)
 }
 
-pub fn profile_create(paths: &AppPaths, name: &str, targets: ProfileTargets) -> Result<Profile, AppError> {
+pub fn profile_create(
+    paths: &AppPaths,
+    name: &str,
+    targets: ProfileTargets,
+) -> Result<Profile, AppError> {
     if name.trim().is_empty() {
         return Err(AppError::new("VALIDATION_ERROR", "name is required"));
     }
@@ -2287,7 +2558,10 @@ pub fn profile_update(
         }
     }
     let Some(found) = found else {
-        return Err(AppError::new("NOT_FOUND", format!("profile not found: {profile_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("profile not found: {profile_id}"),
+        ));
     };
     let s = save_profiles(&all).map_err(AppError::from)?;
     write_atomic(&paths.profiles_path, &s).map_err(AppError::from)?;
@@ -2299,14 +2573,21 @@ pub fn profile_delete(paths: &AppPaths, profile_id: &str) -> Result<(), AppError
     let before = all.len();
     all.retain(|p| p.profile_id != profile_id);
     if all.len() == before {
-        return Err(AppError::new("NOT_FOUND", format!("profile not found: {profile_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("profile not found: {profile_id}"),
+        ));
     }
     let s = save_profiles(&all).map_err(AppError::from)?;
     write_atomic(&paths.profiles_path, &s).map_err(AppError::from)?;
     Ok(())
 }
 
-fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Result<PlannedWrite, CoreError> {
+fn plan_apply_profile(
+    paths: &AppPaths,
+    profile: &Profile,
+    client: Client,
+) -> Result<PlannedWrite, CoreError> {
     let mut planned = PlannedWrite {
         files: vec![],
         moves: vec![],
@@ -2333,14 +2614,22 @@ fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Re
 
     let mut store = load_registry_store(paths)?;
     let mut existing = BTreeSet::new();
-    for server in store.servers.iter_mut().filter(|server| server.client == client) {
+    for server in store
+        .servers
+        .iter_mut()
+        .filter(|server| server.client == client)
+    {
         existing.insert(server.name.clone());
         let should_enable = want.contains(&server.name);
         if server.enabled != should_enable {
             server.enabled = should_enable;
             server.updated_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            server.payload =
-                registry_payload_for_storage(client, server.transport, server.payload.clone(), should_enable);
+            server.payload = registry_payload_for_storage(
+                client,
+                server.transport,
+                server.payload.clone(),
+                should_enable,
+            );
             if should_enable {
                 planned.summary.will_enable.push(server.server_id.clone());
             } else {
@@ -2353,10 +2642,13 @@ fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Re
         if !existing.contains(&name) {
             planned.warnings.push(Warning {
                 code: "MISSING_SERVER".to_string(),
-                message: format!("Missing server config for profile target: {}:{name}", match client {
-                    Client::ClaudeCode => "claude_code",
-                    Client::Codex => "codex",
-                }),
+                message: format!(
+                    "Missing server config for profile target: {}:{name}",
+                    match client {
+                        Client::ClaudeCode => "claude_code",
+                        Client::Codex => "codex",
+                    }
+                ),
                 details: None,
             });
         }
@@ -2387,10 +2679,17 @@ fn plan_apply_profile(paths: &AppPaths, profile: &Profile, client: Client) -> Re
     Ok(planned)
 }
 
-pub fn profile_preview_apply(paths: &AppPaths, profile_id: &str, client: Client) -> Result<WritePreview, AppError> {
+pub fn profile_preview_apply(
+    paths: &AppPaths,
+    profile_id: &str,
+    client: Client,
+) -> Result<WritePreview, AppError> {
     let all = load_profiles(&paths.profiles_path).map_err(AppError::from)?;
     let Some(p) = all.iter().find(|p| p.profile_id == profile_id) else {
-        return Err(AppError::new("NOT_FOUND", format!("profile not found: {profile_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("profile not found: {profile_id}"),
+        ));
     };
     let planned = plan_apply_profile(paths, p, client).map_err(AppError::from)?;
     build_preview(planned).map_err(AppError::from)
@@ -2404,13 +2703,19 @@ pub fn profile_apply(
 ) -> Result<ApplyResult, AppError> {
     let all = load_profiles(&paths.profiles_path).map_err(AppError::from)?;
     let Some(p) = all.iter().find(|p| p.profile_id == profile_id) else {
-        return Err(AppError::new("NOT_FOUND", format!("profile not found: {profile_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("profile not found: {profile_id}"),
+        ));
     };
     let planned = plan_apply_profile(paths, p, client).map_err(AppError::from)?;
     apply_planned(paths, planned, &expected).map_err(AppError::from)
 }
 
-pub fn backup_list(paths: &AppPaths, target_path: Option<String>) -> Result<Vec<BackupRecord>, AppError> {
+pub fn backup_list(
+    paths: &AppPaths,
+    target_path: Option<String>,
+) -> Result<Vec<BackupRecord>, AppError> {
     let mut all = load_backup_index(&paths.backup_index_path).map_err(AppError::from)?;
     if let Some(tp) = target_path {
         all.retain(|r| r.target_path == tp);
@@ -2418,10 +2723,16 @@ pub fn backup_list(paths: &AppPaths, target_path: Option<String>) -> Result<Vec<
     Ok(all)
 }
 
-pub fn backup_preview_rollback(paths: &AppPaths, backup_id: &str) -> Result<WritePreview, AppError> {
+pub fn backup_preview_rollback(
+    paths: &AppPaths,
+    backup_id: &str,
+) -> Result<WritePreview, AppError> {
     let all = load_backup_index(&paths.backup_index_path).map_err(AppError::from)?;
     let Some(rec) = all.iter().find(|r| r.backup_id == backup_id) else {
-        return Err(AppError::new("NOT_FOUND", format!("backup not found: {backup_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("backup not found: {backup_id}"),
+        ));
     };
     let target = PathBuf::from(&rec.target_path);
     let backup = PathBuf::from(&rec.backup_path);
@@ -2454,7 +2765,10 @@ pub fn backup_apply_rollback(
 
     let all = load_backup_index(&paths.backup_index_path).map_err(AppError::from)?;
     let Some(rec) = all.iter().find(|r| r.backup_id == backup_id) else {
-        return Err(AppError::new("NOT_FOUND", format!("backup not found: {backup_id}")));
+        return Err(AppError::new(
+            "NOT_FOUND",
+            format!("backup not found: {backup_id}"),
+        ));
     };
     let target = PathBuf::from(&rec.target_path);
     let backup = PathBuf::from(&rec.backup_path);
@@ -2464,8 +2778,14 @@ pub fn backup_apply_rollback(
     // Backup current target before rollback.
     let mut backups = Vec::new();
     if target.exists() {
-        let rec2 = backup_file(&paths.backups_dir, &target, BackupOp::Rollback, "pre-rollback backup", vec![])
-            .map_err(AppError::from)?;
+        let rec2 = backup_file(
+            &paths.backups_dir,
+            &target,
+            BackupOp::Rollback,
+            "pre-rollback backup",
+            vec![],
+        )
+        .map_err(AppError::from)?;
         backups.push(rec2);
     }
 
