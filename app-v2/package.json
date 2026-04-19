@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:ui": "vitest run --config vitest.config.ts",
     "tauri": "tauri",
     "tauri:dev": "GDK_BACKEND=x11 GTK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev"
   },
@@ -20,10 +21,13 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "jsdom": "^29.0.2",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.1.4"
   }
 }

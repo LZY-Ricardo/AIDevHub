@@ -8,6 +8,10 @@ import { McpConfigDiffSummaryDialog } from "./components/McpConfigDiffSummaryDia
 import { createRequestCoordinator } from "./lib/config-check-flow.js";
 import { confirmMcpUpdateWithRefresh } from "./lib/config-confirm-flow.js";
 import {
+  bindConfigErrorAutoDismiss,
+  shouldAutoDismissConfigError,
+} from "./lib/config-error-display.js";
+import {
   deriveCheckResultState,
   deriveIgnorePreflightState,
   shouldRefreshAfterIgnore,
@@ -74,6 +78,19 @@ function App() {
   useEffect(() => {
     void loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (!configError || !shouldAutoDismissConfigError(configError)) {
+      return;
+    }
+
+    return bindConfigErrorAutoDismiss({
+      error: configError,
+      setConfigError,
+      setTimeoutFn: window.setTimeout.bind(window),
+      clearTimeoutFn: window.clearTimeout.bind(window),
+    }) ?? undefined;
+  }, [configError]);
 
   useEffect(() => {
     async function loadStats() {
