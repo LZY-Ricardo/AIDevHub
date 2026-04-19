@@ -25,7 +25,7 @@ export function McpConfigDiffDialog({
 
   return (
     <Dialog
-      title="项目内 MCP 与本地差异"
+      title="配置差异"
       open={open}
       onClose={() => {
         if (busy) return;
@@ -46,12 +46,12 @@ export function McpConfigDiffDialog({
           <div className="ui-pageSummaryCard ui-dialogSummaryCard">
             <div className="ui-label">差异状态</div>
             <div className="ui-pageSummaryValue">{diff.has_diff ? "存在差异" : "已同步"}</div>
-            <div className="ui-help">当前客户端：{diff.client}</div>
+            <div className="ui-help">客户端：{diff.client}</div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
             <div className="ui-help">
-              当前客户端：<span className="ui-code">{diff.client}</span>
+              客户端：<span className="ui-code">{diff.client}</span>
             </div>
             <div className="ui-tabs" role="tablist" aria-label="差异视图">
               <button type="button" className="ui-tab" role="tab" aria-selected={mode === "split"} onClick={() => setMode("split")}>
@@ -74,7 +74,7 @@ export function McpConfigDiffDialog({
           {diff.has_diff ? (
             <DiffViewer diff={diff.diff_unified} mode={mode} wrap={wrap} />
           ) : (
-            <div className="ui-help">当前没有发现差异。</div>
+            <div className="ui-help">配置已同步，无差异。</div>
           )}
         </div>
       )}

@@ -458,19 +458,19 @@ export function SkillsPage() {
           <div className="ui-pageSummaryCard">
             <div className="ui-label">技能资产</div>
             <div className="ui-pageSummaryValue">{skills?.length ?? 0}</div>
-            <div className="ui-help">本地技能总数</div>
+            <div className="ui-help">本地技能</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">投放实例</div>
             <div className="ui-pageSummaryValue">{repoDeployments?.length ?? 0}</div>
-            <div className="ui-help">仓库技能对应的投放副本</div>
+            <div className="ui-help">仓库技能投放副本</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">漂移实例</div>
             <div className="ui-pageSummaryValue">
               {(repoDeployments ?? []).filter((deployment) => deployment.status === "drifted").length}
             </div>
-            <div className="ui-help">建议优先回流再重新投放</div>
+            <div className="ui-help">需回流后重新投放</div>
           </div>
         </div>
       </section>
@@ -566,8 +566,8 @@ export function SkillsPage() {
               />
               <div className="ui-help">
                 {createClient === "codex"
-                  ? "将创建 <codex_home>/skills/<name>/SKILL.md"
-                  : "将创建 ~/.claude/commands/<name>.md"}
+                  ? "创建路径：<codex_home>/skills/<name>/SKILL.md"
+                  : "创建路径：~/.claude/commands/<name>.md"}
               </div>
             </div>
 
@@ -581,7 +581,7 @@ export function SkillsPage() {
                 rows={3}
                 disabled={busy}
               />
-              <div className="ui-help">P0 仅只读查看；此处仅用于初始化 frontmatter.description。</div>
+              <div className="ui-help">用于初始化 frontmatter.description。</div>
             </div>
 
             <div className="ui-field ui-fieldFull">
@@ -917,7 +917,7 @@ function RepoDetailsDrawer({
       >
         <div className="ui-dialogHeader">
           <div className="ui-dialogTitleWrap">
-            <div className="ui-dialogEyebrow">Asset Detail</div>
+            <div className="ui-dialogEyebrow">仓库 Skill</div>
             <div className="ui-dialogTitle">仓库 Skill 详情</div>
           </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
@@ -1225,7 +1225,7 @@ function DetailsDrawer({
       >
         <div className="ui-dialogHeader">
           <div className="ui-dialogTitleWrap">
-            <div className="ui-dialogEyebrow">Skill Detail</div>
+            <div className="ui-dialogEyebrow">Skill</div>
             <div className="ui-dialogTitle">Skill 详情</div>
           </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">

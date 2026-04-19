@@ -16,7 +16,7 @@ export function McpConfigDiffSummaryDialog({
 }) {
   return (
     <Dialog
-      title="项目内 MCP 与本地差异摘要"
+      title="配置差异摘要"
       open={open}
       onClose={() => {
         if (busy) return;
@@ -40,13 +40,13 @@ export function McpConfigDiffSummaryDialog({
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
           <div className="ui-pageSummaryCard ui-dialogSummaryCard">
-            <div className="ui-help">当前客户端</div>
+            <div className="ui-help">客户端</div>
             <div className="ui-code">{diff.client}</div>
-            <div className="ui-help">本地目标</div>
+            <div className="ui-help">目标路径</div>
             <div className="ui-code">{diff.target_path}</div>
           </div>
           <div className={diff.has_diff ? "ui-help" : "ui-card"} style={diff.has_diff ? undefined : { padding: "16px" }}>
-            {diff.has_diff ? "检测到项目内 MCP 与本地配置存在差异。" : "当前没有发现差异。"}
+            {diff.has_diff ? "检测到配置差异。" : "配置已同步，无差异。"}
           </div>
         </div>
       )}

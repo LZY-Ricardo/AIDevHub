@@ -9,7 +9,7 @@ export function TopbarBrand({ onSettingsClick }: TopbarBrandProps) {
     <div className="ui-topbarBrand">
       <div className="ui-brandBlock">
         <h1 className="ui-brandName">AIDevHub</h1>
-        <div className="ui-brandTag">精准工作台</div>
+        <div className="ui-brandTag">工作台</div>
       </div>
       <button
         className="ui-iconBtn"

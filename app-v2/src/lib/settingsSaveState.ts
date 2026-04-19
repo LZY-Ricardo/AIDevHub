@@ -17,21 +17,21 @@ export function deriveSettingsSaveState({
   if (!settings) {
     return {
       label: "未加载",
-      help: "等待设置加载完成后才能保存。",
+      help: "等待设置加载完成。",
     };
   }
 
   if (busy) {
     return {
       label: "保存中",
-      help: "正在写回本地设置文件。",
+      help: "正在保存...",
     };
   }
 
   if (error) {
     return {
       label: "保存失败",
-      help: "上一次保存未成功，请修复错误后重试。",
+      help: "保存失败，请重试。",
     };
   }
 
@@ -40,12 +40,12 @@ export function deriveSettingsSaveState({
   if (isDirty) {
     return {
       label: "未保存更改",
-      help: "当前选择尚未写回本地设置文件。",
+      help: "有未保存的更改。",
     };
   }
 
   return {
     label: "已同步",
-    help: "当前页面状态已与本地设置文件一致。",
+    help: "已与本地设置同步。",
   };
 }

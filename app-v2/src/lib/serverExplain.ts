@@ -15,21 +15,21 @@ export interface ExplainedServerDetails {
 }
 
 const KNOWN_SERVER_DESCRIPTIONS: Record<string, string> = {
-  neon: "用于连接和管理 Neon 数据库能力，例如查询、分支、迁移和调优。",
-  brightdata: "用于执行网页搜索、抓取和结构化内容提取。",
-  playwright: "用于浏览器自动化操作，例如打开页面、点击、截图和表单交互。",
-  "chrome-devtools": "用于浏览器调试能力，例如查看 DOM、网络请求和控制台信息。",
-  context7: "用于查询常见库和框架的文档内容，帮助补充技术说明。",
+  neon: "Neon 数据库连接、查询与迁移。",
+  brightdata: "网页搜索、抓取与内容提取。",
+  playwright: "浏览器自动化：页面交互、截图与表单操作。",
+  "chrome-devtools": "浏览器调试：DOM 检查、网络请求与控制台。",
+  context7: "查询常见库与框架的最新文档。",
 };
 
 const KNOWN_FIELD_HINTS: Record<string, string> = {
-  command: "启动本地 MCP 服务的命令。",
-  args: "传给启动命令的参数。",
-  url: "连接远程 MCP 服务的地址。",
-  env: "运行该 MCP 所需的环境变量。",
-  headers: "连接远程服务时附带的请求头，通常用于认证。",
-  enabled: "标记当前 MCP 是否启用。",
-  type: "声明 MCP 的连接方式或服务类型。",
+  command: "本地启动命令。",
+  args: "启动命令的参数。",
+  url: "远程 MCP 服务地址。",
+  env: "运行所需的环境变量。",
+  headers: "远程请求头（通常用于认证）。",
+  enabled: "是否启用当前 MCP。",
+  type: "连接方式或服务类型。",
 };
 
 const SUMMARY_FIELD_PRIORITY = ["type", "url", "command", "args", "headers", "env", "enabled"];
@@ -44,12 +44,12 @@ function explainDescription(server: ServerRecord): string {
   if (known) return known;
 
   if (server.transport === "http" && typeof server.payload.url === "string") {
-    return "用于通过远程 HTTP MCP 服务提供外部能力接入。";
+    return "通过 HTTP 接入远程 MCP 服务。";
   }
   if (server.transport === "stdio" && typeof server.payload.command === "string") {
-    return "用于通过本地命令启动 MCP 服务并接入外部能力。";
+    return "通过本地命令启动 MCP 服务。";
   }
-  return "用于为客户端提供可调用的 MCP 能力，当前暂无更具体的内置说明。";
+  return "MCP 能力服务。";
 }
 
 function formatScalar(value: unknown): string {
@@ -66,7 +66,7 @@ function formatScalar(value: unknown): string {
 }
 
 function explainFieldHint(key: string): string {
-  return KNOWN_FIELD_HINTS[normalizeKey(key)] ?? "该项来自 MCP 原始配置，当前暂无内置说明。";
+  return KNOWN_FIELD_HINTS[normalizeKey(key)] ?? "MCP 原始配置字段。";
 }
 
 function sortSummaryFields(fields: ExplainedServerField[]): ExplainedServerField[] {

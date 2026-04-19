@@ -128,16 +128,18 @@ export function Dashboard({
       <div className="ui-dashboardGrid">
         <section
           className="ui-dashboardPanel ui-dashboardPanelWide"
-          aria-label="运行工作区"
+          aria-label="快速操作"
         >
           <div className="ui-cardTitleRow">
             <h2 className="ui-sectionTitle">
               {dashboardContent.sections.runtime.title}
             </h2>
           </div>
-          <p className="ui-dashboardPanelIntro">
-            {dashboardContent.sections.runtime.description}
-          </p>
+          {dashboardContent.sections.runtime.description ? (
+            <p className="ui-dashboardPanelIntro">
+              {dashboardContent.sections.runtime.description}
+            </p>
+          ) : null}
           <div className="ui-quickActionGrid">
             <QuickActionButton
               icon="plus"
@@ -172,16 +174,18 @@ export function Dashboard({
 
         <section
           className="ui-dashboardPanel ui-dashboardPanelWide"
-          aria-label="资产与恢复"
+          aria-label="资产总览"
         >
           <div className="ui-cardTitleRow">
             <h2 className="ui-sectionTitle">
               {dashboardContent.sections.assets.title}
             </h2>
           </div>
-          <p className="ui-dashboardPanelIntro">
-            {dashboardContent.sections.assets.description}
-          </p>
+          {dashboardContent.sections.assets.description ? (
+            <p className="ui-dashboardPanelIntro">
+              {dashboardContent.sections.assets.description}
+            </p>
+          ) : null}
         </section>
 
         <section className="ui-dashboardPanel" aria-label="恢复中心">
@@ -190,9 +194,11 @@ export function Dashboard({
               {dashboardContent.sections.recovery.title}
             </h2>
           </div>
-          <p className="ui-dashboardPanelIntro">
-            {dashboardContent.sections.recovery.description}
-          </p>
+          {dashboardContent.sections.recovery.description ? (
+            <p className="ui-dashboardPanelIntro">
+              {dashboardContent.sections.recovery.description}
+            </p>
+          ) : null}
         </section>
       </div>
     </div>

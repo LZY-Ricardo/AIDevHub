@@ -164,12 +164,12 @@ export function ServerEditForm({
 
       {unknownFields.length > 0 ? (
         <div className="ui-help">
-          存在 {unknownFields.length} 个附加字段，保存时会保留；可在高级编辑中查看。
+          存在 {unknownFields.length} 个附加字段，可在高级编辑中查看。
         </div>
       ) : null}
 
       {client === "claude_code" && transport === "http" ? (
-        <div className="ui-help">Claude HTTP MCP 的 `type` 字段由系统维持为 `http`。</div>
+        <div className="ui-help">`type` 字段由系统自动维护为 `http`。</div>
       ) : null}
     </div>
   );

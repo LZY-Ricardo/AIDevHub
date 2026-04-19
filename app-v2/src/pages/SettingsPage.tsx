@@ -10,12 +10,12 @@ const MODE_OPTIONS: Array<{
   {
     value: "open_diff",
     label: "open_diff",
-    help: "发现 MCP 差异后直接打开完整 diff，适合逐条核对变更。",
+    help: "发现差异后直接打开完整 diff。",
   },
   {
     value: "summary_only",
     label: "summary_only",
-    help: "仅展示摘要，减少打断；需要时再进入详细内容。",
+    help: "仅展示摘要，按需查看详情。",
   },
 ];
 
@@ -47,15 +47,9 @@ export function SettingsPage({
   return (
     <div className="ui-settingsWorkspace">
       <aside className="ui-settingsMenu">
-        <div className="ui-label">设置分组</div>
+        <div className="ui-label">设置</div>
         <div className="ui-settingsMenuItem ui-settingsMenuItemActive ui-settingsMenuItemStatic" aria-current="true">
           差异展示
-        </div>
-        <div className="ui-settingsMenuItem ui-settingsMenuItemStatic" aria-hidden="true">
-          界面偏好
-        </div>
-        <div className="ui-settingsMenuItem ui-settingsMenuItemStatic" aria-hidden="true">
-          风险确认
         </div>
       </aside>
 
@@ -64,7 +58,7 @@ export function SettingsPage({
           <h2 className="ui-sectionTitle">MCP 差异检测结果展示方式</h2>
         </div>
         <div className="ui-help" style={{ marginTop: "8px" }}>
-          这里只控制差异检测结果的默认展示偏好，不扩展额外流程状态。
+          控制差异检测结果的默认展示方式。
         </div>
 
         <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>

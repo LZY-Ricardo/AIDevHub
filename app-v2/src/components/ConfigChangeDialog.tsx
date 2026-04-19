@@ -107,7 +107,7 @@ export function ConfigChangeDialog({
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-            <div className="ui-help">按来源分组。MCP 可同步，Skill 仅查看。共 {groupedBySource.length} 组。</div>
+            <div className="ui-help">按来源分组，MCP 可同步，Skill 仅查看。共 {groupedBySource.length} 组。</div>
             <div className="ui-tabs" role="tablist" aria-label="差异视图">
               <button type="button" className="ui-tab" role="tab" aria-selected={mode === "split"} onClick={() => setMode("split")}>
                 对比视图
@@ -137,7 +137,7 @@ export function ConfigChangeDialog({
                   <div style={{ display: "grid", justifyItems: "end", gap: "8px" }}>
                     <span className="ui-badge">{items.length} 条变化</span>
                     {groupKind === "skill" ? (
-                      <span className="ui-pill" title="Skill 不纳入项目内部副本，仅支持查看差异或忽略本次变化。">
+                      <span className="ui-pill" title="Skill 仅支持查看差异或忽略。">
                         <span className="ui-pillDot" />
                         <span className="ui-code ui-pillText">仅查看</span>
                       </span>
@@ -149,12 +149,12 @@ export function ConfigChangeDialog({
                         onClick={() => {
                           void onConfirmMcp(groupConfirmRequest);
                         }}
-                        title="将当前外部 MCP 变化同步到项目内部副本，不会回写外部文件。"
+                        title="同步外部 MCP 变更到项目内部，不回写外部文件。"
                         >
                           同步到项目内 MCP
                         </button>
                     ) : (
-                      <span className="ui-pill" title="当前 MCP 变更暂不支持同步到项目内部副本。">
+                      <span className="ui-pill" title="当前 MCP 变更暂不支持同步。">
                         <span className="ui-pillDot" />
                         <span className="ui-code ui-pillText">暂不支持同步</span>
                       </span>

@@ -185,7 +185,7 @@ export function ProfilesPage() {
           </div>
         </div>
         <div style={{ marginTop: "10px" }} className="ui-help">
-          方案采用收敛模式：应用后启用集合将精确等于 targets[client]（缺失 MCP 会跳过并提示）。
+          应用方案后，启用列表将精确等于所选 targets（缺失的 MCP 会跳过并提示）。
         </div>
       </div>
 
@@ -270,7 +270,7 @@ function TargetSelector({
         <span className="ui-badge">{selected.length}</span>
       </div>
       <div style={{ marginTop: "10px" }} className="ui-help">
-        勾选后将作为该客户端的目标启用集合。
+        勾选后将作为该客户端的启用列表。
       </div>
 
       <div style={{ marginTop: "12px", display: "grid", gap: "8px" }}>

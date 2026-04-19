@@ -114,7 +114,7 @@ export const WritePreviewDialog = memo(function WritePreviewDialog({
               </button>
             </div>
 
-            <div className="ui-help">所有写入动作都必须先经过预览确认。</div>
+            <div className="ui-help">写入前需预览确认。</div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
@@ -270,7 +270,7 @@ function DiffView({ preview }: { preview: WritePreview }) {
           </button>
         </div>
 
-        <div className="ui-help">左右对比基于统一差异（unified diff）的分块（hunk），上下文 3 行。</div>
+        <div className="ui-help">基于 unified diff，上下文 3 行。</div>
       </div>
 
       {preview.files.map((f) => (

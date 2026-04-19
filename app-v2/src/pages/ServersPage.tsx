@@ -480,19 +480,19 @@ export function ServersPage({
           <div className="ui-pageSummaryCard">
             <div className="ui-label">运行工作区</div>
             <div className="ui-pageSummaryValue">{servers?.length ?? 0}</div>
-            <div className="ui-help">当前客户端下的 MCP 数量</div>
+            <div className="ui-help">MCP 总数</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">已启用</div>
             <div className="ui-pageSummaryValue">
               {(servers ?? []).filter((server) => server.enabled).length}
             </div>
-            <div className="ui-help">优先显示可用端点与健康状态</div>
+            <div className="ui-help">活跃端点</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">写入准备度</div>
-            <div className="ui-pageSummaryValue">{registryBusy ? "检测中" : "预览优先"}</div>
-            <div className="ui-help">任何关键写入都必须先走预览链路</div>
+            <div className="ui-pageSummaryValue">{registryBusy ? "检测中" : "就绪"}</div>
+            <div className="ui-help">写入前需预览确认</div>
           </div>
         </div>
       </section>
@@ -511,7 +511,7 @@ export function ServersPage({
             </div>
           </div>
           <div className="ui-btnRow">
-            <button type="button" className="ui-btn" onClick={load} disabled={busy} title="重新从后端加载当前客户端的 MCP 列表">
+            <button type="button" className="ui-btn" onClick={load} disabled={busy} title="重新加载 MCP 列表">
               <Icon name="refresh" /> 刷新
             </button>
             <button
@@ -519,7 +519,7 @@ export function ServersPage({
               className="ui-btn"
               onClick={runHealthCheckAll}
               disabled={busy || healthBusy || !servers || servers.filter((s) => s.enabled).length === 0}
-              title="对所有已启用的 MCP 服务器执行连通性检测"
+              title="检测所有已启用 MCP 的连通性"
             >
               <Icon name="refresh" /> 全部检测
             </button>
@@ -528,12 +528,12 @@ export function ServersPage({
               className="ui-btn"
               onClick={requestRegistryExternalDiff}
               disabled={busy || registryBusy}
-              title="对比项目内部配置与本机客户端配置文件的差异"
+              title="对比项目配置与本机配置的差异"
             >
-              检测项目与本地差异
+              检测差异
             </button>
-            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy} title="检查本机客户端配置文件是否有外部变更">
-              <Icon name="refresh" /> 手动检查更新
+            <button type="button" className="ui-btn" onClick={onCheckConfigUpdates} disabled={busy || configCheckBusy} title="检查客户端配置是否有外部变更">
+              <Icon name="refresh" /> 检查更新
             </button>
           </div>
         </div>
@@ -645,9 +645,9 @@ export function ServersPage({
 
         <aside className="ui-workspaceSide">
           <div className="ui-sidePanelCard">
-            <h3 className="ui-sidePanelTitle">运行提示</h3>
+            <h3 className="ui-sidePanelTitle">提示</h3>
             <p className="ui-sidePanelText">
-              优先关注漂移检测、健康检查和预览写入。详情侧板负责展示实体信息和配置摘要，不直接替代预览流程。
+              点击 MCP 行查看详情，所有写入操作需预览确认。
             </p>
           </div>
         </aside>
@@ -724,9 +724,6 @@ export function ServersPage({
             <div className="ui-pageSummaryValue">
               {addServerTransport === "stdio" ? "stdio" : "http"}
             </div>
-            <div className="ui-help">
-              先选 transport，再展开对应字段，最后进入变更预览。
-            </div>
           </div>
 
           {addServerError ? (
@@ -751,7 +748,7 @@ export function ServersPage({
                       options={clientOptions}
                       onChange={setClient}
                     />
-                    <div className="ui-help">选择将写入哪个客户端的全局配置。</div>
+                    <div className="ui-help">将写入该客户端的全局配置。</div>
                   </div>
 
                   <div className="ui-field">
@@ -857,9 +854,9 @@ export function ServersPage({
 
             <aside className="ui-workspaceSide">
               <div className="ui-sidePanelCard">
-                <h3 className="ui-sidePanelTitle">创建原则</h3>
+                <h3 className="ui-sidePanelTitle">提示</h3>
                 <p className="ui-sidePanelText">
-                  transport 决定字段分组。先完成基础信息，再进入对应协议字段，最后统一进入变更预览。
+                  选择传输方式后填写对应配置，完成后进入变更预览。
                 </p>
               </div>
             </aside>
@@ -957,7 +954,7 @@ function DetailsDrawer({
       })
       .catch(() => {
         if (cancelled) return;
-        setNotesError("人工说明加载失败，当前展示的是自动生成说明。");
+        setNotesError("说明加载失败，显示自动生成内容。");
       })
       .finally(() => {
         if (cancelled) return;
@@ -1006,7 +1003,7 @@ function DetailsDrawer({
       setNotes(saved);
       return saved;
     } catch {
-      setNotesError("人工说明保存失败，请稍后重试。");
+      setNotesError("说明保存失败，请重试。");
       return null;
     } finally {
       setNotesBusy(false);
@@ -1175,7 +1172,7 @@ function DetailsDrawer({
       setMode("edit");
       setEditorTab("form");
     } catch {
-      setEditError("配置编辑会话加载失败，请稍后重试。");
+      setEditError("编辑会话加载失败，请重试。");
     } finally {
       setEditBusy(false);
     }
@@ -1220,8 +1217,8 @@ function DetailsDrawer({
       >
         <div className="ui-dialogHeader">
           <div className="ui-dialogTitleWrap">
-            <div className="ui-dialogEyebrow">Runtime Detail</div>
-            <div className="ui-dialogTitle">MCP详情</div>
+            <div className="ui-dialogEyebrow">MCP</div>
+            <div className="ui-dialogTitle">MCP 详情</div>
           </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
@@ -1366,7 +1363,7 @@ function DetailsDrawer({
                       style={DETAIL_ACTION_BUTTON_STYLE}
                       disabled={!canReveal || revealBusy || busy}
                       onClick={() => toggleReveal(!reveal)}
-                      title="显示敏感信息（若后端允许）"
+                      title="显示敏感信息"
                     >
                       {revealBusy ? "加载中..." : reveal ? "隐藏敏感信息" : "显示敏感信息"}
                     </button>
@@ -1489,7 +1486,7 @@ function DetailsDrawer({
                       {summaryFields.length > 0 ? (
                         summaryFields.map((field) => renderFieldCard(field, true))
                       ) : (
-                        <div className="ui-help">暂无可解释的配置项。</div>
+                        <div className="ui-help">暂无配置项。</div>
                       )}
                     </div>
                   </>

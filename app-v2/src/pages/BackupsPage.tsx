@@ -112,21 +112,21 @@ export function BackupsPage() {
             <div className="ui-pageSummaryValue">
               {records?.length ?? 0}
             </div>
-            <div className="ui-help">当前可用备份记录</div>
+            <div className="ui-help">备份记录</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">最近快照</div>
             <div className="ui-pageSummaryValue">
               {sortedRecords[0] ? isoToLocal(sortedRecords[0].created_at) : "暂无"}
             </div>
-            <div className="ui-help">优先展示最近一次可恢复快照</div>
+            <div className="ui-help">最近一次备份</div>
           </div>
           <div className="ui-pageSummaryCard">
             <div className="ui-label">回滚提示</div>
             <div className="ui-pageSummaryValue">
-              {pendingRollback ? "待确认" : "预览优先"}
+              {pendingRollback ? "待确认" : "就绪"}
             </div>
-            <div className="ui-help">任何恢复动作都必须先经过预览</div>
+            <div className="ui-help">回滚前需预览确认</div>
           </div>
         </div>
       </section>
@@ -158,7 +158,7 @@ export function BackupsPage() {
           </div>
         </div>
         <div style={{ marginTop: "10px" }} className="ui-help">
-          回滚 apply 会先对当前目标文件再备份一次，然后恢复选中的备份内容。
+          回滚前会自动备份当前文件。
         </div>
       </div>
 
@@ -253,9 +253,9 @@ export function BackupsPage() {
 
         <aside className="ui-workspaceSide">
           <div className="ui-sidePanelCard">
-            <h3 className="ui-sidePanelTitle">回滚提示</h3>
+            <h3 className="ui-sidePanelTitle">提示</h3>
             <p className="ui-sidePanelText">
-              回滚会恢复目标文件内容，并自动生成新的备份记录。高风险操作应始终从预览开始。
+              回滚会恢复目标文件，并自动创建备份。建议从预览开始。
             </p>
           </div>
         </aside>
