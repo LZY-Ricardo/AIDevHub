@@ -287,6 +287,8 @@ function App() {
           reloadToken={reloadToken}
           writeConfigTrigger={writeConfigTrigger}
           addServerTrigger={addServerTrigger}
+          onWriteConfigTriggerConsumed={() => setWriteConfigTrigger(0)}
+          onAddServerTriggerConsumed={() => setAddServerTrigger(0)}
         />
       ) : null}
 

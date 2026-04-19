@@ -68,6 +68,8 @@ export function ServersPage({
   reloadToken,
   writeConfigTrigger,
   addServerTrigger,
+  onWriteConfigTriggerConsumed,
+  onAddServerTriggerConsumed,
 }: {
   onCheckConfigUpdates: () => Promise<void>;
   configCheckBusy: boolean;
@@ -77,6 +79,8 @@ export function ServersPage({
   reloadToken: number;
   writeConfigTrigger?: number;
   addServerTrigger?: number;
+  onWriteConfigTriggerConsumed?: () => void;
+  onAddServerTriggerConsumed?: () => void;
 }) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
@@ -226,11 +230,13 @@ export function ServersPage({
   useEffect(() => {
     if (!writeConfigTrigger) return;
     void requestRegistrySyncPreview();
+    onWriteConfigTriggerConsumed?.();
   }, [writeConfigTrigger]);
 
   useEffect(() => {
     if (!addServerTrigger) return;
     setAddServerOpen(true);
+    onAddServerTriggerConsumed?.();
   }, [addServerTrigger]);
 
   async function openDetails(s: ServerRecord) {

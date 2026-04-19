@@ -10,6 +10,10 @@ const settingsSource = readFileSync(
   new URL("../src/pages/SettingsPage.tsx", import.meta.url),
   "utf8",
 );
+const serversSource = readFileSync(
+  new URL("../src/pages/ServersPage.tsx", import.meta.url),
+  "utf8",
+);
 const uiCssSource = readFileSync(
   new URL("../src/styles/ui.css", import.meta.url),
   "utf8",
@@ -38,4 +42,11 @@ test("工作台布局在窄窗下会折叠成单列", () => {
   assert.match(uiCssSource, /@media \(max-width: 920px\)[\s\S]*\.ui-pageSummaryGrid\s*\{[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(uiCssSource, /@media \(max-width: 920px\)[\s\S]*\.ui-workspaceLayout\s*\{[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(uiCssSource, /@media \(max-width: 920px\)[\s\S]*\.ui-settingsWorkspace\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+});
+
+test("Servers 页面触发器只在 token 变化时消费一次", () => {
+  assert.match(serversSource, /onWriteConfigTriggerConsumed\?: \(\) => void/);
+  assert.match(serversSource, /onAddServerTriggerConsumed\?: \(\) => void/);
+  assert.match(serversSource, /onWriteConfigTriggerConsumed\?\.\(\)/);
+  assert.match(serversSource, /onAddServerTriggerConsumed\?\.\(\)/);
 });

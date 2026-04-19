@@ -38,6 +38,8 @@ test("App 使用页面内容配置构建页面头部", () => {
   assert.match(appSource, /onWriteConfig=\{\(\) => \{/);
   assert.match(appSource, /navigate\("mcp"\)/);
   assert.match(appSource, /setWriteConfigTrigger/);
+  assert.match(appSource, /onWriteConfigTriggerConsumed=\{\(\) => setWriteConfigTrigger\(0\)\}/);
+  assert.match(appSource, /onAddServerTriggerConsumed=\{\(\) => setAddServerTrigger\(0\)\}/);
 });
 
 test("顶部导航只渲染真正可点击的 MCP 和 Skills 入口", () => {
