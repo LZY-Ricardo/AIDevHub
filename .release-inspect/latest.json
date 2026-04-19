@@ -1,0 +1,35 @@
+{
+  "version": "0.4.0",
+  "notes": "See the assets to download this version.",
+  "pub_date": "2026-04-17T14:37:43.402Z",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySkROWVdPMW9ReWNsOGJzWkE2MHp4RU1uUWc3M0JlNnRHVklZSjdvQ0pMKzFxTTd1MW1QWXRPeVZQeHRVUFd3VHRnc3laTkFpeGc5SWdHaGNIbU5ya2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NTk0CWZpbGU6QUlEZXZIdWJfMC40LjBfYW1kNjQuQXBwSW1hZ2UKUUtIMnlLNXBZczBNOFFKVm5xU25QdGswbHdqSTR2WVk3dUhkcjZDS01uMzlpYzNaQ1d2ZjJkdjRLMG9Uc0dIK1NFUmRxSUsvUnI4WUZ5aTUyNnFIQ3c9PQo=",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySkROWVdPMW9ReWNsOGJzWkE2MHp4RU1uUWc3M0JlNnRHVklZSjdvQ0pMKzFxTTd1MW1QWXRPeVZQeHRVUFd3VHRnc3laTkFpeGc5SWdHaGNIbU5ya2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NTk0CWZpbGU6QUlEZXZIdWJfMC40LjBfYW1kNjQuQXBwSW1hZ2UKUUtIMnlLNXBZczBNOFFKVm5xU25QdGswbHdqSTR2WVk3dUhkcjZDS01uMzlpYzNaQ1d2ZjJkdjRLMG9Uc0dIK1NFUmRxSUsvUnI4WUZ5aTUyNnFIQ3c9PQo=",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySk1yK2M1SGZUem5TRGw2UWdVK1lTbUlVNFB1RkhqTDhpd3dKeGdOblZLcUI1Tnl4UjE2dWhQckxjbFhBbW93NmdGSTV0cXIwNmh5YjY2dDUvbHVoR3dzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NTkzCWZpbGU6QUlEZXZIdWJfMC40LjBfYW1kNjQuZGViCkpzYldnN09tZHhwczJzMnN0Ymxtd3hFUitaQjVUN1FacFMwZzlmeXVVYkYzTXUrU3lEajNqcmlOQmN6akdHWEhrVVNZbVc0NFladVlGZzIxR0VFOUNnPT0K",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySktBTndHTTI3azZSeGNSVmJ3UG5jYkVWd0FWUGMrZWt4K1BSK214VzZ4UlVTbFhsWUFwcjNXdk1Sb3paWmZMVE10bklpYlo0djlvME5yRTI1VG1RdkFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NTk0CWZpbGU6QUlEZXZIdWItMC40LjAtMS54ODZfNjQucnBtCkVSVzZEY2FQeENBeTVrVWpwYTlZOEl2VDJpTUljWWVPN0Y2UkVWY0k1OG5BYXA3WS9zdUhiWitTMW9GVlVlNjBSMW5WNisvYjkzclNUK1pZQ2pXa0NRPT0K",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub-0.4.0-1.x86_64.rpm"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySkw4Z0NTdEo1QmtTbWY0WGQ1RnRDdkprYkV5dkZvNGZaNy92Y1BLYlZjQXhLbjJOQVRyNzRadVNiQlNoZkVjTUtwcHYzVUIyaFZkY2FXOHowZDR3YkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NjU5CWZpbGU6QUlEZXZIdWJfMC40LjBfeDY0X2VuLVVTLm1zaQpENGg4VXlNZC9yRmtUTEtkSUJFcGhKUnJ0VXJxWGgwRVoyZ2ZFaDRPdkF6RmN0YVRWam1TQWVtZ1BFN0VYN243eVJqdzdIWnlyb2FDM05TdDlBbS9CZz09Cg==",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_x64_en-US.msi"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySkw4Z0NTdEo1QmtTbWY0WGQ1RnRDdkprYkV5dkZvNGZaNy92Y1BLYlZjQXhLbjJOQVRyNzRadVNiQlNoZkVjTUtwcHYzVUIyaFZkY2FXOHowZDR3YkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NjU5CWZpbGU6QUlEZXZIdWJfMC40LjBfeDY0X2VuLVVTLm1zaQpENGg4VXlNZC9yRmtUTEtkSUJFcGhKUnJ0VXJxWGgwRVoyZ2ZFaDRPdkF6RmN0YVRWam1TQWVtZ1BFN0VYN243eVJqdzdIWnlyb2FDM05TdDlBbS9CZz09Cg==",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_x64_en-US.msi"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSzhHS0llSHYySkg5TjFOLzRjcC84NUdBSGtObjRNMm1CWVdwNnJUYlRIM3M0c0g2ZEJUaCtaSVgwU0RadGFUbUo3clBaeEtmazhmNmFxZENLS1Q1Ni93NC9ZZmc0dmd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDM2NjU5CWZpbGU6QUlEZXZIdWJfMC40LjBfeDY0LXNldHVwLmV4ZQpkUExvSVE3QUwzUVJiYWdkUUxOV051dHdkNlhjaDdPYStTeXplWjdTYXVFQXErSGtSRWZiR3RBbWUyaVJXb3laREZDM3I0ZWwyQ3FGcVVvbG43QUxCUT09Cg==",
+      "url": "https://github.com/LZY-Ricardo/AIDevHub/releases/download/app-v0.4.0/AIDevHub_0.4.0_x64-setup.exe"
+    }
+  }
+}

@@ -1,0 +1,136 @@
+name: Release Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.4.2
+        required: true
+        type: string
+      notes:
+        description: Release notes summary
+        required: true
+        type: string
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: app-v2
+        run: pnpm install
+
+      - name: Update release version files
+        run: node app-v2/scripts/update-release-version.mjs app-v2 "${{ inputs.version }}"
+
+      - name: Commit version bump
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-v2/package.json app-v2/src-tauri/Cargo.toml app-v2/src-tauri/Cargo.lock app-v2/src-tauri/tauri.conf.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "chore(release): 升级版本到${{ inputs.version }}"
+            git push origin HEAD:main
+          }
+
+      - name: Create and push release tag
+        shell: pwsh
+        run: |
+          $tag = "app-v${{ inputs.version }}"
+          git tag -f $tag
+          git push origin $tag --force
+
+      - name: Build signed bundles
+        working-directory: app-v2
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build
+
+      - name: Generate latest.json
+        shell: pwsh
+        run: |
+          $tag = "app-v${{ inputs.version }}"
+          $notes = "${{ inputs.notes }}"
+          $pubDate = (Get-Date).ToString("o")
+          node app-v2/scripts/generate-latest-json.mjs `
+            latest.json `
+            "${{ inputs.version }}" `
+            $notes `
+            $pubDate `
+            windows-x86_64 `
+            app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig `
+            https://github.com/${{ github.repository }}/releases/download/$tag/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip
+
+      - name: Create or update release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "app-v${{ inputs.version }}"
+          $title = "AIDevHub v${{ inputs.version }}"
+          $notes = @"
+          ## Summary
+          ${{ inputs.notes }}
+
+          ## Assets
+          - Windows MSI installer
+          - Windows MSI signature
+          - Windows MSI updater zip
+          - Windows MSI updater zip signature
+          - Windows NSIS installer
+          - Windows NSIS signature
+          - Windows NSIS updater zip
+          - Windows NSIS updater zip signature
+          - latest.json
+          "@
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.sig" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip.sig" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe.sig" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig" `
+              "latest.json" `
+              --target main `
+              --title $title `
+              --notes $notes
+          }
+          else {
+            gh release upload $tag `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.sig" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip" `
+              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip.sig" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe.sig" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip" `
+              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig" `
+              "latest.json" `
+              --clobber
+            gh release edit $tag --title $title --notes $notes
+          }
