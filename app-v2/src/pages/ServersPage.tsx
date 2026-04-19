@@ -469,6 +469,28 @@ export function ServersPage({
 
   return (
     <div style={{ display: "grid", gap: "16px" }}>
+      <section className="ui-pageSummary">
+        <div className="ui-pageSummaryGrid">
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">运行工作区</div>
+            <div className="ui-pageSummaryValue">{servers?.length ?? 0}</div>
+            <div className="ui-help">当前客户端下的 MCP 数量</div>
+          </div>
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">已启用</div>
+            <div className="ui-pageSummaryValue">
+              {(servers ?? []).filter((server) => server.enabled).length}
+            </div>
+            <div className="ui-help">优先显示可用端点与健康状态</div>
+          </div>
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">写入准备度</div>
+            <div className="ui-pageSummaryValue">{registryBusy ? "检测中" : "预览优先"}</div>
+            <div className="ui-help">任何关键写入都必须先走预览链路</div>
+          </div>
+        </div>
+      </section>
+
       <div className="ui-card" style={{ padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -518,8 +540,14 @@ export function ServersPage({
         </div>
       ) : null}
 
-      <div className="ui-tableWrap">
-        <table className="ui-table ui-tableMcp ui-tableNoStickyLastCol" aria-label="MCP列表">
+      <div className="ui-workspaceLayout">
+        <section className="ui-workspaceMain">
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">MCP 列表</h2>
+          </div>
+
+          <div className="ui-tableWrap">
+            <table className="ui-table ui-tableMcp ui-tableNoStickyLastCol" aria-label="MCP列表">
           <colgroup>
             <col className="ui-colName" />
             <col className="ui-colTransport" />
@@ -605,7 +633,18 @@ export function ServersPage({
               </tr>
             ) : null}
           </tbody>
-        </table>
+            </table>
+          </div>
+        </section>
+
+        <aside className="ui-workspaceSide">
+          <div className="ui-sidePanelCard">
+            <h3 className="ui-sidePanelTitle">运行提示</h3>
+            <p className="ui-sidePanelText">
+              优先关注漂移检测、健康检查和预览写入。详情侧板负责展示实体信息和配置摘要，不直接替代预览流程。
+            </p>
+          </div>
+        </aside>
       </div>
 
       <DetailsDrawer
@@ -674,6 +713,16 @@ export function ServersPage({
         }
       >
         <div style={{ display: "grid", gap: "16px" }}>
+          <div className="ui-pageSummaryCard ui-dialogSummaryCard">
+            <div className="ui-label">新增 MCP</div>
+            <div className="ui-pageSummaryValue">
+              {addServerTransport === "stdio" ? "stdio" : "http"}
+            </div>
+            <div className="ui-help">
+              先选 transport，再展开对应字段，最后进入变更预览。
+            </div>
+          </div>
+
           {addServerError ? (
             <div className="ui-error">
               <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{addServerError.code}</div>
@@ -681,71 +730,134 @@ export function ServersPage({
             </div>
           ) : null}
 
-          <div className="ui-formGrid">
-            <div className="ui-field">
-              <div className="ui-label">客户端</div>
-              <UiSelect<Client>
-                ariaLabel="选择客户端"
-                value={client}
-                options={clientOptions}
-                onChange={setClient}
-              />
-              <div className="ui-help">选择将写入哪个客户端的全局配置。</div>
-            </div>
+          <div className="ui-workspaceLayout">
+            <section className="ui-workspaceMain">
+              <div className="ui-card" style={{ padding: "18px" }}>
+                <div className="ui-cardTitleRow">
+                  <h3 className="ui-sectionTitle">基础信息</h3>
+                </div>
+                <div className="ui-formGrid" style={{ marginTop: "12px" }}>
+                  <div className="ui-field">
+                    <div className="ui-label">客户端</div>
+                    <UiSelect<Client>
+                      ariaLabel="选择客户端"
+                      value={client}
+                      options={clientOptions}
+                      onChange={setClient}
+                    />
+                    <div className="ui-help">选择将写入哪个客户端的全局配置。</div>
+                  </div>
 
-            <div className="ui-field">
-              <div className="ui-label">传输方式</div>
-              <UiSelect<"stdio" | "http">
-                ariaLabel="选择传输方式"
-                value={addServerTransport}
-                options={transportOptions}
-                onChange={setAddServerTransport}
-              />
-            </div>
+                  <div className="ui-field">
+                    <div className="ui-label">传输方式</div>
+                    <UiSelect<"stdio" | "http">
+                      ariaLabel="选择传输方式"
+                      value={addServerTransport}
+                      options={transportOptions}
+                      onChange={setAddServerTransport}
+                    />
+                  </div>
 
-            <div className="ui-field ui-fieldFull">
-              <div className="ui-label">名称</div>
-              <input className="ui-input" value={addServerName} onChange={(e) => setAddServerName(e.currentTarget.value)} placeholder="例如: context7 / github / local_files" />
-              <div className="ui-help">将作为 mcpServers 的 key。</div>
-            </div>
+                  <div className="ui-field ui-fieldFull">
+                    <div className="ui-label">名称</div>
+                    <input
+                      className="ui-input"
+                      value={addServerName}
+                      onChange={(e) => setAddServerName(e.currentTarget.value)}
+                      placeholder="例如: context7 / github / local_files"
+                    />
+                    <div className="ui-help">将作为 mcpServers 的 key。</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ui-card" style={{ padding: "18px" }}>
+                <div className="ui-cardTitleRow">
+                  <h3 className="ui-sectionTitle">
+                    {addServerTransport === "stdio" ? "stdio 配置" : "http 配置"}
+                  </h3>
+                </div>
+                {addServerTransport === "stdio" ? (
+                  <div className="ui-formGrid" style={{ marginTop: "12px" }}>
+                    <div className="ui-field ui-fieldFull">
+                      <div className="ui-label">启动命令</div>
+                      <input
+                        className="ui-input ui-code"
+                        value={addServerCommand}
+                        onChange={(e) => setAddServerCommand(e.currentTarget.value)}
+                        placeholder="例如: npx"
+                      />
+                    </div>
+                    <div className="ui-field ui-fieldFull">
+                      <div className="ui-label">参数（每行一个）</div>
+                      <textarea
+                        className="ui-textarea ui-code"
+                        rows={3}
+                        value={addServerArgsText}
+                        onChange={(e) => setAddServerArgsText(e.currentTarget.value)}
+                        placeholder={"-y\n@upstash/context7-mcp"}
+                      />
+                    </div>
+                    {client === "claude_code" ? (
+                      <div className="ui-field ui-fieldFull">
+                        <div className="ui-label">环境变量（每行 KEY=VALUE）</div>
+                        <textarea
+                          className="ui-textarea ui-code"
+                          rows={3}
+                          value={addServerEnvText}
+                          onChange={(e) => setAddServerEnvText(e.currentTarget.value)}
+                          placeholder={"API_KEY=xxxx"}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="ui-formGrid" style={{ marginTop: "12px" }}>
+                    <div className="ui-field ui-fieldFull">
+                      <div className="ui-label">访问地址</div>
+                      <input
+                        className="ui-input ui-code"
+                        value={addServerUrl}
+                        onChange={(e) => setAddServerUrl(e.currentTarget.value)}
+                        placeholder="http://localhost:8080/mcp"
+                      />
+                    </div>
+                    {client === "claude_code" ? (
+                      <div className="ui-field ui-fieldFull">
+                        <div className="ui-label">请求头（每行 KEY=VALUE）</div>
+                        <textarea
+                          className="ui-textarea ui-code"
+                          rows={3}
+                          value={addServerHeadersText}
+                          onChange={(e) => setAddServerHeadersText(e.currentTarget.value)}
+                          placeholder={"Authorization=Bearer xxx"}
+                        />
+                      </div>
+                    ) : (
+                      <div className="ui-field ui-fieldFull">
+                        <div className="ui-label">Bearer Token 环境变量（可选）</div>
+                        <input
+                          className="ui-input ui-code"
+                          value={addServerBearerEnv}
+                          onChange={(e) => setAddServerBearerEnv(e.currentTarget.value)}
+                          placeholder="FIGMA_OAUTH_TOKEN"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <aside className="ui-workspaceSide">
+              <div className="ui-sidePanelCard">
+                <h3 className="ui-sidePanelTitle">创建原则</h3>
+                <p className="ui-sidePanelText">
+                  transport 决定字段分组。先完成基础信息，再进入对应协议字段，最后统一进入变更预览。
+                </p>
+              </div>
+            </aside>
           </div>
-
-          {addServerTransport === "stdio" ? (
-            <div className="ui-formGrid">
-              <div className="ui-field ui-fieldFull">
-                <div className="ui-label">启动命令</div>
-                <input className="ui-input ui-code" value={addServerCommand} onChange={(e) => setAddServerCommand(e.currentTarget.value)} placeholder="例如: npx" />
-              </div>
-              <div className="ui-field ui-fieldFull">
-                <div className="ui-label">参数（每行一个）</div>
-                <textarea className="ui-textarea ui-code" rows={3} value={addServerArgsText} onChange={(e) => setAddServerArgsText(e.currentTarget.value)} placeholder={"-y\n@upstash/context7-mcp"} />
-              </div>
-              {client === "claude_code" ? (
-                <div className="ui-field ui-fieldFull">
-                  <div className="ui-label">环境变量（每行 KEY=VALUE）</div>
-                  <textarea className="ui-textarea ui-code" rows={3} value={addServerEnvText} onChange={(e) => setAddServerEnvText(e.currentTarget.value)} placeholder={"API_KEY=xxxx"} />
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="ui-formGrid">
-              <div className="ui-field ui-fieldFull">
-                <div className="ui-label">访问地址</div>
-                <input className="ui-input ui-code" value={addServerUrl} onChange={(e) => setAddServerUrl(e.currentTarget.value)} placeholder="http://localhost:8080/mcp" />
-              </div>
-              {client === "claude_code" ? (
-                <div className="ui-field ui-fieldFull">
-                  <div className="ui-label">请求头（每行 KEY=VALUE）</div>
-                  <textarea className="ui-textarea ui-code" rows={3} value={addServerHeadersText} onChange={(e) => setAddServerHeadersText(e.currentTarget.value)} placeholder={"Authorization=Bearer xxx"} />
-                </div>
-              ) : (
-                <div className="ui-field ui-fieldFull">
-                  <div className="ui-label">Bearer Token 环境变量（可选）</div>
-                  <input className="ui-input ui-code" value={addServerBearerEnv} onChange={(e) => setAddServerBearerEnv(e.currentTarget.value)} placeholder="FIGMA_OAUTH_TOKEN" />
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </Dialog>
 
@@ -1101,7 +1213,10 @@ function DetailsDrawer({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="ui-dialogHeader">
-          <div className="ui-dialogTitle">MCP详情</div>
+          <div className="ui-dialogTitleWrap">
+            <div className="ui-dialogEyebrow">Runtime Detail</div>
+            <div className="ui-dialogTitle">MCP详情</div>
+          </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
           </button>
@@ -1204,7 +1319,7 @@ function DetailsDrawer({
             </div>
           ) : (
             <div style={{ display: "grid", gap: DETAIL_STACK_GAP }}>
-              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
+              <div className="ui-pageSummaryCard ui-dialogSummaryCard" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={DETAIL_HEADER_LAYOUT_STYLE}>
                   <div style={{ minWidth: 0 }}>
                     <div className="ui-label">名称</div>
@@ -1258,7 +1373,7 @@ function DetailsDrawer({
                 ) : null}
               </div>
 
-              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
+              <div className="ui-dialogSectionCard" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
                   <div className="ui-label">功能作用</div>
                   {!editingDescription ? (
@@ -1324,7 +1439,7 @@ function DetailsDrawer({
                 ) : null}
               </div>
 
-              <div className="ui-card" style={{ padding: DETAIL_CARD_PADDING }}>
+              <div className="ui-dialogSectionCard" style={{ padding: DETAIL_CARD_PADDING }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="ui-label">配置说明</div>
                   <div style={{ ...DETAIL_ACTION_ROW_STYLE, flexWrap: "wrap" }}>

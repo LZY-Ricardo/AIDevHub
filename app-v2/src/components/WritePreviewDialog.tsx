@@ -66,6 +66,14 @@ export const WritePreviewDialog = memo(function WritePreviewDialog({
         <div className="ui-error">未生成预览内容。</div>
       ) : (
         <>
+          <div className="ui-pageSummaryCard ui-dialogSummaryCard">
+            <div className="ui-label">预览概览</div>
+            <div className="ui-pageSummaryValue">{preview.files.length}</div>
+            <div className="ui-help">
+              个文件将被改写{moveCount ? `，${moveCount} 个路径将被移动` : ""}
+            </div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
             <div className="ui-tabs" role="tablist" aria-label="预览标签">
               <button
@@ -106,9 +114,7 @@ export const WritePreviewDialog = memo(function WritePreviewDialog({
               </button>
             </div>
 
-            <div className="ui-help">
-              {preview.files.length} 个文件将被改写{moveCount ? `，${moveCount} 个路径将被移动` : ""}
-            </div>
+            <div className="ui-help">所有写入动作都必须先经过预览确认。</div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
@@ -142,7 +148,7 @@ function SummaryView({ preview }: { preview: WritePreview }) {
         </div>
       </div>
 
-      <div style={{ marginTop: "14px", display: "grid", gap: "12px" }}>
+      <div className="ui-dialogSectionGrid">
         <ServerListBlock title="将新增" items={will_add} />
         <ServerListBlock title="将启用" items={will_enable} />
         <ServerListBlock title="将停用" items={will_disable} />
@@ -153,7 +159,7 @@ function SummaryView({ preview }: { preview: WritePreview }) {
 
 function ServerListBlock({ title, items }: { title: string; items: string[] }) {
   return (
-    <div>
+    <div className="ui-dialogSectionCard">
       <div className="ui-label">{title}</div>
       {items.length === 0 ? (
         <div className="ui-help">无</div>
@@ -291,7 +297,7 @@ function MovesView({ preview }: { preview: WritePreview }) {
   return (
     <div style={{ display: "grid", gap: "12px" }}>
       {moves.map((m, idx) => (
-        <div key={`${m.from}-${m.to}-${idx}`} className="ui-card" style={{ padding: "16px" }}>
+        <div key={`${m.from}-${m.to}-${idx}`} className="ui-dialogSectionCard">
           <div className="ui-label">移动（{m.kind === "dir" ? "目录" : "文件"}）</div>
           <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
             <div className="ui-code">{m.from}</div>
@@ -314,8 +320,8 @@ function WarningsView({ preview }: { preview: WritePreview }) {
       {preview.warnings.map((w, idx) => (
         <div
           key={`${w.code}-${idx}`}
-          className="ui-card"
-          style={{ padding: "16px", borderColor: "rgba(245, 158, 11, 0.25)" }}
+          className="ui-dialogSectionCard"
+          style={{ borderColor: "rgba(245, 158, 11, 0.25)" }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ color: "rgba(245, 158, 11, 0.95)" }}>

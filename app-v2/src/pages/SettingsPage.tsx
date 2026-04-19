@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AppError, AppSettings, McpDiffCheckMode } from "../lib/types";
+import { deriveSettingsSaveState } from "../lib/settingsSaveState";
 
 const MODE_OPTIONS: Array<{
   value: McpDiffCheckMode;
@@ -36,10 +37,32 @@ export function SettingsPage({
     setMode(settings.mcp_diff_check_mode);
   }, [settings]);
 
+  const saveState = deriveSettingsSaveState({
+    settings,
+    currentMode: mode,
+    busy,
+    error,
+  });
+
   return (
-    <div style={{ display: "grid", gap: "16px" }}>
-      <section className="ui-card" style={{ padding: "16px" }}>
-        <div className="ui-label">MCP 差异检测结果展示方式</div>
+    <div className="ui-settingsWorkspace">
+      <aside className="ui-settingsMenu">
+        <div className="ui-label">设置分组</div>
+        <div className="ui-settingsMenuItem ui-settingsMenuItemActive ui-settingsMenuItemStatic" aria-current="true">
+          差异展示
+        </div>
+        <div className="ui-settingsMenuItem ui-settingsMenuItemStatic" aria-hidden="true">
+          界面偏好
+        </div>
+        <div className="ui-settingsMenuItem ui-settingsMenuItemStatic" aria-hidden="true">
+          风险确认
+        </div>
+      </aside>
+
+      <section className="ui-settingsPanel">
+        <div className="ui-cardTitleRow">
+          <h2 className="ui-sectionTitle">MCP 差异检测结果展示方式</h2>
+        </div>
         <div className="ui-help" style={{ marginTop: "8px" }}>
           这里只控制差异检测结果的默认展示偏好，不扩展额外流程状态。
         </div>
@@ -70,6 +93,12 @@ export function SettingsPage({
               <div className="ui-help">{option.help}</div>
             </label>
           ))}
+        </div>
+
+        <div className="ui-pageSummaryCard" style={{ marginTop: "16px" }}>
+          <div className="ui-label">保存状态</div>
+          <div className="ui-pageSummaryValue">{saveState.label}</div>
+          <div className="ui-help">{saveState.help}</div>
         </div>
 
         <div className="ui-btnRow" style={{ marginTop: "16px" }}>

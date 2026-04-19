@@ -7,7 +7,10 @@ interface TopbarBrandProps {
 export function TopbarBrand({ onSettingsClick }: TopbarBrandProps) {
   return (
     <div className="ui-topbarBrand">
-      <h1 className="ui-brandName">AIDevHub</h1>
+      <div className="ui-brandBlock">
+        <h1 className="ui-brandName">AIDevHub</h1>
+        <div className="ui-brandTag">精准工作台</div>
+      </div>
       <button
         className="ui-iconBtn"
         onClick={onSettingsClick}

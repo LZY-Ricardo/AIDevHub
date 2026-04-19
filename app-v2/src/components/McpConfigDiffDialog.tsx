@@ -43,6 +43,12 @@ export function McpConfigDiffDialog({
         <div className="ui-help">暂无差异结果。</div>
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
+          <div className="ui-pageSummaryCard ui-dialogSummaryCard">
+            <div className="ui-label">差异状态</div>
+            <div className="ui-pageSummaryValue">{diff.has_diff ? "存在差异" : "已同步"}</div>
+            <div className="ui-help">当前客户端：{diff.client}</div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
             <div className="ui-help">
               当前客户端：<span className="ui-code">{diff.client}</span>
