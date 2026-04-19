@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { TopNavShell, type RouteKey, type TopbarAction } from "./components/TopNavShell";
+import { TopNavShell, type RouteKey } from "./components/TopNavShell";
 import { Dashboard } from "./components/Dashboard";
 import { SettingsTabs } from "./components/SettingsTabs";
 import { ConfigChangeDialog } from "./components/ConfigChangeDialog";
@@ -33,6 +33,10 @@ import { SkillsPage } from "./pages/SkillsPage";
 import { BackupsPage } from "./pages/BackupsPage";
 import { SettingsPage as SettingsPageContent } from "./pages/SettingsPage";
 import { UpdateChecker } from "./components/UpdateChecker";
+import {
+  buildPageHeaderActions,
+  pageHeaderContent,
+} from "./lib/pageContent";
 
 let startupConfigCheckBootstrapped = false;
 
@@ -244,38 +248,28 @@ function App() {
     }
   }
 
-  const mcpPageHeader = {
-    title: "MCP管理",
-    actions: [
-      { icon: "save" as const, label: "写入配置", tooltip: "将项目内部维护的 MCP 配置信息写入本机客户端配置文件", onClick: () => setWriteConfigTrigger((n) => n + 1) },
-      { icon: "plus" as const, label: "添加", tooltip: "添加新的 MCP 服务器到项目内部配置", onClick: () => setAddServerTrigger((n) => n + 1) },
-    ] satisfies TopbarAction[],
-  };
-
-  const skillPageHeader = {
-    title: "Skill管理",
-    actions: [
-      { icon: "refresh" as const, label: "检测差异", tooltip: "检测项目内部配置与本机客户端配置文件的差异", onClick: () => navigate("skills") },
-      { icon: "save" as const, label: "写入配置", tooltip: "将项目内部维护的 Skill 配置信息写入本机客户端配置文件", onClick: () => console.log("写入配置") },
-      { icon: "download" as const, label: "安装", tooltip: "安装新的 Skill 到项目内部配置", onClick: () => navigate("skills") },
-    ] satisfies TopbarAction[],
-  };
-
-  const settingsPageHeader = {
-    title: "设置",
-  };
-
+  const activeContent =
+    route === "dashboard" ? undefined : pageHeaderContent[route];
   const activePageHeader =
-    route === "mcp" ? mcpPageHeader
-    : route === "skills" ? skillPageHeader
-    : route === "settings" ? settingsPageHeader
-    : undefined;
+    route === "dashboard" || !activeContent
+      ? undefined
+      : {
+          ...activeContent,
+          actions: buildPageHeaderActions(route, {
+            openWriteConfig: () => setWriteConfigTrigger((n: number) => n + 1),
+            openAddMcp: () => setAddServerTrigger((n: number) => n + 1),
+          }),
+        };
 
   return (
     <TopNavShell route={route} onNavigate={navigate} pageHeader={activePageHeader}>
       {route === "dashboard" ? (
         <Dashboard
           onNavigate={navigate}
+          onWriteConfig={() => {
+            navigate("mcp");
+            setWriteConfigTrigger((n: number) => n + 1);
+          }}
           mcpCount={mcpCount}
           mcpActiveCount={mcpActiveCount}
           skillCount={skillCount}

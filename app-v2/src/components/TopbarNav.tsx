@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import { topLevelNavItems } from "../lib/pageContent";
 
 interface TopbarNavProps {
   onMcpClick: () => void;
@@ -6,16 +7,28 @@ interface TopbarNavProps {
 }
 
 export function TopbarNav({ onMcpClick, onSkillClick }: TopbarNavProps) {
+  const handlers = {
+    mcp: onMcpClick,
+    skills: onSkillClick,
+  };
+
   return (
     <nav className="ui-topbarNav">
-      <button className="ui-topbarNavItem" onClick={onMcpClick}>
-        <Icon name="servers" size={18} />
-        <span>MCP管理</span>
-      </button>
-      <button className="ui-topbarNavItem" onClick={onSkillClick}>
-        <Icon name="skills" size={18} />
-        <span>Skill管理</span>
-      </button>
+      {topLevelNavItems
+        .filter((item) => item.key === "mcp" || item.key === "skills")
+        .map((item) => (
+          <button
+            key={item.key}
+            className="ui-topbarNavItem"
+            onClick={handlers[item.key]}
+          >
+            <Icon
+              name={item.key === "skills" ? "skills" : "servers"}
+              size={18}
+            />
+            <span>{item.label}</span>
+          </button>
+        ))}
     </nav>
   );
 }

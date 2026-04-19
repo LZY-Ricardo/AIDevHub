@@ -6,6 +6,11 @@
   overflow: hidden;
 }
 
+.ui-brandBlock {
+  display: grid;
+  gap: 2px;
+}
+
 .ui-sidebar {
   position: fixed;
   inset: 0 auto 0 0;
@@ -75,7 +80,7 @@
   box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-md) var(--space-2xl) var(--space-2xl);
+  padding: 20px var(--space-2xl) var(--space-2xl);
   min-width: 0;
 }
 
@@ -110,9 +115,9 @@
 .ui-card {
   /* Default: full-width cards for "stacked" pages that only use grid for `gap`. */
   grid-column: 1 / -1;
-  background: #ffffff;
+  background: var(--color-surface-1);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 24px;
   box-shadow: var(--shadow-sm);
   padding: var(--space-lg);
   transition: border-color var(--dur) var(--ease-out),
@@ -126,7 +131,7 @@
 
 .ui-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(30, 41, 59, 0.15);
+  border-color: rgba(31, 107, 255, 0.2);
   box-shadow: var(--shadow-md);
 }
 
@@ -248,7 +253,7 @@
   border-radius: 12px;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
-  background: rgba(var(--color-text-rgb), 0.06);
+  background: rgba(var(--color-text-rgb), 0.045);
   transition: transform var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
@@ -261,14 +266,14 @@
 }
 
 .ui-btnPrimary {
-  border-color: rgba(30, 41, 59, 0.2);
-  background: #1e293b;
+  border-color: rgba(var(--color-cta-rgb), 0.3);
+  background: linear-gradient(135deg, #1f6bff 0%, #0d47c9 100%);
   color: #ffffff;
   font-weight: 700;
 }
 
 .ui-btnPrimary:hover {
-  background: #334155;
+  background: linear-gradient(135deg, #2d78ff 0%, #1552d8 100%);
 }
 
 .ui-btnDanger {
@@ -661,11 +666,25 @@
   align-items: center;
 }
 
+.ui-dialogTitleWrap {
+  display: grid;
+  gap: 4px;
+}
+
+.ui-dialogEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
 .ui-dialogTitle {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  letter-spacing: -0.01em;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .ui-dialogBody {
@@ -679,6 +698,23 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-sm);
+}
+
+.ui-dialogSummaryCard {
+  margin-bottom: 4px;
+}
+
+.ui-dialogSectionGrid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.ui-dialogSectionCard {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  padding: 16px;
 }
 
 .ui-tabs {
@@ -859,6 +895,22 @@
     grid-template-columns: 1fr;
   }
 
+  .ui-pageSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-workspaceLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-workspaceSide {
+    order: 2;
+  }
+
+  .ui-settingsWorkspace {
+    grid-template-columns: 1fr;
+  }
+
   .ui-dashboardQuickActions {
     grid-template-columns: 1fr;
   }
@@ -892,8 +944,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
-  background: #ffffff;
+  border-bottom: 1px solid rgba(31, 107, 255, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(18px);
   /* Force GPU compositing layer to prevent WebKitGTK paint invalidation bug
      where nav items become invisible after route changes back to dashboard */
   transform: translateZ(0);
@@ -906,11 +959,19 @@
 }
 
 .ui-brandName {
-  font-family: var(--font-mono);
+  font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 700;
   margin: 0;
   color: var(--color-text);
+}
+
+.ui-brandTag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .ui-topbarNav {
@@ -925,7 +986,7 @@
   padding: 10px 16px;
   border-radius: var(--radius-md);
   border: 1px solid transparent;
-  background: transparent;
+  background: rgba(var(--color-text-rgb), 0.03);
   color: var(--color-text);
   cursor: pointer;
   font-weight: 500;
@@ -941,7 +1002,7 @@
 }
 
 .ui-topbarNavItem:hover {
-  background: rgba(var(--color-text-rgb), 0.06);
+  background: rgba(var(--color-primary-rgb), 0.09);
 }
 
 .ui-iconBtn {
@@ -1009,7 +1070,7 @@
 }
 
 .ui-pageTitleBar {
-  font-family: var(--font-mono);
+  font-family: var(--font-heading);
   font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
@@ -1049,32 +1110,49 @@
 
 /* === Dashboard 仪表盘 === */
 .ui-dashboard {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xl);
+  gap: 20px;
 }
 
 .ui-dashboardWelcome h1 {
-  font-family: var(--font-mono);
-  font-size: 32px;
+  font-family: var(--font-heading);
+  font-size: 42px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
   margin: 0;
   color: var(--color-text);
 }
 
+.ui-dashboardEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: 10px;
+}
+
+.ui-dashboardLead {
+  margin: 14px 0 0;
+  max-width: 68ch;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
 .ui-dashboardStats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-lg);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .ui-statCard {
-  background: #ffffff;
+  background: var(--color-surface-1);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 22px;
   padding: var(--space-lg);
   box-shadow: var(--shadow-sm);
   transition: transform var(--dur-fast) var(--ease-out),
@@ -1095,7 +1173,7 @@
 }
 
 .ui-statCardTitle {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 14px;
   font-weight: 600;
   margin: 0;
@@ -1119,12 +1197,171 @@
 
 .ui-statValue {
   font-family: var(--font-mono);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
 }
 
-.ui-sectionTitle {
+.ui-dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.ui-dashboardPanel {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+.ui-dashboardPanelWide {
+  min-height: 240px;
+}
+
+.ui-dashboardPanelIntro {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.ui-pageSummary {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px 24px;
+}
+
+.ui-pageSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ui-pageSummaryCard {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 22px;
+  padding: 16px 18px;
+}
+
+.ui-pageSummaryValue {
+  margin-top: 6px;
   font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.ui-pageFilterCard {
+  margin-top: 4px;
+}
+
+.ui-workspaceLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.72fr);
+  gap: 18px;
+}
+
+.ui-workspaceMain {
+  display: grid;
+  gap: 16px;
+}
+
+.ui-workspaceSide {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.ui-sidePanelCard {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 26px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px;
+}
+
+.ui-sidePanelTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ui-sidePanelText {
+  margin: 10px 0 0;
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+
+.ui-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.ui-timelineItem {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  padding: 14px 16px;
+}
+
+.ui-timelineTitle {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ui-settingsWorkspace {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.ui-settingsMenu {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.ui-settingsMenuItem {
+  border: 0;
+  background: var(--color-surface-2);
+  border-radius: 18px;
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.ui-settingsMenuItemActive {
+  background: rgba(var(--color-primary-rgb), 0.12);
+  color: var(--color-cta);
+}
+
+.ui-settingsMenuItemStatic {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.ui-settingsPanel {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px 24px;
+}
+
+.ui-sectionTitle {
+  font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 var(--space-md) 0;
@@ -1132,8 +1369,9 @@
 
 .ui-quickActionGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-md);
+  margin-top: 18px;
 }
 
 .ui-quickActionBtn {
@@ -1144,7 +1382,7 @@
   padding: var(--space-lg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: #ffffff;
+  background: var(--color-surface-2);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -1155,8 +1393,8 @@
 }
 
 .ui-quickActionBtn:hover {
-  background: rgba(var(--color-text-rgb), 0.04);
-  border-color: rgba(var(--color-text-rgb), 0.15);
+  background: rgba(var(--color-primary-rgb), 0.08);
+  border-color: rgba(var(--color-primary-rgb), 0.18);
   transform: translateY(-2px);
 }
 

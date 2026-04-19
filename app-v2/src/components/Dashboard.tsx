@@ -6,6 +6,7 @@ import type { RouteKey } from "./TopNavShell";
 import type { BackupRecord, BackupOp } from "../lib/types";
 import { api } from "../lib/api";
 import { formatRelativeTime } from "../lib/format";
+import { dashboardContent } from "../lib/pageContent";
 
 interface Activity {
   id: string;
@@ -15,6 +16,7 @@ interface Activity {
 
 interface DashboardProps {
   onNavigate: (route: RouteKey) => void;
+  onWriteConfig: () => void;
   mcpCount?: number;
   mcpActiveCount?: number;
   skillCount?: number;
@@ -54,6 +56,7 @@ function backupToActivity(record: BackupRecord): Activity {
 
 export function Dashboard({
   onNavigate,
+  onWriteConfig,
   mcpCount = 0,
   mcpActiveCount = 0,
   skillCount = 0,
@@ -95,13 +98,15 @@ export function Dashboard({
   };
 
   const handleWriteConfig = () => {
-    console.log("写入配置");
+    onWriteConfig();
   };
 
   return (
     <div className="ui-dashboard">
       <section className="ui-dashboardWelcome">
-        <h1>欢迎使用 AIDevHub</h1>
+        <div className="ui-dashboardEyebrow">{dashboardContent.eyebrow}</div>
+        <h1>{dashboardContent.heroTitle}</h1>
+        <p className="ui-dashboardLead">{dashboardContent.heroDescription}</p>
       </section>
 
       <section className="ui-dashboardStats">
@@ -117,23 +122,76 @@ export function Dashboard({
         />
       </section>
 
-      <section className="ui-dashboardQuickActions">
-        <h2 className="ui-sectionTitle">快速操作</h2>
-        <div className="ui-quickActionGrid">
-          <QuickActionButton icon="plus" label="添加MCP" onClick={handleAddMcp} />
-          <QuickActionButton icon="download" label="安装Skill" onClick={handleInstallSkill} />
-          <QuickActionButton icon="save" label="写入配置" onClick={handleWriteConfig} />
-        </div>
-      </section>
+      <div className="ui-dashboardGrid">
+        <section
+          className="ui-dashboardPanel ui-dashboardPanelWide"
+          aria-label="运行工作区"
+        >
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">
+              {dashboardContent.sections.runtime.title}
+            </h2>
+          </div>
+          <p className="ui-dashboardPanelIntro">
+            {dashboardContent.sections.runtime.description}
+          </p>
+          <div className="ui-quickActionGrid">
+            <QuickActionButton
+              icon="plus"
+              label={dashboardContent.quickActions.addMcp}
+              onClick={handleAddMcp}
+            />
+            <QuickActionButton
+              icon="download"
+              label={dashboardContent.quickActions.installSkill}
+              onClick={handleInstallSkill}
+            />
+            <QuickActionButton
+              icon="save"
+              label={dashboardContent.quickActions.writeConfig}
+              onClick={handleWriteConfig}
+            />
+          </div>
+        </section>
 
-      <section className="ui-dashboardActivity">
-        <h2 className="ui-sectionTitle">最近活动</h2>
-        {loading ? (
-          <div className="ui-activityEmpty">加载中...</div>
-        ) : (
-          <ActivityList activities={activities} />
-        )}
-      </section>
+        <section className="ui-dashboardPanel" aria-label="最近动态">
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">
+              {dashboardContent.sections.activity.title}
+            </h2>
+          </div>
+          {loading ? (
+            <div className="ui-activityEmpty">加载中...</div>
+          ) : (
+            <ActivityList activities={activities} />
+          )}
+        </section>
+
+        <section
+          className="ui-dashboardPanel ui-dashboardPanelWide"
+          aria-label="资产与恢复"
+        >
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">
+              {dashboardContent.sections.assets.title}
+            </h2>
+          </div>
+          <p className="ui-dashboardPanelIntro">
+            {dashboardContent.sections.assets.description}
+          </p>
+        </section>
+
+        <section className="ui-dashboardPanel" aria-label="恢复中心">
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">
+              {dashboardContent.sections.recovery.title}
+            </h2>
+          </div>
+          <p className="ui-dashboardPanelIntro">
+            {dashboardContent.sections.recovery.description}
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

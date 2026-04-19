@@ -1,39 +1,38 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Space+Grotesk:wght@500;700&display=swap");
 
 :root {
-  /* 简约配色方案 - 中性灰 */
-  /* Base palette */
-  --color-primary: #64748b; /* 中性灰 */
-  --color-secondary: #f1f5f9; /* 浅灰 */
-  --color-cta: #475569; /* 深灰 */
-  --color-background: #ffffff; /* 纯白 */
-  --color-text: #1e293b; /* 深灰 */
+  --color-primary: #1f6bff;
+  --color-secondary: #eef4ff;
+  --color-cta: #0d47c9;
+  --color-background: #eef4ff;
+  --color-text: #0e1726;
   color-scheme: light;
 
-  /* RGB helpers for consistent translucency in ui.css */
-  --color-primary-rgb: 100, 116, 139;
-  --color-secondary-rgb: 241, 245, 249;
-  --color-cta-rgb: 71, 85, 105;
-  --color-background-rgb: 255, 255, 255;
-  --color-text-rgb: 30, 41, 59;
+  --color-primary-rgb: 31, 107, 255;
+  --color-secondary-rgb: 238, 244, 255;
+  --color-cta-rgb: 13, 71, 201;
+  --color-background-rgb: 238, 244, 255;
+  --color-text-rgb: 14, 23, 38;
 
-  /* Surface colors */
   --color-ink-rgb: 255, 255, 255;
 
-  --color-surface-0: rgba(255, 255, 255, 0.8);
-  --color-surface-1: rgba(255, 255, 255, 0.95);
+  --color-surface-0: rgba(255, 255, 255, 0.86);
+  --color-surface-1: rgba(255, 255, 255, 0.98);
+  --color-surface-2: #f7faff;
+  --color-panel: #e7f0ff;
 
-  --color-border: rgba(30, 41, 59, 0.1);
-  --color-border-subtle: rgba(30, 41, 59, 0.06);
-  --color-border-strong: rgba(30, 41, 59, 0.15);
+  --color-border: rgba(31, 74, 155, 0.14);
+  --color-border-subtle: rgba(31, 74, 155, 0.08);
+  --color-border-strong: rgba(31, 74, 155, 0.22);
 
-  --color-muted: rgba(30, 41, 59, 0.6);
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
+  --color-muted: rgba(66, 83, 111, 0.82);
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-success: #16a34a;
 
-  --shadow-sm: 0 1px 2px rgba(11, 18, 32, 0.08);
-  --shadow-md: 0 10px 24px rgba(11, 18, 32, 0.14);
-  --shadow-lg: 0 18px 40px rgba(11, 18, 32, 0.18);
+  --shadow-sm: 0 8px 24px rgba(15, 43, 97, 0.08);
+  --shadow-md: 0 18px 48px rgba(15, 43, 97, 0.14);
+  --shadow-lg: 0 28px 64px rgba(15, 43, 97, 0.18);
 
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -47,9 +46,11 @@
   --space-2xl: 48px;
 
   /* Add CJK-capable fallbacks to avoid tofu/boxes on Chinese UI text. */
-  --font-body: "IBM Plex Sans", "Noto Sans SC", system-ui, -apple-system,
+  --font-body: "Inter", "Noto Sans SC", system-ui, -apple-system,
     "Segoe UI", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei",
     "Noto Sans CJK SC", sans-serif;
+  --font-heading: "Space Grotesk", "Inter", "Noto Sans SC", system-ui,
+    sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New", "Noto Sans SC", "PingFang SC",
     "Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", monospace;
@@ -76,7 +77,9 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--color-text);
-  background: #ffffff;
+  background:
+    radial-gradient(circle at top right, rgba(31, 107, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

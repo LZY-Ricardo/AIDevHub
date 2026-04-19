@@ -18,7 +18,6 @@ import { clientLabel, enabledLabel, skillKindLabel, skillScopeLabel } from "../l
 import { getProjectRootDraftError } from "../lib/projectRootValidation";
 import {
   canInstallRepoSkillToTargetType,
-  canInstallRepoSkillToClient,
   repoSkillInstallStatusText,
   summarizeRepoSkillInstallState,
 } from "../lib/repoSkillInstallState";
@@ -454,6 +453,28 @@ export function SkillsPage() {
 
   return (
     <div style={{ display: "grid", gap: "16px" }}>
+      <section className="ui-pageSummary">
+        <div className="ui-pageSummaryGrid">
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">技能资产</div>
+            <div className="ui-pageSummaryValue">{skills?.length ?? 0}</div>
+            <div className="ui-help">本地技能总数</div>
+          </div>
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">投放实例</div>
+            <div className="ui-pageSummaryValue">{repoDeployments?.length ?? 0}</div>
+            <div className="ui-help">仓库技能对应的投放副本</div>
+          </div>
+          <div className="ui-pageSummaryCard">
+            <div className="ui-label">漂移实例</div>
+            <div className="ui-pageSummaryValue">
+              {(repoDeployments ?? []).filter((deployment) => deployment.status === "drifted").length}
+            </div>
+            <div className="ui-help">建议优先回流再重新投放</div>
+          </div>
+        </div>
+      </section>
+
       <div className="ui-card" style={{ padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
@@ -593,7 +614,13 @@ export function SkillsPage() {
         </div>
       ) : null}
 
-      <div className="ui-tableWrap">
+      <div className="ui-workspaceLayout">
+        <section className="ui-workspaceMain">
+          <div className="ui-cardTitleRow">
+            <h2 className="ui-sectionTitle">本地技能</h2>
+          </div>
+
+          <div className="ui-tableWrap">
         <table className="ui-table ui-tableSkills ui-tableNoStickyLastCol" aria-label="Skills列表">
           <colgroup>
             <col className="ui-colSkillName" />
@@ -702,6 +729,58 @@ export function SkillsPage() {
             ) : null}
           </tbody>
         </table>
+          </div>
+        </section>
+
+        <aside className="ui-workspaceSide">
+          <div className="ui-sidePanelCard">
+            <div className="ui-cardTitleRow">
+              <h3 className="ui-sidePanelTitle">仓库技能</h3>
+              <div className="ui-help">{repoSkills ? `${repoSkills.length} 个` : "加载中..."}</div>
+            </div>
+            <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+              {(repoSkills ?? []).map((skill) => {
+                const deploymentState = repoDeploymentState.get(skill.skill_id) ?? {
+                  claudeInstalled: false,
+                  codexInstalled: false,
+                  claudeMissing: false,
+                  codexMissing: false,
+                };
+                const installStatus = repoSkillInstallStatusText(deploymentState);
+                const hasInstalledTarget =
+                  deploymentState.claudeInstalled || deploymentState.codexInstalled;
+
+                return (
+                  <div key={skill.skill_id} className="ui-timelineItem">
+                    <div className="ui-timelineTitle">{skill.display_name}</div>
+                    <div className="ui-help" style={{ marginTop: "6px" }}>
+                      v{skill.version} · {installStatus}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                      <span className="ui-pill ui-skillMetaPill" title={installStatus}>
+                        <span
+                          className={`ui-pillDot ${hasInstalledTarget ? "ui-pillDotOn" : "ui-pillDotOff"}`}
+                        />
+                        <span className="ui-code ui-ellipsis ui-pillText">{installStatus}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="ui-btn"
+                        disabled={busy}
+                        onClick={() => openRepoDetails(skill)}
+                      >
+                        查看详情
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {repoSkills && repoSkills.length === 0 ? (
+                <div className="ui-help">仓库中还没有 Skill。</div>
+              ) : null}
+            </div>
+          </div>
+        </aside>
       </div>
 
       <DetailsDrawer
@@ -710,84 +789,6 @@ export function SkillsPage() {
         basic={selected}
         full={selectedDetails}
       />
-
-      <div className="ui-card" style={{ padding: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-          <div className="ui-label">内部仓库</div>
-          <div className="ui-help">{repoSkills ? `${repoSkills.length} 个 Skill` : "加载中..."}</div>
-        </div>
-        <div style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
-          {(repoSkills ?? []).map((skill) => (
-            <div
-              key={skill.skill_id}
-              className="ui-card"
-              style={{
-                padding: "12px 14px",
-                display: "flex",
-                justifyContent: "space-between",
-                gap: "12px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              {(() => {
-                const deploymentState = repoDeploymentState.get(skill.skill_id) ?? {
-                  claudeInstalled: false,
-                  codexInstalled: false,
-                  claudeMissing: false,
-                  codexMissing: false,
-                };
-                const installStatus = repoSkillInstallStatusText(deploymentState);
-                const canInstallClaude = canInstallRepoSkillToClient(deploymentState, "claude_code");
-                const canInstallCodex = canInstallRepoSkillToClient(deploymentState, "codex");
-                const hasInstalledTarget = deploymentState.claudeInstalled || deploymentState.codexInstalled;
-                return (
-                  <>
-              <div style={{ display: "grid", gap: "6px", minWidth: 0, flex: "1 1 240px" }}>
-                <div className="ui-code ui-ellipsis" title={skill.display_name}>
-                  {skill.display_name}
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                  <div className="ui-help">v{skill.version}</div>
-                  <span className="ui-pill ui-skillMetaPill" title={installStatus}>
-                    <span
-                      className={`ui-pillDot ${hasInstalledTarget ? "ui-pillDotOn" : "ui-pillDotOff"}`}
-                    />
-                    <span className="ui-code ui-ellipsis ui-pillText">{installStatus}</span>
-                  </span>
-                </div>
-              </div>
-              <div className="ui-btnRow" style={{ flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="ui-btn"
-                  disabled={busy || !canInstallClaude}
-                  onClick={() => deployRepoSkill(skill.skill_id, "claude_global")}
-                  title={canInstallClaude ? "安装到 Claude 全局目录" : "已经安装到 Claude 全局目录"}
-                >
-                  安装到 Claude
-                </button>
-                <button
-                  type="button"
-                  className="ui-btn"
-                  disabled={busy || !canInstallCodex}
-                  onClick={() => deployRepoSkill(skill.skill_id, "codex_global")}
-                  title={canInstallCodex ? "安装到 Codex 全局目录" : "已经安装到 Codex 全局目录"}
-                >
-                  安装到 Codex
-                </button>
-                <button type="button" className="ui-btn" disabled={busy} onClick={() => openRepoDetails(skill)}>
-                  详情 <Icon name="chevronRight" />
-                </button>
-              </div>
-                  </>
-                );
-              })()}
-            </div>
-          ))}
-          {repoSkills && repoSkills.length === 0 ? <div className="ui-help">仓库中还没有 Skill。</div> : null}
-        </div>
-      </div>
 
       <RepoDetailsDrawer
         open={repoDetailsOpen}
@@ -915,14 +916,17 @@ function RepoDetailsDrawer({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="ui-dialogHeader">
-          <div className="ui-dialogTitle">仓库 Skill 详情</div>
+          <div className="ui-dialogTitleWrap">
+            <div className="ui-dialogEyebrow">Asset Detail</div>
+            <div className="ui-dialogTitle">仓库 Skill 详情</div>
+          </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
           </button>
         </div>
         <div className="ui-dialogBody">
           <div style={{ display: "grid", gap: "12px" }}>
-            <div className="ui-card" style={{ padding: "16px" }}>
+            <div className="ui-pageSummaryCard ui-dialogSummaryCard">
               <div className="ui-label">名称</div>
               <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
                 {full?.manifest.display_name ?? basic?.display_name ?? "（未加载）"}
@@ -935,7 +939,7 @@ function RepoDetailsDrawer({
               </div>
             </div>
 
-            <div className="ui-card" style={{ padding: "16px" }}>
+            <div className="ui-dialogSectionCard">
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 <div className="ui-label">投放</div>
                 <div className="ui-btnRow">
@@ -1111,7 +1115,7 @@ function RepoDetailsDrawer({
               </div>
             </div>
 
-            <div className="ui-card" style={{ padding: "16px" }}>
+            <div className="ui-dialogSectionCard">
               <div className="ui-label">仓库目录</div>
               <div className="ui-code" style={{ marginTop: "8px" }}>
                 {full?.manifest.repo_root ?? "（未加载）"}
@@ -1220,7 +1224,10 @@ function DetailsDrawer({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="ui-dialogHeader">
-          <div className="ui-dialogTitle">Skill 详情</div>
+          <div className="ui-dialogTitleWrap">
+            <div className="ui-dialogEyebrow">Skill Detail</div>
+            <div className="ui-dialogTitle">Skill 详情</div>
+          </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
           </button>
@@ -1230,7 +1237,7 @@ function DetailsDrawer({
             <div className="ui-help">无内容</div>
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
-              <div className="ui-card" style={{ padding: "16px" }}>
+              <div className="ui-pageSummaryCard ui-dialogSummaryCard">
                 <div className="ui-label">名称</div>
                 <div className="ui-code" style={{ marginTop: "8px", fontWeight: 700 }}>
                   {formatSkillName(rec.skill_id)}
@@ -1274,10 +1281,10 @@ function DetailsDrawer({
                 </div>
               </div>
 
-              <div className="ui-card" style={{ padding: "16px" }}>
-                <div className="ui-label">内容（只读）</div>
-                <div style={{ marginTop: "10px" }}>
-                  <pre className="ui-pre">{content || "（未加载）"}</pre>
+            <div className="ui-dialogSectionCard">
+              <div className="ui-label">内容（只读）</div>
+              <div style={{ marginTop: "10px" }}>
+                <pre className="ui-pre">{content || "（未加载）"}</pre>
                 </div>
               </div>
             </div>

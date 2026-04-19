@@ -29,7 +29,10 @@ export function Dialog({
     >
       <div className="ui-dialog" onMouseDown={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
         <div className="ui-dialogHeader">
-          <div className="ui-dialogTitle">{title}</div>
+          <div className="ui-dialogTitleWrap">
+            <div className="ui-dialogEyebrow">Preview Workspace</div>
+            <div className="ui-dialogTitle">{title}</div>
+          </div>
           <button type="button" className="ui-btn" onClick={onClose} aria-label="关闭">
             <Icon name="x" />
           </button>
