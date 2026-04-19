@@ -21,6 +21,8 @@ interface DashboardProps {
   mcpActiveCount?: number;
   skillCount?: number;
   skillInstalledCount?: number;
+  /** 递增此值可强制刷新最近动态 */
+  refreshTrigger?: number;
 }
 
 function extractName(id: string): string {
@@ -61,6 +63,7 @@ export function Dashboard({
   mcpActiveCount = 0,
   skillCount = 0,
   skillInstalledCount = 0,
+  refreshTrigger,
 }: DashboardProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +90,7 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTrigger]);
 
   const handleAddMcp = () => {
     onNavigate("mcp");

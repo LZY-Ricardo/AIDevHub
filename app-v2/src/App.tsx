@@ -57,6 +57,7 @@ function App() {
   const [reloadToken, setReloadToken] = useState(0);
   const [writeConfigTrigger, setWriteConfigTrigger] = useState(0);
   const [addServerTrigger, setAddServerTrigger] = useState(0);
+  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
   const configCheckFlow = useMemo(() => createRequestCoordinator(), []);
 
   const [mcpCount, setMcpCount] = useState(0);
@@ -67,7 +68,12 @@ function App() {
   useEffect(() => {
     const onHash = () => {
       const r = readRouteFromHash();
-      if (r) setRoute(r);
+      if (r) {
+        setRoute(r);
+        if (r === "dashboard") {
+          setDashboardRefreshTrigger((n: number) => n + 1);
+        }
+      }
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -112,10 +118,13 @@ function App() {
       }
     }
     void loadStats();
-  }, []);
+  }, [dashboardRefreshTrigger]);
 
   function navigate(r: RouteKey) {
     setRoute(r);
+    if (r === "dashboard") {
+      setDashboardRefreshTrigger((n: number) => n + 1);
+    }
     window.location.hash = r === "dashboard" ? "#/" : `#/${r}`;
   }
 
@@ -274,6 +283,7 @@ function App() {
           mcpActiveCount={mcpActiveCount}
           skillCount={skillCount}
           skillInstalledCount={skillInstalledCount}
+          refreshTrigger={dashboardRefreshTrigger}
         />
       ) : null}
 
