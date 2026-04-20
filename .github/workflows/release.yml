@@ -143,6 +143,7 @@ jobs:
           $tag = "app-v$v"
           $notes = $env:RELEASE_NOTES
           $pubDate = (Get-Date).ToString("o")
+          Write-Host "Generating latest.json with version=$v notes=$notes pubDate=$pubDate"
           node app-v2/scripts/generate-latest-json.mjs `
             latest.json `
             $v `
@@ -151,6 +152,8 @@ jobs:
             windows-x86_64 `
             "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig" `
             "https://github.com/${{ github.repository }}/releases/download/$tag/AIDevHub_${v}_x64-setup.nsis.zip"
+          Write-Host "latest.json content:"
+          Get-Content -Raw latest.json | Write-Host
 
       - name: Validate latest.json
         shell: pwsh
@@ -162,6 +165,7 @@ jobs:
             throw "缺少 latest.json"
           }
           $manifest = Get-Content -Raw "latest.json" | ConvertFrom-Json
+          Write-Host "manifest.version='$($manifest.version)' expected='$v'"
           $expectedSignature = (Get-Content -Raw "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig").Trim()
           $expectedUrl = "https://github.com/${{ github.repository }}/releases/download/app-v$v/AIDevHub_${v}_x64-setup.nsis.zip"
 
