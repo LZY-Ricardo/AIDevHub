@@ -249,6 +249,9 @@
 }
 
 .ui-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
   border-radius: 12px;
   padding: 10px 12px;
@@ -1411,6 +1414,7 @@
 .ui-activityItem {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-items: center;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--color-border-subtle);
