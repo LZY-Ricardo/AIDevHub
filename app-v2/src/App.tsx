@@ -299,6 +299,7 @@ function App() {
           addServerTrigger={addServerTrigger}
           onWriteConfigTriggerConsumed={() => setWriteConfigTrigger(0)}
           onAddServerTriggerConsumed={() => setAddServerTrigger(0)}
+          onDataChanged={() => setDashboardRefreshTrigger((n: number) => n + 1)}
         />
       ) : null}
 

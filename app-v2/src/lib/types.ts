@@ -120,6 +120,8 @@ export interface BackupRecord {
   op: BackupOp;
   summary: string;
   affected_ids?: string[];
+  enabled_ids?: string[];
+  disabled_ids?: string[];
 }
 
 export interface ApplyResult {

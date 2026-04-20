@@ -42,7 +42,7 @@ export function existsLabel(exists: boolean): string {
 }
 
 /** 将 T 后时间部分的短横线还原为冒号，以兼容 2026-04-01T02-39-55Z 这类格式 */
-function normalizeIso(iso: string): string {
+export function normalizeIso(iso: string): string {
   return iso.replace(/T(\d{2})-(\d{2})-(\d{2})/, "T$1:$2:$3");
 }
 

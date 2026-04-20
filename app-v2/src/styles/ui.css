@@ -262,7 +262,13 @@
     background var(--dur-fast) var(--ease-out);
 }
 
-.ui-btn:hover {
+.ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ui-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: rgba(30, 41, 59, 0.2);
   background: rgba(30, 41, 59, 0.08);

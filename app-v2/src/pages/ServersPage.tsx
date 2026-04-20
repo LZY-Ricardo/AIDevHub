@@ -70,6 +70,7 @@ export function ServersPage({
   addServerTrigger,
   onWriteConfigTriggerConsumed,
   onAddServerTriggerConsumed,
+  onDataChanged,
 }: {
   onCheckConfigUpdates: () => Promise<void>;
   configCheckBusy: boolean;
@@ -81,6 +82,7 @@ export function ServersPage({
   addServerTrigger?: number;
   onWriteConfigTriggerConsumed?: () => void;
   onAddServerTriggerConsumed?: () => void;
+  onDataChanged?: () => void;
 }) {
   const [client, setClient] = useState<Client>("claude_code");
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
@@ -192,6 +194,7 @@ export function ServersPage({
       resetAddServerForm();
       setAddServerOpen(false);
       await load();
+      onDataChanged?.();
     } catch (e) {
       setAddServerError(e as AppError);
     } finally {
@@ -304,6 +307,7 @@ export function ServersPage({
       setPendingToggle(null);
       setPendingEdit(null);
       await load();
+      onDataChanged?.();
     } catch (e) {
       setError(e as AppError);
     } finally {
@@ -963,8 +967,9 @@ function DetailsDrawer({
 
     return () => {
       cancelled = true;
+      setNotesBusy(false);
     };
-  }, [open, s]);
+  }, [open, s?.server_id]);
 
   async function toggleReveal(next: boolean) {
     if (!s) return;

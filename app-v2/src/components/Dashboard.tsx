@@ -5,7 +5,7 @@ import { ActivityList } from "./ActivityList";
 import type { RouteKey } from "./TopNavShell";
 import type { BackupRecord, BackupOp } from "../lib/types";
 import { api } from "../lib/api";
-import { formatRelativeTime } from "../lib/format";
+import { formatRelativeTime, normalizeIso } from "../lib/format";
 import { dashboardContent } from "../lib/pageContent";
 
 interface Activity {
@@ -25,22 +25,51 @@ interface DashboardProps {
   refreshTrigger?: number;
 }
 
+function extractClientLabel(id: string): string {
+  if (id.startsWith('claude_code:')) return 'CC';
+  if (id.startsWith('codex:')) return 'CX';
+  return '';
+}
+
 function extractName(id: string): string {
   const idx = id.indexOf(':');
   return idx >= 0 ? id.slice(idx + 1) : id;
 }
 
-function formatActivityDescription(op: BackupOp, affectedIds?: string[]): string {
-  const names = (affectedIds ?? []).map(extractName);
-  const nameStr = names.length > 0 ? names.join('、') : '';
+function formatActivityDescription(op: BackupOp, record: BackupRecord): string {
+  const enabledIds = record.enabled_ids ?? [];
+  const disabledIds = record.disabled_ids ?? [];
+  const affectedIds = record.affected_ids ?? [];
 
   switch (op) {
-    case 'toggle':
-      return nameStr ? `切换了 ${nameStr}` : '切换了服务器状态';
-    case 'add_server':
-      return nameStr ? `添加了 ${nameStr}` : '添加了 MCP 服务器';
-    case 'edit_server':
-      return nameStr ? `编辑了 ${nameStr}` : '编辑了 MCP 服务器';
+    case 'toggle': {
+      const parts: string[] = [];
+      for (const id of enabledIds) {
+        const client = extractClientLabel(id);
+        const name = extractName(id);
+        parts.push(`${client} 启用了 ${name}`);
+      }
+      for (const id of disabledIds) {
+        const client = extractClientLabel(id);
+        const name = extractName(id);
+        parts.push(`${client} 停用了 ${name}`);
+      }
+      if (parts.length > 0) return parts.join('、');
+      const names = affectedIds.map(extractName);
+      return names.length > 0 ? `切换了 ${names.join('、')}` : '切换了服务器状态';
+    }
+    case 'add_server': {
+      const names = affectedIds.map(extractName);
+      const clients = [...new Set(affectedIds.map(extractClientLabel).filter(Boolean))];
+      const prefix = clients.length > 0 ? `${clients.join('/')} ` : '';
+      return names.length > 0 ? `${prefix}添加了 ${names.join('、')}` : '添加了 MCP 服务器';
+    }
+    case 'edit_server': {
+      const names = affectedIds.map(extractName);
+      const clients = [...new Set(affectedIds.map(extractClientLabel).filter(Boolean))];
+      const prefix = clients.length > 0 ? `${clients.join('/')} ` : '';
+      return names.length > 0 ? `${prefix}编辑了 ${names.join('、')}` : '编辑了 MCP 服务器';
+    }
     case 'apply_profile':
       return '应用了配置方案';
     case 'rollback':
@@ -52,7 +81,7 @@ function backupToActivity(record: BackupRecord): Activity {
   return {
     id: record.backup_id,
     time: formatRelativeTime(record.created_at),
-    description: formatActivityDescription(record.op, record.affected_ids),
+    description: formatActivityDescription(record.op, record),
   };
 }
 
@@ -76,7 +105,7 @@ export function Dashboard({
       .then((records) => {
         if (cancelled) return;
         const sorted = [...records].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          (a, b) => new Date(normalizeIso(b.created_at)).getTime() - new Date(normalizeIso(a.created_at)).getTime(),
         );
         setActivities(sorted.slice(0, 3).map(backupToActivity));
       })

@@ -450,6 +450,8 @@ fn backup_file(
     op: BackupOp,
     summary: &str,
     affected_ids: Vec<String>,
+    enabled_ids: Vec<String>,
+    disabled_ids: Vec<String>,
 ) -> Result<BackupRecord, CoreError> {
     fs::create_dir_all(backups_dir)
         .map_err(|e| CoreError::Io(format!("mkdir {}: {e}", backups_dir.display())))?;
@@ -479,6 +481,8 @@ fn backup_file(
         op,
         summary: summary.to_string(),
         affected_ids,
+        enabled_ids,
+        disabled_ids,
     })
 }
 
@@ -2260,6 +2264,8 @@ fn apply_planned(
                 planned.backup_op.clone(),
                 "auto backup",
                 affected_ids.clone(),
+                planned.summary.will_enable.clone(),
+                planned.summary.will_disable.clone(),
             )?;
             backups.push(rec);
         }
@@ -2783,6 +2789,8 @@ pub fn backup_apply_rollback(
             &target,
             BackupOp::Rollback,
             "pre-rollback backup",
+            vec![],
+            vec![],
             vec![],
         )
         .map_err(AppError::from)?;

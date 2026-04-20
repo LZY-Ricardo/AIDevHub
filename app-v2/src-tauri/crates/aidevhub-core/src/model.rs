@@ -354,6 +354,10 @@ pub struct BackupRecord {
     pub summary: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub affected_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enabled_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disabled_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
