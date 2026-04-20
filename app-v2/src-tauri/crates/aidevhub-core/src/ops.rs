@@ -132,6 +132,32 @@ fn ensure_parent_dir(path: &Path) -> Result<(), CoreError> {
     Ok(())
 }
 
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), CoreError> {
+    fs::create_dir_all(dst)
+        .map_err(|e| CoreError::Io(format!("mkdir {}: {e}", dst.display())))?;
+    for entry in fs::read_dir(src).map_err(|e| {
+        CoreError::Io(format!("read_dir {}: {e}", src.display()))
+    })? {
+        let entry = entry.map_err(|e| {
+            CoreError::Io(format!("readdir entry {}: {e}", src.display()))
+        })?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path).map_err(|e| {
+                CoreError::Io(format!(
+                    "copy {} -> {}: {e}",
+                    src_path.display(),
+                    dst_path.display()
+                ))
+            })?;
+        }
+    }
+    Ok(())
+}
+
 fn write_atomic(path: &Path, content: &str) -> Result<(), CoreError> {
     ensure_parent_dir(path)?;
     let parent = path
@@ -1768,44 +1794,96 @@ fn plan_toggle_skill(
             });
         }
         Client::ClaudeCode => {
-            let enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
-            let disabled_path = paths
+            // Try commands first (file-based: ~/.claude/commands/{name}.md)
+            let cmd_enabled_path = paths.claude_commands_dir.join(format!("{name}.md"));
+            let cmd_disabled_path = paths
                 .claude_commands_disabled_dir
                 .join(format!("{name}.md"));
-            let exists_enabled = enabled_path.exists();
-            let exists_disabled = disabled_path.exists();
-            if exists_enabled && exists_disabled {
+            let cmd_exists_enabled = cmd_enabled_path.exists();
+            let cmd_exists_disabled = cmd_disabled_path.exists();
+
+            // Then try skills (directory-based: ~/.claude/skills/{name}/SKILL.md)
+            let skill_enabled_dir = paths.claude_skills_dir.join(&name);
+            let skill_disabled_dir = paths.claude_skills_disabled_dir.join(&name);
+            let skill_exists_enabled =
+                skill_enabled_dir.is_dir() && skill_enabled_dir.join("SKILL.md").exists();
+            let skill_exists_disabled =
+                skill_disabled_dir.is_dir() && skill_disabled_dir.join("SKILL.md").exists();
+
+            if (cmd_exists_enabled || cmd_exists_disabled)
+                && (skill_exists_enabled || skill_exists_disabled)
+            {
                 return Err(CoreError::Validation(format!(
-                    "command exists in both enabled/disabled locations: {skill_id_str}"
+                    "skill exists as both command and skill directory: {skill_id_str}"
                 )));
             }
 
-            let currently_enabled = exists_enabled;
-            if currently_enabled == enabled {
-                return Ok(planned);
-            }
-
-            let (from, to) = if enabled {
-                (disabled_path, enabled_path)
+            if cmd_exists_enabled || cmd_exists_disabled {
+                // File-based command
+                if cmd_exists_enabled && cmd_exists_disabled {
+                    return Err(CoreError::Validation(format!(
+                        "command exists in both enabled/disabled locations: {skill_id_str}"
+                    )));
+                }
+                let currently_enabled = cmd_exists_enabled;
+                if currently_enabled == enabled {
+                    return Ok(planned);
+                }
+                let (from, to) = if enabled {
+                    (cmd_disabled_path, cmd_enabled_path)
+                } else {
+                    (cmd_enabled_path, cmd_disabled_path)
+                };
+                if !from.exists() {
+                    return Err(CoreError::NotFound(format!(
+                        "command file missing: {}",
+                        from.display()
+                    )));
+                }
+                planned
+                    .expected_files
+                    .push(file_precondition_from_disk(&from)?);
+                planned.moves.push(PlannedMove {
+                    from,
+                    to,
+                    kind: SkillKind::File,
+                });
+            } else if skill_exists_enabled || skill_exists_disabled {
+                // Directory-based skill
+                if skill_exists_enabled && skill_exists_disabled {
+                    return Err(CoreError::Validation(format!(
+                        "skill exists in both enabled/disabled locations: {skill_id_str}"
+                    )));
+                }
+                let currently_enabled = skill_exists_enabled;
+                if currently_enabled == enabled {
+                    return Ok(planned);
+                }
+                let (from, to) = if enabled {
+                    (skill_disabled_dir, skill_enabled_dir)
+                } else {
+                    (skill_enabled_dir, skill_disabled_dir)
+                };
+                let entry_from = from.join("SKILL.md");
+                if !entry_from.exists() {
+                    return Err(CoreError::NotFound(format!(
+                        "missing SKILL.md: {}",
+                        entry_from.display()
+                    )));
+                }
+                planned
+                    .expected_files
+                    .push(file_precondition_from_disk(&entry_from)?);
+                planned.moves.push(PlannedMove {
+                    from,
+                    to,
+                    kind: SkillKind::Dir,
+                });
             } else {
-                (enabled_path, disabled_path)
-            };
-
-            if !from.exists() {
                 return Err(CoreError::NotFound(format!(
-                    "command file missing: {}",
-                    from.display()
+                    "skill not found: {skill_id_str}"
                 )));
             }
-
-            planned
-                .expected_files
-                .push(file_precondition_from_disk(&from)?);
-            planned.moves.push(PlannedMove {
-                from,
-                to,
-                kind: SkillKind::File,
-            });
         }
     }
 
@@ -2306,13 +2384,33 @@ fn apply_planned(
             )));
         }
         ensure_parent_dir(&m.to)?;
-        fs::rename(&m.from, &m.to).map_err(|e| {
-            CoreError::Io(format!(
-                "rename {} -> {}: {e}",
-                m.from.display(),
-                m.to.display()
-            ))
-        })?;
+        if fs::rename(&m.from, &m.to).is_err() {
+            // On Windows, fs::rename can fail with "Access Denied" (os error 5)
+            // for certain directories. Fall back to copy + remove_dir_all.
+            if m.from.is_dir() {
+                copy_dir_recursive(&m.from, &m.to)?;
+                fs::remove_dir_all(&m.from).map_err(|e| {
+                    CoreError::Io(format!(
+                        "remove_dir_all {} after copy: {e}",
+                        m.from.display()
+                    ))
+                })?;
+            } else {
+                fs::copy(&m.from, &m.to).map_err(|e| {
+                    CoreError::Io(format!(
+                        "copy {} -> {}: {e}",
+                        m.from.display(),
+                        m.to.display()
+                    ))
+                })?;
+                fs::remove_file(&m.from).map_err(|e| {
+                    CoreError::Io(format!(
+                        "remove {} after copy: {e}",
+                        m.from.display()
+                    ))
+                })?;
+            }
+        }
     }
 
     for f in &planned.files {
