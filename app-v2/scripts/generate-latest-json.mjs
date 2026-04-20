@@ -9,6 +9,19 @@ export function buildLatestManifest({
   signature,
   url,
 }) {
+  if (!signature?.trim()) {
+    throw new Error("Signature cannot be empty");
+  }
+  if (Number.isNaN(Date.parse(pubDate))) {
+    throw new Error("pubDate must be a valid date string");
+  }
+  if (!platform) {
+    throw new Error("platform is required");
+  }
+  if (!url) {
+    throw new Error("url is required");
+  }
+
   return {
     version,
     notes,
@@ -44,7 +57,9 @@ export function generateLatestJson({
   writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+const cliEntry = process.argv[1] ? `file://${process.argv[1].replace(/\\/g, "/")}` : null;
+
+if (cliEntry && import.meta.url === cliEntry) {
   const [
     ,
     ,

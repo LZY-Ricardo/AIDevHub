@@ -1,36 +1,86 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-function replaceJsonVersion(filePath, nextVersion) {
+function buildJsonVersionContent(filePath, nextVersion) {
   const source = readFileSync(filePath, "utf8");
   const json = JSON.parse(source);
   json.version = nextVersion;
-  writeFileSync(filePath, `${JSON.stringify(json, null, 2)}\n`, "utf8");
+  return `${JSON.stringify(json, null, 2)}\n`;
 }
 
-function replaceCargoTomlVersion(filePath, nextVersion) {
+function buildCargoTomlVersionContent(filePath, nextVersion) {
   const source = readFileSync(filePath, "utf8");
-  const updated = source.replace(/^version = ".*"$/m, `version = "${nextVersion}"`);
-  writeFileSync(filePath, updated, "utf8");
+  const updated = source.replace(
+    /(\[package\][^\[]*?)^version = ".*"$/m,
+    `$1version = "${nextVersion}"`,
+  );
+  if (updated === source) {
+    throw new Error(`Failed to update Cargo.toml version in ${filePath}`);
+  }
+  return updated;
 }
 
-function replaceCargoLockVersion(filePath, nextVersion) {
+function buildCargoLockVersionContent(filePath, nextVersion) {
   const source = readFileSync(filePath, "utf8");
   const updated = source.replace(
     /(name = "app-v2"\r?\nversion = ")([^"]+)(")/,
     `$1${nextVersion}$3`,
   );
-  writeFileSync(filePath, updated, "utf8");
+  if (updated === source) {
+    throw new Error(`Failed to update Cargo.lock version in ${filePath}`);
+  }
+  return updated;
 }
 
 export function updateReleaseVersion(projectRoot, nextVersion) {
-  replaceJsonVersion(resolve(projectRoot, "package.json"), nextVersion);
-  replaceCargoTomlVersion(resolve(projectRoot, "src-tauri/Cargo.toml"), nextVersion);
-  replaceJsonVersion(resolve(projectRoot, "src-tauri/tauri.conf.json"), nextVersion);
-  replaceCargoLockVersion(resolve(projectRoot, "src-tauri/Cargo.lock"), nextVersion);
+  const packageJsonPath = resolve(projectRoot, "package.json");
+  const cargoTomlPath = resolve(projectRoot, "src-tauri/Cargo.toml");
+  const tauriConfigPath = resolve(projectRoot, "src-tauri/tauri.conf.json");
+  const cargoLockPath = resolve(projectRoot, "src-tauri/Cargo.lock");
+
+  const nextPackageJson = buildJsonVersionContent(packageJsonPath, nextVersion);
+  const nextCargoToml = buildCargoTomlVersionContent(cargoTomlPath, nextVersion);
+  const nextTauriConfig = buildJsonVersionContent(tauriConfigPath, nextVersion);
+  const nextCargoLock = buildCargoLockVersionContent(cargoLockPath, nextVersion);
+
+  writeFileSync(packageJsonPath, nextPackageJson, "utf8");
+  writeFileSync(cargoTomlPath, nextCargoToml, "utf8");
+  writeFileSync(tauriConfigPath, nextTauriConfig, "utf8");
+  writeFileSync(cargoLockPath, nextCargoLock, "utf8");
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+export function readReleaseVersions(projectRoot) {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(projectRoot, "package.json"), "utf8"),
+  );
+  const tauriConfig = JSON.parse(
+    readFileSync(resolve(projectRoot, "src-tauri/tauri.conf.json"), "utf8"),
+  );
+  const cargoToml = readFileSync(resolve(projectRoot, "src-tauri/Cargo.toml"), "utf8");
+  const cargoLock = readFileSync(resolve(projectRoot, "src-tauri/Cargo.lock"), "utf8");
+
+  const cargoVersionMatch = cargoToml.match(/^version = "([^"]+)"$/m);
+  if (!cargoVersionMatch) {
+    throw new Error("Failed to read Cargo.toml version");
+  }
+  const cargoLockVersionMatch = cargoLock.match(
+    /(name = "app-v2"\r?\nversion = ")([^"]+)(")/,
+  );
+  if (!cargoLockVersionMatch) {
+    throw new Error("Failed to read Cargo.lock version");
+  }
+
+  return {
+    packageJson: packageJson.version,
+    cargoToml: cargoVersionMatch[1],
+    cargoLock: cargoLockVersionMatch[2],
+    tauriConfig: tauriConfig.version,
+  };
+}
+
+const cliEntry = process.argv[1] ? `file://${process.argv[1].replace(/\\/g, "/")}` : null;
+
+if (cliEntry && import.meta.url === cliEntry) {
   const projectRoot = process.argv[2];
   const nextVersion = process.argv[3];
 

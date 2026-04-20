@@ -26,16 +26,18 @@
 
 - Risk: GitHub Secrets 中的签名私钥配置错误会导致 workflow 只能产出安装包，不能产出完整 updater 元数据
   - Mitigation: 在 workflow 中对私钥存在性和构建产物完整性做显式检查
-- Risk: 自动提升版本号会改动多个文件，失败时可能留下半完成状态
-  - Mitigation: 在 workflow 中集中更新并在单次提交/临时工作树里完成
+- Risk: 已存在错误 tag 或 release 时，重跑 workflow 可能覆盖错误发布状态
+  - Mitigation: workflow 对同版本 tag/release 先做 fail-fast，不允许在脏状态上继续覆盖
+- Risk: 创建 release 过程中如果上传资产失败，可能留下半成品 release/tag
+  - Mitigation: workflow 在创建 release 失败后自动删除本次新建的 release 与 tag
 
 ## Migration Plan
 
 1. 新增 release automation workflow
-2. 用手动触发模式先验证一次
+2. 用手动触发模式验证一次
 3. 确认 release 资产、`latest.json` 和 updater 链路可用
 
 ## Open Questions
 
 - 是否要把 Linux/macOS 的 updater 元数据也纳入同一份 `latest.json`
-- 版本号提升是 workflow 自动提交，还是通过 tag / 输入参数驱动但不回写仓库
+- 版本号是否继续坚持“先提交到 main，再触发 workflow”的模式

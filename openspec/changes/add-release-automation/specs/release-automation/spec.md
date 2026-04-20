@@ -7,6 +7,18 @@ The system SHALL provide a GitHub Actions workflow that can build and publish a 
 - **WHEN** a maintainer starts the release workflow with a target version
 - **THEN** the workflow builds the desktop application, signs the updater artifacts, and prepares the release assets for publication
 
+#### Scenario: Workflow is triggered from a non-main ref
+- **WHEN** a maintainer triggers the release workflow from any branch other than `main`
+- **THEN** the workflow fails before starting the release process
+
+#### Scenario: Version files do not match the requested version
+- **WHEN** the workflow input version differs from tracked release version files
+- **THEN** the workflow fails before building release artifacts
+
+#### Scenario: Same-version tag or release already exists
+- **WHEN** the workflow detects an existing `app-vX.Y.Z` tag or release
+- **THEN** it fails before publishing new assets, requiring manual cleanup or operator review
+
 ### Requirement: Updater Metadata Generation
 The system SHALL generate and publish a `latest.json` file that matches the configured updater endpoint contract.
 

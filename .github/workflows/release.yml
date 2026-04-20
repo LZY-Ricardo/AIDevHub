@@ -23,6 +23,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require main branch
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -ne "refs/heads/main") {
+            throw "Release Automation 只能从 main 手动触发"
+          }
+
+      - name: Fail if release tag already exists
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $tag = "app-v$env:RELEASE_VERSION"
+          git fetch origin --tags --force
+          if ($LASTEXITCODE -ne 0) {
+            throw "拉取远端 tags 失败，无法继续发布。"
+          }
+
+          git show-ref --verify --quiet "refs/tags/$tag"
+          if ($LASTEXITCODE -eq 0) {
+            throw "检测到已存在的 tag $tag，请先人工确认并清理后再重新触发发布。"
+          }
+
+          $releaseCheck = gh api "repos/${{ github.repository }}/releases/tags/$tag" 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "检测到已存在的 release $tag，请先人工确认并清理后再重新触发发布。"
+          }
+          if ($releaseCheck -notmatch "404" -and $releaseCheck -notmatch "Not Found") {
+            throw "检查 release 状态失败：$releaseCheck"
+          }
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -37,27 +69,17 @@ jobs:
         working-directory: app-v2
         run: pnpm install
 
-      - name: Update release version files
-        run: node app-v2/scripts/update-release-version.mjs app-v2 "${{ inputs.version }}"
-
-      - name: Commit version bump
+      - name: Verify release version matches tracked files
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app-v2/package.json app-v2/src-tauri/Cargo.toml app-v2/src-tauri/Cargo.lock app-v2/src-tauri/tauri.conf.json
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
-            git commit -m "chore(release): 升级版本到${{ inputs.version }}"
-            git push origin HEAD:main
+          $v = $env:RELEASE_VERSION
+          $versionsJson = node -e "import { readReleaseVersions } from './app-v2/scripts/update-release-version.mjs'; console.log(JSON.stringify(readReleaseVersions('app-v2')))"
+          $versions = $versionsJson | ConvertFrom-Json
+          if ($versions.packageJson -ne $v -or $versions.cargoToml -ne $v -or $versions.cargoLock -ne $v -or $versions.tauriConfig -ne $v) {
+            throw "版本文件与 workflow 输入不一致，请先在 main 上完成版本升级后再触发发布。"
           }
-
-      - name: Create and push release tag
-        shell: pwsh
-        run: |
-          $tag = "app-v${{ inputs.version }}"
-          git tag -f $tag
-          git push origin $tag --force
 
       - name: Build signed bundles
         working-directory: app-v2
@@ -66,31 +88,105 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build
 
+      - name: Validate bundle artifacts
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $v = $env:RELEASE_VERSION
+          $required = @(
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi",
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.sig",
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.zip",
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.zip.sig",
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.exe",
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.exe.sig",
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip",
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig"
+          )
+
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -gt 0) {
+            throw "缺少发布产物: $($missing -join ', ')"
+          }
+
+          $empty = $required | Where-Object { (Get-Item $_).Length -le 0 }
+          if ($empty.Count -gt 0) {
+            throw "发布产物为空文件: $($empty -join ', ')"
+          }
+
+          $sigFiles = $required | Where-Object { $_ -like "*.sig" }
+          foreach ($sig in $sigFiles) {
+            $sigContent = (Get-Content -Raw $sig).Trim()
+            if (-not $sigContent) {
+              throw "签名文件为空: $sig"
+            }
+          }
+
       - name: Generate latest.json
         shell: pwsh
+        env:
+          RELEASE_NOTES: ${{ inputs.notes }}
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          $tag = "app-v${{ inputs.version }}"
-          $notes = "${{ inputs.notes }}"
+          $v = $env:RELEASE_VERSION
+          $tag = "app-v$v"
+          $notes = $env:RELEASE_NOTES
           $pubDate = (Get-Date).ToString("o")
           node app-v2/scripts/generate-latest-json.mjs `
             latest.json `
-            "${{ inputs.version }}" `
+            $v `
             $notes `
             $pubDate `
             windows-x86_64 `
-            app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig `
-            https://github.com/${{ github.repository }}/releases/download/$tag/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig" `
+            "https://github.com/${{ github.repository }}/releases/download/$tag/AIDevHub_${v}_x64-setup.nsis.zip"
 
-      - name: Create or update release
+      - name: Validate latest.json
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $v = $env:RELEASE_VERSION
+          if (-not (Test-Path "latest.json")) {
+            throw "缺少 latest.json"
+          }
+          $manifest = Get-Content -Raw "latest.json" | ConvertFrom-Json
+          $expectedSignature = (Get-Content -Raw "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig").Trim()
+          $expectedUrl = "https://github.com/${{ github.repository }}/releases/download/app-v$v/AIDevHub_${v}_x64-setup.nsis.zip"
+
+          if ($manifest.version -ne $v) {
+            throw "latest.json version 不匹配"
+          }
+          if (-not $manifest.notes) {
+            throw "latest.json notes 不能为空"
+          }
+          if (-not $manifest.pub_date -or [DateTime]::TryParse($manifest.pub_date, [ref]([datetime]::MinValue)) -eq $false) {
+            throw "latest.json pub_date 不合法"
+          }
+          if (-not $manifest.platforms.'windows-x86_64') {
+            throw "latest.json 缺少 windows-x86_64 平台配置"
+          }
+          if ($manifest.platforms.'windows-x86_64'.signature -ne $expectedSignature) {
+            throw "latest.json signature 不匹配"
+          }
+          if ($manifest.platforms.'windows-x86_64'.url -ne $expectedUrl) {
+            throw "latest.json url 不匹配"
+          }
+
+      - name: Create release
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
-          $tag = "app-v${{ inputs.version }}"
-          $title = "AIDevHub v${{ inputs.version }}"
+          $v = $env:RELEASE_VERSION
+          $tag = "app-v$v"
+          $title = "AIDevHub v$v"
           $notes = @"
           ## Summary
-          ${{ inputs.notes }}
+          $env:RELEASE_NOTES
 
           ## Assets
           - Windows MSI installer
@@ -104,33 +200,31 @@ jobs:
           - latest.json
           "@
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.sig" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip.sig" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe.sig" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig" `
-              "latest.json" `
-              --target main `
-              --title $title `
-              --notes $notes
-          }
-          else {
-            gh release upload $tag `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.sig" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip" `
-              "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${{ inputs.version }}_x64_en-US.msi.zip.sig" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.exe.sig" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip" `
-              "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${{ inputs.version }}_x64-setup.nsis.zip.sig" `
-              "latest.json" `
-              --clobber
-            gh release edit $tag --title $title --notes $notes
+          gh release create $tag `
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi" `
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.sig" `
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.zip" `
+            "app-v2/src-tauri/target/release/bundle/msi/AIDevHub_${v}_x64_en-US.msi.zip.sig" `
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.exe" `
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.exe.sig" `
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip" `
+            "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig" `
+            "latest.json" `
+            --target ${{ github.sha }} `
+            --title $title `
+            --notes $notes
+
+      - name: Cleanup failed release
+        if: failure()
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $tag = "app-v$env:RELEASE_VERSION"
+          $cleanupErrors = @()
+          try { gh release delete $tag --yes 2>&1 | ForEach-Object { $_.ToString() } } catch { $cleanupErrors += "release delete failed: $_" }
+          try { git push origin ":refs/tags/$tag" 2>&1 } catch { $cleanupErrors += "tag delete failed: $_" }
+          if ($cleanupErrors.Count -gt 0) {
+            Write-Warning "清理发布失败，可能需要人工干预：$($cleanupErrors -join '; ')"
           }
