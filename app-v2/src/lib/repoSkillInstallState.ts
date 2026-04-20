@@ -93,9 +93,9 @@ export function summarizeRepoSkillInstallState(
 }
 
 export function repoSkillInstallStatusText(state: RepoSkillInstallState): string {
-  if (state.claudeInstalled && state.codexInstalled) return "已安装到 Claude / Codex";
-  if (state.claudeInstalled) return "已安装到 Claude";
-  if (state.codexInstalled) return "已安装到 Codex";
+  if (state.claudeInstalled && state.codexInstalled) return "Claude + Codex";
+  if (state.claudeInstalled) return "Claude";
+  if (state.codexInstalled) return "Codex";
   if (state.claudeMissing && state.codexMissing) return "Claude / Codex 安装缺失";
   if (state.claudeMissing) return "Claude 安装缺失";
   if (state.codexMissing) return "Codex 安装缺失";
