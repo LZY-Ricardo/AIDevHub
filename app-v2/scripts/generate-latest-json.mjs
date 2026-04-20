@@ -57,7 +57,9 @@ export function generateLatestJson({
   writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
-const cliEntry = process.argv[1] ? `file://${process.argv[1].replace(/\\/g, "/")}` : null;
+import { pathToFileURL } from "node:url";
+
+const cliEntry = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
 
 if (cliEntry && import.meta.url === cliEntry) {
   const [

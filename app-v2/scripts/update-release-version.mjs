@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function buildJsonVersionContent(filePath, nextVersion) {
   const source = readFileSync(filePath, "utf8");
@@ -78,7 +79,7 @@ export function readReleaseVersions(projectRoot) {
   };
 }
 
-const cliEntry = process.argv[1] ? `file://${process.argv[1].replace(/\\/g, "/")}` : null;
+const cliEntry = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
 
 if (cliEntry && import.meta.url === cliEntry) {
   const projectRoot = process.argv[2];

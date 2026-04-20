@@ -149,8 +149,15 @@ jobs:
             windows-x86_64 `
             "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig" `
             "https://github.com/${{ github.repository }}/releases/download/$tag/AIDevHub_${v}_x64-setup.nsis.zip"
+          if ($LASTEXITCODE -ne 0) {
+            throw "生成 latest.json 失败，node exit code: $LASTEXITCODE"
+          }
+          if (-not (Test-Path "latest.json")) {
+            throw "latest.json 未生成"
+          }
           Write-Host "latest.json content:"
           Get-Content -Raw latest.json | Write-Host
+          exit 0
 
       - name: Validate latest.json
         shell: pwsh
