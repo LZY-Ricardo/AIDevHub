@@ -63,6 +63,7 @@ jobs:
             throw "检查 release 状态失败：$releaseCheck"
           }
           Write-Host "tag 和 release 均不存在，可以继续发布。"
+          exit 0
 
       - uses: pnpm/action-setup@v4
         with:
