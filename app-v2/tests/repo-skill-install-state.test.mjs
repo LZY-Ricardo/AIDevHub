@@ -98,3 +98,37 @@ test("全局安装应只禁用对应全局目标，不影响项目目标", () =>
   assert.equal(canInstallRepoSkillToTargetType(state, "claude_project"), true);
   assert.equal(canInstallRepoSkillToTargetType(state, "codex_project"), true);
 });
+
+test("本地已安装的 skill 应反映为已安装，即使无 deployment 记录", () => {
+  const state = summarizeRepoSkillInstallState(
+    [],
+    [
+      { skill_id: "claude_code:beads-assistant", client: "claude_code" },
+      { skill_id: "claude_code:cn-commit", client: "claude_code" },
+    ],
+    [
+      { skill_id: "skill-abc123", slug: "beads-assistant", display_name: "Beads" },
+      { skill_id: "skill-def456", slug: "cn-commit", display_name: "CN Commit" },
+    ],
+  );
+
+  const beads = state.get("skill-abc123");
+  assert.equal(beads?.claudeInstalled, true);
+  assert.equal(repoSkillInstallStatusText(beads), "已安装到 Claude");
+
+  const cnCommit = state.get("skill-def456");
+  assert.equal(cnCommit?.claudeInstalled, true);
+  assert.equal(repoSkillInstallStatusText(cnCommit), "已安装到 Claude");
+});
+
+test("本地 skill 与 deployment 合并时应正确叠加", () => {
+  const state = summarizeRepoSkillInstallState(
+    [deployment({ skill_id: "skill-xyz", client: "codex", target_type: "codex_global" })],
+    [{ skill_id: "claude_code:my-skill", client: "claude_code" }],
+    [{ skill_id: "skill-xyz", slug: "my-skill", display_name: "My Skill" }],
+  ).get("skill-xyz");
+
+  assert.equal(state?.claudeInstalled, true);
+  assert.equal(state?.codexInstalled, true);
+  assert.equal(repoSkillInstallStatusText(state), "已安装到 Claude / Codex");
+});

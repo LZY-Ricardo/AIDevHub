@@ -176,8 +176,8 @@ export function SkillsPage() {
   }, [skills, query]);
 
   const repoDeploymentState = useMemo(() => {
-    return summarizeRepoSkillInstallState(repoDeployments ?? []);
-  }, [repoDeployments]);
+    return summarizeRepoSkillInstallState(repoDeployments ?? [], skills ?? [], repoSkills ?? []);
+  }, [repoDeployments, skills, repoSkills]);
 
   async function openDetails(s: SkillRecord) {
     setSelected(s);
@@ -624,7 +624,6 @@ export function SkillsPage() {
         <table className="ui-table ui-tableSkills ui-tableNoStickyLastCol" aria-label="Skills列表">
           <colgroup>
             <col className="ui-colSkillName" />
-            <col className="ui-colSkillClient" />
             <col className="ui-colSkillScope" />
             <col className="ui-colSkillKind" />
             <col className="ui-colSkillStatus" />
@@ -633,7 +632,6 @@ export function SkillsPage() {
           <thead>
             <tr>
               <th className="ui-th">名称</th>
-              <th className="ui-th">客户端</th>
               <th className="ui-th">范围</th>
               <th className="ui-th">类型</th>
               <th className="ui-th">状态</th>
@@ -645,7 +643,6 @@ export function SkillsPage() {
           <tbody>
             {(filtered ?? []).map((s) => {
               const displayName = formatSkillName(s.skill_id);
-              const clientText = clientLabel(s.client);
               const scopeText = skillScopeLabel(s.scope);
               const kindText = skillKindLabel(s.kind);
               const statusText = enabledLabel(s.enabled);
@@ -660,11 +657,6 @@ export function SkillsPage() {
                   <td className="ui-td">
                     <div className="ui-code ui-ellipsis ui-skillNameText" title={displayName}>
                       {displayName}
-                    </div>
-                  </td>
-                  <td className="ui-td">
-                    <div className="ui-ellipsis ui-skillClientText" title={clientText}>
-                      {clientText}
                     </div>
                   </td>
                   <td className="ui-td">
@@ -715,14 +707,14 @@ export function SkillsPage() {
             })}
             {skills && filtered.length === 0 ? (
               <tr>
-                <td className="ui-td" colSpan={6}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">暂无 Skill。</div>
                 </td>
               </tr>
             ) : null}
             {!skills ? (
               <tr>
-                <td className="ui-td" colSpan={6}>
+                <td className="ui-td" colSpan={5}>
                   <div className="ui-help">加载中...</div>
                 </td>
               </tr>

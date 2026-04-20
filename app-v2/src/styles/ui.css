@@ -378,11 +378,7 @@
 }
 
 .ui-tableSkills col.ui-colSkillName {
-  width: 14rem;
-}
-
-.ui-tableSkills col.ui-colSkillClient {
-  width: 8.5rem;
+  width: auto;
 }
 
 .ui-tableSkills col.ui-colSkillScope,
@@ -400,7 +396,7 @@
 }
 
 .ui-skillNameText {
-  max-width: 13rem;
+  max-width: none;
 }
 
 .ui-skillClientText {
@@ -1270,11 +1266,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.72fr);
   gap: 18px;
+  align-content: start;
 }
 
 .ui-workspaceMain {
   display: grid;
   gap: 16px;
+  align-content: start;
 }
 
 .ui-workspaceSide {

@@ -1,4 +1,4 @@
-import type { Client, DeploymentTargetType, SkillDeployment } from "./types";
+import type { Client, DeploymentTargetType, ManagedSkillView, SkillDeployment, SkillRecord } from "./types";
 
 export interface RepoSkillInstallState {
   claudeInstalled: boolean;
@@ -15,8 +15,28 @@ function matchesGlobalTargetType(deployment: SkillDeployment, client: Client): b
     : deployment.target_type === "codex_global";
 }
 
+/** Extract the short skill name from a SkillRecord.skill_id like "claude_code:beads-assistant" */
+function stripClientPrefix(skillId: string): string {
+  const idx = skillId.indexOf(":");
+  return idx >= 0 ? skillId.slice(idx + 1) : skillId;
+}
+
+/**
+ * Build a mapping from slug → repo skill_id (hashed).
+ * e.g. "beads-assistant" → "skill-a1b2c3d4e5f6a7b8"
+ */
+function buildSlugToIdMap(repoSkills: ManagedSkillView[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const rs of repoSkills) {
+    map.set(rs.slug, rs.skill_id);
+  }
+  return map;
+}
+
 export function summarizeRepoSkillInstallState(
   deployments: SkillDeployment[],
+  localSkills?: SkillRecord[],
+  repoSkills?: ManagedSkillView[],
 ): Map<string, RepoSkillInstallState> {
   const state = new Map<string, RepoSkillInstallState>();
 
@@ -39,6 +59,34 @@ export function summarizeRepoSkillInstallState(
     }
 
     state.set(deployment.skill_id, current);
+  }
+
+  // Cross-reference with locally installed skills to detect manual installs
+  // that have no deployment record.  Repo skill_ids are hashed ("skill-abc…"),
+  // so we resolve via the slug field (e.g. "beads-assistant").
+  if (localSkills && localSkills.length > 0 && repoSkills && repoSkills.length > 0) {
+    const slugToId = buildSlugToIdMap(repoSkills);
+
+    for (const skill of localSkills) {
+      const slug = stripClientPrefix(skill.skill_id);
+      const repoId = slugToId.get(slug);
+      if (!repoId) continue;
+
+      const current = state.get(repoId) ?? {
+        claudeInstalled: false,
+        codexInstalled: false,
+        claudeMissing: false,
+        codexMissing: false,
+      };
+
+      if (skill.client === "claude_code") {
+        current.claudeInstalled = true;
+      } else if (skill.client === "codex") {
+        current.codexInstalled = true;
+      }
+
+      state.set(repoId, current);
+    }
   }
 
   return state;
