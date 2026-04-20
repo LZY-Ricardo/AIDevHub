@@ -37,7 +37,9 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           $tag = "app-v$env:RELEASE_VERSION"
-          git fetch origin --tags --force
+          Write-Host "检查 tag: $tag"
+
+          git fetch origin --tags --force 2>&1 | Write-Host
           if ($LASTEXITCODE -ne 0) {
             throw "拉取远端 tags 失败，无法继续发布。"
           }
@@ -46,14 +48,21 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             throw "检测到已存在的 tag $tag，请先人工确认并清理后再重新触发发布。"
           }
+          Write-Host "tag 不存在，继续检查 release..."
 
+          $releaseExitCode = 0
           $releaseCheck = gh api "repos/${{ github.repository }}/releases/tags/$tag" 2>&1
-          if ($LASTEXITCODE -eq 0) {
+          $releaseExitCode = $LASTEXITCODE
+          Write-Host "gh api exit code: $releaseExitCode"
+          Write-Host "gh api output: $releaseCheck"
+
+          if ($releaseExitCode -eq 0) {
             throw "检测到已存在的 release $tag，请先人工确认并清理后再重新触发发布。"
           }
-          if ($releaseCheck -notmatch "404" -and $releaseCheck -notmatch "Not Found") {
+          if ($releaseCheck -notmatch "404" -and $releaseCheck -notmatch "Not Found" -and $releaseCheck -notmatch "not found") {
             throw "检查 release 状态失败：$releaseCheck"
           }
+          Write-Host "tag 和 release 均不存在，可以继续发布。"
 
       - uses: pnpm/action-setup@v4
         with:
