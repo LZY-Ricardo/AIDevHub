@@ -14,6 +14,8 @@ export function opLabel(op: BackupOp): string {
   switch (op) {
     case "toggle":
       return "开关切换";
+    case "toggle_skill":
+      return "Skill 切换";
     case "add_server":
       return "新增MCP";
     case "edit_server":

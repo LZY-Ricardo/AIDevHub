@@ -58,6 +58,22 @@ function formatActivityDescription(op: BackupOp, record: BackupRecord): string {
       const names = affectedIds.map(extractName);
       return names.length > 0 ? `切换了 ${names.join('、')}` : '切换了服务器状态';
     }
+    case 'toggle_skill': {
+      const parts: string[] = [];
+      for (const id of enabledIds) {
+        const client = extractClientLabel(id);
+        const name = extractName(id);
+        parts.push(`${client} 启用了 Skill ${name}`);
+      }
+      for (const id of disabledIds) {
+        const client = extractClientLabel(id);
+        const name = extractName(id);
+        parts.push(`${client} 停用了 Skill ${name}`);
+      }
+      if (parts.length > 0) return parts.join('、');
+      const names = affectedIds.map(extractName);
+      return names.length > 0 ? `切换了 Skill ${names.join('、')}` : '切换了 Skill 状态';
+    }
     case 'add_server': {
       const names = affectedIds.map(extractName);
       const clients = [...new Set(affectedIds.map(extractClientLabel).filter(Boolean))];

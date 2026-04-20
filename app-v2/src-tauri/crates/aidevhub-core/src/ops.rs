@@ -1718,7 +1718,7 @@ fn plan_toggle_skill(
         expected_files: vec![],
         summary: WriteSummary::default(),
         warnings: vec![],
-        backup_op: BackupOp::Toggle, // no backups for skills; value is unused
+        backup_op: BackupOp::ToggleSkill,
     };
 
     match client {
@@ -2269,6 +2269,27 @@ fn apply_planned(
             )?;
             backups.push(rec);
         }
+    }
+
+    // For skill-only operations (moves without config file changes),
+    // create a synthetic activity record so they appear in recent activity.
+    if backups.is_empty() && !planned.moves.is_empty() {
+        let ts = Utc::now()
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+            .replace(':', "-");
+        let backup_id = Uuid::new_v4().to_string();
+        let target_path = planned.moves[0].from.to_string_lossy().to_string();
+        backups.push(BackupRecord {
+            backup_id,
+            target_path,
+            backup_path: String::new(),
+            created_at: ts,
+            op: planned.backup_op.clone(),
+            summary: "skill toggle".to_string(),
+            affected_ids: affected_ids.clone(),
+            enabled_ids: planned.summary.will_enable.clone(),
+            disabled_ids: planned.summary.will_disable.clone(),
+        });
     }
 
     for m in &planned.moves {

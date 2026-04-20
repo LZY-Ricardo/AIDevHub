@@ -304,7 +304,7 @@ function App() {
       ) : null}
 
       {route === "skills" ? (
-        <SkillsPage />
+        <SkillsPage onDataChanged={() => setDashboardRefreshTrigger((n: number) => n + 1)} />
       ) : null}
 
       {route === "settings" ? (

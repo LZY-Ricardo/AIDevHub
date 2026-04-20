@@ -338,6 +338,7 @@ pub struct WritePreview {
 #[serde(rename_all = "snake_case")]
 pub enum BackupOp {
     Toggle,
+    ToggleSkill,
     AddServer,
     EditServer,
     ApplyProfile,

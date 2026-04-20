@@ -110,7 +110,7 @@ export interface WritePreview {
   warnings: Warning[];
 }
 
-export type BackupOp = "toggle" | "add_server" | "edit_server" | "apply_profile" | "rollback";
+export type BackupOp = "toggle" | "toggle_skill" | "add_server" | "edit_server" | "apply_profile" | "rollback";
 
 export interface BackupRecord {
   backup_id: string;

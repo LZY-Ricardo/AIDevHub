@@ -100,7 +100,7 @@ function useProjectRootValidation(root: string) {
   return validation;
 }
 
-export function SkillsPage() {
+export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
   const [client, setClient] = useState<Client>("claude_code");
   const [scope, setScope] = useState<ScopeFilter>("user");
   const [skills, setSkills] = useState<SkillRecord[] | null>(null);
@@ -441,6 +441,7 @@ export function SkillsPage() {
       setPending(null);
       setPreview(null);
       await load();
+      onDataChanged?.();
       if (selectedRepo) {
         await openRepoDetails(selectedRepo);
       }
