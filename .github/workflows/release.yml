@@ -141,13 +141,10 @@ jobs:
         run: |
           $v = $env:RELEASE_VERSION
           $tag = "app-v$v"
-          $notes = $env:RELEASE_NOTES
           $pubDate = (Get-Date).ToString("o")
-          Write-Host "Generating latest.json with version=$v notes=$notes pubDate=$pubDate"
           node app-v2/scripts/generate-latest-json.mjs `
             latest.json `
             $v `
-            $notes `
             $pubDate `
             windows-x86_64 `
             "app-v2/src-tauri/target/release/bundle/nsis/AIDevHub_${v}_x64-setup.nsis.zip.sig" `

@@ -65,16 +65,17 @@ if (cliEntry && import.meta.url === cliEntry) {
     ,
     outputPath,
     version,
-    notes,
     pubDate,
     platform,
     signatureFilePath,
     url,
   ] = process.argv;
 
+  const notes = process.env.RELEASE_NOTES;
+
   if (!outputPath || !version || !notes || !pubDate || !platform || !signatureFilePath || !url) {
     throw new Error(
-      "Usage: node generate-latest-json.mjs <outputPath> <version> <notes> <pubDate> <platform> <signatureFilePath> <url>",
+      "Usage: RELEASE_NOTES=... node generate-latest-json.mjs <outputPath> <version> <pubDate> <platform> <signatureFilePath> <url>",
     );
   }
 
