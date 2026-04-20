@@ -41,26 +41,28 @@ export function existsLabel(exists: boolean): string {
   return exists ? "是" : "否";
 }
 
+/** 将 T 后时间部分的短横线还原为冒号，以兼容 2026-04-01T02-39-55Z 这类格式 */
+function normalizeIso(iso: string): string {
+  return iso.replace(/T(\d{2})-(\d{2})-(\d{2})/, "T$1:$2:$3");
+}
+
 export function isoToLocal(iso: string): string {
-  const d = new Date(iso);
+  const d = new Date(normalizeIso(iso));
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString();
 }
 
 export function formatRelativeTime(iso: string): string {
-  const now = Date.now();
-  const d = new Date(iso);
+  const d = new Date(normalizeIso(iso));
   if (Number.isNaN(d.getTime())) return iso;
-  const diffMs = now - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}天前`;
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const hour = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const sec = String(d.getSeconds()).padStart(2, "0");
+  if (year === new Date().getFullYear()) {
+    return `${month}-${day} ${hour}:${min}:${sec}`;
+  }
+  return `${year}-${month}-${day} ${hour}:${min}:${sec}`;
 }
