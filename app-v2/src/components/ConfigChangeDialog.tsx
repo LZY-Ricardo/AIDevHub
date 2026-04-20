@@ -87,16 +87,13 @@ export function ConfigChangeDialog({
     <Dialog
       title="检测到外部配置文件已更新"
       open={open}
-      onClose={() => {
-        if (busy) return;
-        onClose();
-      }}
+      onClose={onClose}
       footer={
         <div className="ui-btnRow">
           <button type="button" className="ui-btn" disabled={busy || updates.length === 0} onClick={() => onIgnore(ignoreConditions)}>
             忽略本次变化
           </button>
-          <button type="button" className="ui-btn" disabled={busy} onClick={onClose}>
+          <button type="button" className="ui-btn" onClick={onClose}>
             关闭
           </button>
         </div>
