@@ -7,7 +7,7 @@ use aidevhub_core::{
         profile_apply, profile_create, profile_delete, profile_list, profile_preview_apply,
         profile_update, runtime_get_info, server_apply_add, server_apply_edit, server_apply_toggle,
         server_get, server_get_edit_session, server_list, server_preview_add, server_preview_edit,
-        server_preview_toggle, AppPaths,
+        server_preview_toggle, skill_get, skill_list, AppPaths,
     },
 };
 
@@ -33,6 +33,7 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         claude_commands_disabled_dir: base.join(".claude").join("commands_disabled"),
         claude_skills_dir: base.join(".claude").join("skills"),
         claude_skills_disabled_dir: base.join(".claude").join("skills_disabled"),
+        agent_skills_dir: base.join(".agents").join("skills"),
         codex_config_path: base.join("codex.toml"),
         codex_skills_dir: base.join(".codex").join("skills"),
         codex_skills_disabled_dir: base.join(".codex").join("skills_disabled"),
@@ -58,6 +59,13 @@ fn write(path: &PathBuf, content: &str) {
         fs::create_dir_all(p).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+fn write_skill_md(path: &PathBuf, name: &str, description: &str) {
+    write(
+        path,
+        &format!("---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n"),
+    );
 }
 
 fn registry_server(
@@ -191,6 +199,80 @@ fn runtime_info_paths_and_exists() {
     );
     let info2 = runtime_get_info(&paths).unwrap();
     assert!(info2.exists.claude_config);
+}
+
+#[test]
+fn skill_list_discovers_shared_agent_skills_as_read_only_entries() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write_skill_md(
+        &paths.agent_skills_dir.join("shared-alpha").join("SKILL.md"),
+        "shared-alpha",
+        "Shared agent skill",
+    );
+
+    let list = skill_list(&paths, None, Some("all".to_string())).unwrap();
+    let skill = list
+        .iter()
+        .find(|item| item.skill_id == "agent_shared:shared-alpha")
+        .expect("shared agent skill should be discovered");
+
+    assert_eq!(skill.name, "shared-alpha");
+    assert_eq!(skill.description, "Shared agent skill");
+    assert!(skill.readonly);
+    assert_eq!(skill.source.as_str(), "agent_shared");
+}
+
+#[test]
+fn skill_get_reads_shared_agent_skill_by_dedicated_namespace() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write_skill_md(
+        &paths.agent_skills_dir.join("shared-beta").join("SKILL.md"),
+        "shared-beta",
+        "Shared beta skill",
+    );
+
+    let full = skill_get(&paths, "agent_shared:shared-beta").unwrap();
+
+    assert_eq!(full.record.skill_id, "agent_shared:shared-beta");
+    assert!(full.record.readonly);
+    assert_eq!(full.record.source.as_str(), "agent_shared");
+    assert!(full.content.contains("Shared beta skill"));
+}
+
+#[test]
+fn skill_list_with_client_filter_excludes_shared_agent_skills() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = mk_paths(&tmp);
+
+    write_skill_md(
+        &paths.agent_skills_dir.join("shared-gamma").join("SKILL.md"),
+        "shared-gamma",
+        "Shared gamma skill",
+    );
+    write_skill_md(
+        &paths.codex_skills_dir.join("codex-local").join("SKILL.md"),
+        "codex-local",
+        "Codex local skill",
+    );
+
+    let codex_list = skill_list(&paths, Some(Client::Codex), Some("all".to_string())).unwrap();
+    assert!(codex_list.iter().any(|item| item.skill_id == "codex:codex-local"));
+    assert!(
+        codex_list
+            .iter()
+            .all(|item| item.skill_id != "agent_shared:shared-gamma")
+    );
+
+    let claude_list = skill_list(&paths, Some(Client::ClaudeCode), Some("all".to_string())).unwrap();
+    assert!(
+        claude_list
+            .iter()
+            .all(|item| item.skill_id != "agent_shared:shared-gamma")
+    );
 }
 
 #[test]

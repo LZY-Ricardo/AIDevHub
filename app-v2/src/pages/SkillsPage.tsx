@@ -14,7 +14,7 @@ import type {
   WritePreview,
 } from "../lib/types";
 import { api } from "../lib/api";
-import { clientLabel, enabledLabel, skillKindLabel, skillScopeLabel } from "../lib/format";
+import { clientLabel, enabledLabel, skillKindLabel, skillScopeLabel, skillSourceLabel } from "../lib/format";
 import { getProjectRootDraftError } from "../lib/projectRootValidation";
 import {
   canInstallRepoSkillToTargetType,
@@ -26,6 +26,7 @@ import { UiSelect, type UiSelectOption } from "../components/UiSelect";
 import { WritePreviewDialog } from "../components/WritePreviewDialog";
 
 type ScopeFilter = "user" | "system" | "disabled";
+type SourceFilter = "all" | "claude" | "codex" | "agent";
 
 type PendingAction =
   | { type: "toggle"; skill_id: string; enabled: boolean }
@@ -101,7 +102,7 @@ function useProjectRootValidation(root: string) {
 }
 
 export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
-  const [client, setClient] = useState<Client>("claude_code");
+  const [source, setSource] = useState<SourceFilter>("all");
   const [scope, setScope] = useState<ScopeFilter>("user");
   const [skills, setSkills] = useState<SkillRecord[] | null>(null);
   const [repoSkills, setRepoSkills] = useState<ManagedSkillView[] | null>(null);
@@ -135,10 +136,12 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
   const [previewTitle, setPreviewTitle] = useState("变更预览");
   const [pending, setPending] = useState<PendingAction | null>(null);
 
-  const clientOptions = [
-    { value: "claude_code", label: clientLabel("claude_code") },
-    { value: "codex", label: clientLabel("codex") },
-  ] satisfies Array<UiSelectOption<Client>>;
+  const sourceOptions = [
+    { value: "all", label: "全部" },
+    { value: "claude", label: "Claude" },
+    { value: "codex", label: "Codex" },
+    { value: "agent", label: "Agent" },
+  ] satisfies Array<UiSelectOption<SourceFilter>>;
 
   const scopeOptions = [
     { value: "user", label: "用户" },
@@ -150,7 +153,7 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
     setError(null);
     try {
       const [list, repoList, deployments] = await Promise.all([
-        api.skillList({ client, scope }),
+        api.skillList({ scope }),
         api.skillRepoList(),
         api.skillDeploymentList(),
       ]);
@@ -164,16 +167,28 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
 
   useEffect(() => {
     load();
-  }, [client, scope]);
+  }, [scope]);
+
+  const matchesSourceFilter = (skill: SkillRecord, currentSource: SourceFilter) => {
+    if (currentSource === "all") return true;
+    if (currentSource === "claude") {
+      return skill.source === "claude_command" || skill.source === "claude_skill";
+    }
+    if (currentSource === "codex") {
+      return skill.source === "codex_skill";
+    }
+    return skill.source === "agent_shared";
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return skills ?? [];
-    return (skills ?? []).filter((s) => {
+    const sourceFiltered = (skills ?? []).filter((s) => matchesSourceFilter(s, source));
+    if (!q) return sourceFiltered;
+    return sourceFiltered.filter((s) => {
       const hay = `${s.skill_id} ${s.name} ${s.description}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [skills, query]);
+  }, [skills, query, source]);
 
   const repoDeploymentState = useMemo(() => {
     return summarizeRepoSkillInstallState(repoDeployments ?? [], skills ?? [], repoSkills ?? []);
@@ -328,7 +343,7 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
   }
 
   async function requestToggle(s: SkillRecord, enabled: boolean) {
-    if (s.scope === "system") return;
+    if (s.scope === "system" || s.readonly) return;
     setBusy(true);
     setError(null);
     setPreview(null);
@@ -372,14 +387,16 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
   }
 
   async function requestImport(s: SkillRecord) {
+    if (s.readonly || !s.client) return;
+    const importClient = s.client;
     setBusy(true);
     setError(null);
     setPreview(null);
-    setPending({ type: "import", client: s.client, name: formatSkillName(s.skill_id), source_path: s.container_path });
+    setPending({ type: "import", client: importClient, name: formatSkillName(s.skill_id), source_path: s.container_path });
     setPreviewTitle(`导入到仓库：${formatSkillName(s.skill_id)}`);
     try {
       const p = await api.skillRepoPreviewImport({
-        client: s.client,
+        client: importClient,
         name: formatSkillName(s.skill_id),
         source_path: s.container_path,
       });
@@ -480,13 +497,13 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              <div className="ui-label">客户端</div>
+              <div className="ui-label">来源</div>
               <div style={{ minWidth: 180 }}>
-                <UiSelect<Client>
-                  ariaLabel="选择客户端"
-                  value={client}
-                  options={clientOptions}
-                  onChange={setClient}
+                <UiSelect<SourceFilter>
+                  ariaLabel="选择来源"
+                  value={source}
+                  options={sourceOptions}
+                  onChange={setSource}
                   disabled={busy}
                 />
               </div>
@@ -633,7 +650,7 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
           <thead>
             <tr>
               <th className="ui-th">名称</th>
-              <th className="ui-th">范围</th>
+              <th className="ui-th">来源 / 范围</th>
               <th className="ui-th">类型</th>
               <th className="ui-th">状态</th>
               <th className="ui-th" style={{ width: 160 }}>
@@ -646,7 +663,9 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
               const displayName = formatSkillName(s.skill_id);
               const scopeText = skillScopeLabel(s.scope);
               const kindText = skillKindLabel(s.kind);
-              const statusText = enabledLabel(s.enabled);
+              const statusText = s.readonly ? "共享" : enabledLabel(s.enabled);
+              const sourceText = skillSourceLabel(s.source);
+              const readonlyTitle = "共享 Skill 第一阶段为只读";
 
               return (
                 <tr
@@ -661,9 +680,9 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
                     </div>
                   </td>
                   <td className="ui-td">
-                    <span className="ui-pill ui-skillMetaPill" title={scopeText}>
+                    <span className="ui-pill ui-skillMetaPill" title={`${sourceText} / ${scopeText}`}>
                       <span className="ui-pillDot" />
-                      <span className="ui-code ui-ellipsis ui-pillText">{scopeText}</span>
+                      <span className="ui-code ui-ellipsis ui-pillText">{`${sourceText} / ${scopeText}`}</span>
                     </span>
                   </td>
                   <td className="ui-td">
@@ -683,18 +702,18 @@ export function SkillsPage({ onDataChanged }: { onDataChanged?: () => void }) {
                       <button
                         type="button"
                         className="ui-btn"
-                        disabled={busy || s.scope === "system"}
+                        disabled={busy || s.readonly || s.scope === "system"}
                         onClick={() => requestToggle(s, !s.enabled)}
-                        title={s.scope === "system" ? "系统 Skill 不支持开关" : "切换启用状态"}
+                        title={s.readonly ? readonlyTitle : s.scope === "system" ? "系统 Skill 不支持开关" : "切换启用状态"}
                       >
                         {s.enabled ? "停用" : "启用"}
                       </button>
                       <button
                         type="button"
                         className="ui-btn"
-                        disabled={busy || s.kind !== "dir" || s.scope === "system"}
+                        disabled={busy || s.readonly || s.kind !== "dir" || s.scope === "system"}
                         onClick={() => requestImport(s)}
-                        title={s.kind !== "dir" ? "仅第一阶段目录型 Skill 支持导入到仓库" : "导入到内部仓库"}
+                        title={s.readonly ? readonlyTitle : s.kind !== "dir" ? "仅第一阶段目录型 Skill 支持导入到仓库" : "导入到内部仓库"}
                       >
                         导入仓库
                       </button>
@@ -1238,12 +1257,18 @@ function DetailsDrawer({
                 <div style={{ marginTop: "10px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <span className="ui-pill">
                     <span className={`ui-pillDot ${rec.enabled ? "ui-pillDotOn" : "ui-pillDotOff"}`} />
-                    <span className="ui-code">{enabledLabel(rec.enabled)}</span>
+                    <span className="ui-code">{rec.readonly ? "共享" : enabledLabel(rec.enabled)}</span>
                   </span>
                   <span className="ui-pill">
                     <span className="ui-pillDot" />
-                    <span className="ui-code">{clientLabel(rec.client)}</span>
+                    <span className="ui-code">{skillSourceLabel(rec.source)}</span>
                   </span>
+                  {rec.client ? (
+                    <span className="ui-pill">
+                      <span className="ui-pillDot" />
+                      <span className="ui-code">{clientLabel(rec.client)}</span>
+                    </span>
+                  ) : null}
                   <span className="ui-pill">
                     <span className="ui-pillDot" />
                     <span className="ui-code">{skillScopeLabel(rec.scope)}</span>
@@ -1274,10 +1299,10 @@ function DetailsDrawer({
                 </div>
               </div>
 
-            <div className="ui-dialogSectionCard">
-              <div className="ui-label">内容（只读）</div>
-              <div style={{ marginTop: "10px" }}>
-                <pre className="ui-pre">{content || "（未加载）"}</pre>
+              <div className="ui-dialogSectionCard">
+                <div className="ui-label">内容（只读）</div>
+                <div style={{ marginTop: "10px" }}>
+                  <pre className="ui-pre">{content || "（未加载）"}</pre>
                 </div>
               </div>
             </div>

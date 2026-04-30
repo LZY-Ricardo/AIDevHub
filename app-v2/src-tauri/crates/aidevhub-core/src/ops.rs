@@ -69,6 +69,7 @@ pub struct AppPaths {
     pub claude_commands_disabled_dir: PathBuf,
     pub claude_skills_dir: PathBuf,
     pub claude_skills_disabled_dir: PathBuf,
+    pub agent_skills_dir: PathBuf,
     pub codex_config_path: PathBuf,
     pub codex_skills_dir: PathBuf,
     pub codex_skills_disabled_dir: PathBuf,
@@ -133,14 +134,12 @@ fn ensure_parent_dir(path: &Path) -> Result<(), CoreError> {
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), CoreError> {
-    fs::create_dir_all(dst)
-        .map_err(|e| CoreError::Io(format!("mkdir {}: {e}", dst.display())))?;
-    for entry in fs::read_dir(src).map_err(|e| {
-        CoreError::Io(format!("read_dir {}: {e}", src.display()))
-    })? {
-        let entry = entry.map_err(|e| {
-            CoreError::Io(format!("readdir entry {}: {e}", src.display()))
-        })?;
+    fs::create_dir_all(dst).map_err(|e| CoreError::Io(format!("mkdir {}: {e}", dst.display())))?;
+    for entry in
+        fs::read_dir(src).map_err(|e| CoreError::Io(format!("read_dir {}: {e}", src.display())))?
+    {
+        let entry =
+            entry.map_err(|e| CoreError::Io(format!("readdir entry {}: {e}", src.display())))?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
         if src_path.is_dir() {
@@ -249,6 +248,14 @@ fn server_id(client: Client, name: &str) -> String {
         Client::ClaudeCode => format!("claude_code:{name}"),
         Client::Codex => format!("codex:{name}"),
     }
+}
+
+fn shared_agent_skill_id(name: &str) -> String {
+    format!("agent_shared:{name}")
+}
+
+fn parse_shared_agent_skill_id(id: &str) -> Option<String> {
+    id.strip_prefix("agent_shared:").map(ToString::to_string)
 }
 
 fn parse_server_id(id: &str) -> Result<(Client, String), CoreError> {
@@ -1141,6 +1148,7 @@ pub fn runtime_get_info(paths: &AppPaths) -> Result<RuntimeGetInfoResponse, AppE
                 .claude_skills_disabled_dir
                 .to_string_lossy()
                 .to_string(),
+            agent_skills_dir: paths.agent_skills_dir.to_string_lossy().to_string(),
             codex_config_path: paths.codex_config_path.to_string_lossy().to_string(),
             codex_skills_dir: paths.codex_skills_dir.to_string_lossy().to_string(),
             codex_skills_disabled_dir: paths
@@ -1300,12 +1308,14 @@ fn build_skill_record_codex(
     Ok((
         SkillRecord {
             skill_id: server_id(Client::Codex, id_name),
-            client: Client::Codex,
+            client: Some(Client::Codex),
+            source: SkillSource::CodexSkill,
             name,
             description,
             scope,
             kind: SkillKind::Dir,
             enabled,
+            readonly: false,
             entry_path: entry_path.to_string_lossy().to_string(),
             container_path: dir_path.to_string_lossy().to_string(),
         },
@@ -1329,12 +1339,14 @@ fn build_skill_record_claude(
     Ok((
         SkillRecord {
             skill_id: server_id(Client::ClaudeCode, command_name),
-            client: Client::ClaudeCode,
+            client: Some(Client::ClaudeCode),
+            source: SkillSource::ClaudeCommand,
             name: command_name.to_string(),
             description,
             scope: SkillScope::User,
             kind: SkillKind::File,
             enabled,
+            readonly: false,
             entry_path: file_path.to_string_lossy().to_string(),
             container_path: file_path
                 .parent()
@@ -1372,12 +1384,51 @@ fn build_skill_record_claude_skill(
     Ok((
         SkillRecord {
             skill_id: server_id(Client::ClaudeCode, id_name),
-            client: Client::ClaudeCode,
+            client: Some(Client::ClaudeCode),
+            source: SkillSource::ClaudeSkill,
             name,
             description,
             scope,
             kind: SkillKind::Dir,
             enabled,
+            readonly: false,
+            entry_path: entry_path.to_string_lossy().to_string(),
+            container_path: dir_path.to_string_lossy().to_string(),
+        },
+        content,
+    ))
+}
+
+fn build_skill_record_agent_shared(
+    id_name: &str,
+    dir_path: &Path,
+) -> Result<(SkillRecord, String), CoreError> {
+    let entry_path = dir_path.join("SKILL.md");
+    let Some(content) = read_to_string_opt(&entry_path)? else {
+        return Err(CoreError::NotFound(format!(
+            "missing SKILL.md: {}",
+            entry_path.display()
+        )));
+    };
+    let fm = parse_yaml_frontmatter(&content);
+    let fallback = dir_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(id_name)
+        .to_string();
+    let name = fm.get("name").cloned().unwrap_or(fallback);
+    let description = fm.get("description").cloned().unwrap_or_default();
+    Ok((
+        SkillRecord {
+            skill_id: shared_agent_skill_id(id_name),
+            client: None,
+            source: SkillSource::AgentShared,
+            name,
+            description,
+            scope: SkillScope::User,
+            kind: SkillKind::Dir,
+            enabled: true,
+            readonly: true,
             entry_path: entry_path.to_string_lossy().to_string(),
             container_path: dir_path.to_string_lossy().to_string(),
         },
@@ -1557,6 +1608,28 @@ pub fn skill_list(
         }
     }
 
+    if client.is_none() {
+        for ent in read_dir_entries(&paths.agent_skills_dir).map_err(AppError::from)? {
+            let Ok(ft) = ent.file_type() else { continue };
+            if !ft.is_dir() {
+                continue;
+            }
+            let p = ent.path();
+            let Some(dir_name) = p.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let entry = p.join("SKILL.md");
+            if !entry.exists() {
+                continue;
+            }
+            if let Ok((rec, _content)) = build_skill_record_agent_shared(dir_name, &p) {
+                if skill_filter_match(filter, &rec) {
+                    out.push(rec);
+                }
+            }
+        }
+    }
+
     out.sort_by(|a, b| {
         (
             format!("{:?}", a.client),
@@ -1576,6 +1649,19 @@ pub fn skill_list(
 }
 
 pub fn skill_get(paths: &AppPaths, skill_id_str: &str) -> Result<SkillGetResponse, AppError> {
+    if let Some(name) = parse_shared_agent_skill_id(skill_id_str) {
+        let dir = paths.agent_skills_dir.join(&name);
+        if !dir.exists() {
+            return Err(AppError::new(
+                "NOT_FOUND",
+                format!("skill not found: {skill_id_str}"),
+            ));
+        }
+        let (record, content) =
+            build_skill_record_agent_shared(&name, &dir).map_err(AppError::from)?;
+        return Ok(SkillGetResponse { record, content });
+    }
+
     let (client, name) = parse_server_id(skill_id_str).map_err(AppError::from)?;
 
     let (record, content) = match client {
@@ -2404,10 +2490,7 @@ fn apply_planned(
                     ))
                 })?;
                 fs::remove_file(&m.from).map_err(|e| {
-                    CoreError::Io(format!(
-                        "remove {} after copy: {e}",
-                        m.from.display()
-                    ))
+                    CoreError::Io(format!("remove {} after copy: {e}", m.from.display()))
                 })?;
             }
         }

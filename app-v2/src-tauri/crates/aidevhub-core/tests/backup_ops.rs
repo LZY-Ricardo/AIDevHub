@@ -29,6 +29,7 @@ fn mk_paths(tmp: &tempfile::TempDir) -> AppPaths {
         claude_commands_disabled_dir: base.join(".claude").join("commands-disabled"),
         claude_skills_dir: base.join(".claude").join("skills"),
         claude_skills_disabled_dir: base.join(".claude").join("skills-disabled"),
+        agent_skills_dir: base.join(".agents").join("skills"),
         codex_config_path: base.join("config.toml"),
         codex_skills_dir: base.join(".codex").join("skills"),
         codex_skills_disabled_dir: base.join(".codex").join("skills-disabled"),

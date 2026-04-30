@@ -9,9 +9,9 @@ use aidevhub_core::model::{
 };
 use aidevhub_core::ops::{self, AppPaths};
 use serde::Serialize;
-use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItem};
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 async fn run_blocking_command<T, F>(job: F) -> Result<T, AppError>
@@ -35,6 +35,7 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
     let claude_commands_disabled_dir = home.join(".claude").join("commands_disabled");
     let claude_skills_dir = home.join(".claude").join("skills");
     let claude_skills_disabled_dir = home.join(".claude").join("skills_disabled");
+    let agent_skills_dir = home.join(".agents").join("skills");
 
     let codex_home = if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
         PathBuf::from(codex_home)
@@ -56,6 +57,7 @@ fn resolve_paths(app: &tauri::AppHandle) -> Result<AppPaths, AppError> {
         claude_commands_disabled_dir,
         claude_skills_dir,
         claude_skills_disabled_dir,
+        agent_skills_dir,
         codex_config_path,
         codex_skills_dir,
         codex_skills_disabled_dir,
@@ -88,7 +90,10 @@ fn runtime_get_info(app: tauri::AppHandle) -> Result<RuntimeGetInfoResponse, App
 }
 
 #[tauri::command]
-fn pick_directory(app: tauri::AppHandle, initial: Option<String>) -> Result<Option<String>, AppError> {
+fn pick_directory(
+    app: tauri::AppHandle,
+    initial: Option<String>,
+) -> Result<Option<String>, AppError> {
     let mut dialog = app.dialog().file();
     if let Some(initial) = initial.as_deref().filter(|value| !value.trim().is_empty()) {
         dialog = dialog.set_directory(initial);

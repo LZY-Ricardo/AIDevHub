@@ -112,7 +112,7 @@ function App() {
         setMcpCount(servers.length);
         setMcpActiveCount(servers.filter((s) => s.enabled).length);
         setSkillCount(skills.length);
-        setSkillInstalledCount(skills.filter((s) => s.scope === "user").length);
+        setSkillInstalledCount(skills.filter((s) => s.scope === "user" && !s.readonly).length);
       } catch {
         // silent — keep defaults at 0
       }

@@ -1,4 +1,4 @@
-import type { BackupOp, Client, SkillKind, SkillScope, Transport } from "./types";
+import type { BackupOp, Client, SkillKind, SkillScope, SkillSource, Transport } from "./types";
 
 export function clientLabel(c: Client): string {
   return c === "claude_code" ? "Claude Code" : "Codex";
@@ -37,6 +37,18 @@ export function skillScopeLabel(scope: SkillScope): string {
 
 export function skillKindLabel(kind: SkillKind): string {
   return kind === "dir" ? "目录" : "文件";
+}
+
+export function skillSourceLabel(source: SkillSource): string {
+  switch (source) {
+    case "claude_command":
+    case "claude_skill":
+      return "Claude";
+    case "codex_skill":
+      return "Codex";
+    case "agent_shared":
+      return "Agent";
+  }
 }
 
 export function existsLabel(exists: boolean): string {

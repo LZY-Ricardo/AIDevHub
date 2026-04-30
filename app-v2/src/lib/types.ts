@@ -4,6 +4,7 @@ export type McpDiffCheckMode = "open_diff" | "summary_only";
 
 export type SkillScope = "user" | "system";
 export type SkillKind = "dir" | "file";
+export type SkillSource = "claude_command" | "claude_skill" | "codex_skill" | "agent_shared";
 
 export interface AppSettings {
   mcp_diff_check_mode: McpDiffCheckMode;
@@ -135,6 +136,7 @@ export interface RuntimeInfo {
     claude_config_path: string;
     claude_commands_dir: string;
     claude_commands_disabled_dir: string;
+    agent_skills_dir: string;
     codex_config_path: string;
     codex_skills_dir: string;
     codex_skills_disabled_dir: string;
@@ -155,13 +157,15 @@ export interface RuntimeInfo {
 }
 
 export interface SkillRecord {
-  skill_id: string; // "<client>:<name>"
-  client: Client;
+  skill_id: string;
+  client?: Client;
+  source: SkillSource;
   name: string;
   description: string;
   scope: SkillScope;
   kind: SkillKind;
   enabled: boolean;
+  readonly: boolean;
   entry_path: string;
   container_path: string;
 }

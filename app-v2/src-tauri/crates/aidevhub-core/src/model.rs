@@ -31,6 +31,26 @@ pub enum SkillKind {
     File,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillSource {
+    ClaudeCommand,
+    ClaudeSkill,
+    CodexSkill,
+    AgentShared,
+}
+
+impl SkillSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SkillSource::ClaudeCommand => "claude_command",
+            SkillSource::ClaudeSkill => "claude_skill",
+            SkillSource::CodexSkill => "codex_skill",
+            SkillSource::AgentShared => "agent_shared",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppError {
     pub code: String,
@@ -110,13 +130,17 @@ pub struct ServerNotes {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillRecord {
-    pub skill_id: String, // "<client>:<name>"
-    pub client: Client,
+    pub skill_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client: Option<Client>,
+    pub source: SkillSource,
     pub name: String,
     pub description: String,
     pub scope: SkillScope,
     pub kind: SkillKind,
     pub enabled: bool,
+    #[serde(default)]
+    pub readonly: bool,
     pub entry_path: String,
     pub container_path: String,
 }
@@ -381,6 +405,7 @@ pub struct RuntimePaths {
     pub claude_commands_disabled_dir: String,
     pub claude_skills_dir: String,
     pub claude_skills_disabled_dir: String,
+    pub agent_skills_dir: String,
     pub codex_config_path: String,
     pub codex_skills_dir: String,
     pub codex_skills_disabled_dir: String,
