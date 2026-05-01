@@ -213,6 +213,12 @@ export const api = {
     });
   },
 
+  backupPrune(keepPerTarget?: number): Promise<number> {
+    return invokeCmd("backup_prune", {
+      keepPerTarget: keepPerTarget ?? 30,
+    });
+  },
+
   skillList(payload?: { client?: Client; scope?: "all" | "user" | "system" | "disabled" }): Promise<SkillRecord[]> {
     return invokeCmd("skill_list", {
       client: payload?.client,

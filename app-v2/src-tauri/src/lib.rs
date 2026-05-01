@@ -326,6 +326,15 @@ fn backup_apply_rollback(
 }
 
 #[tauri::command]
+fn backup_prune(
+    app: tauri::AppHandle,
+    keep_per_target: usize,
+) -> Result<usize, AppError> {
+    let paths = resolve_paths(&app)?;
+    ops::backup_prune(&paths, keep_per_target)
+}
+
+#[tauri::command]
 async fn config_check_updates(
     app: tauri::AppHandle,
 ) -> Result<ConfigCheckUpdatesResponse, AppError> {
@@ -714,6 +723,16 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Auto-prune backups on startup (keep max 30 per target).
+            {
+                let handle = app.handle().clone();
+                let _ = std::thread::spawn(move || {
+                    if let Ok(paths) = resolve_paths(&handle) {
+                        let _ = ops::backup_prune(&paths, 30);
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -740,6 +759,7 @@ pub fn run() {
             backup_list,
             backup_preview_rollback,
             backup_apply_rollback,
+            backup_prune,
             config_check_updates,
             config_ignore_updates,
             config_accept_mcp_updates,

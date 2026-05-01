@@ -13,6 +13,7 @@ export function BackupsPage() {
   const [records, setRecords] = useState<BackupRecord[] | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pruneBusy, setPruneBusy] = useState(false);
 
   const [preview, setPreview] = useState<WritePreview | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -103,6 +104,21 @@ export function BackupsPage() {
     }
   }
 
+  async function pruneBackups() {
+    setPruneBusy(true);
+    setError(null);
+    try {
+      const prunedCount = await api.backupPrune(30);
+      if (prunedCount > 0) {
+        await load();
+      }
+    } catch (e) {
+      setError(e as AppError);
+    } finally {
+      setPruneBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: "16px" }}>
       <section className="ui-pageSummary">
@@ -154,6 +170,14 @@ export function BackupsPage() {
           <div className="ui-btnRow">
             <button type="button" className="ui-btn" onClick={load} disabled={busy}>
               <Icon name="refresh" /> 刷新
+            </button>
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={pruneBackups}
+              disabled={busy || pruneBusy}
+            >
+              清理备份
             </button>
           </div>
         </div>

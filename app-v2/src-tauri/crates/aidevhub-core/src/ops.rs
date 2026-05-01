@@ -3016,6 +3016,52 @@ pub fn backup_apply_rollback(
     })
 }
 
+pub fn backup_prune(paths: &AppPaths, keep_per_target: usize) -> Result<usize, AppError> {
+    if keep_per_target == 0 {
+        return Err(AppError::new("VALIDATION_ERROR", "keep_per_target must be > 0"));
+    }
+    let mut index = load_backup_index(&paths.backup_index_path).map_err(AppError::from)?;
+    if index.is_empty() {
+        return Ok(0);
+    }
+
+    let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, rec) in index.iter().enumerate() {
+        groups
+            .entry(rec.target_path.clone())
+            .or_default()
+            .push(i);
+    }
+
+    let mut prune_positions: BTreeSet<usize> = BTreeSet::new();
+    for (_, mut positions) in groups {
+        positions.sort_by(|&a, &b| index[b].created_at.cmp(&index[a].created_at));
+        for &pos in positions.iter().skip(keep_per_target) {
+            prune_positions.insert(pos);
+        }
+    }
+
+    let pruned_count = prune_positions.len();
+    if pruned_count == 0 {
+        return Ok(0);
+    }
+
+    for &pos in &prune_positions {
+        let _ = fs::remove_file(&index[pos].backup_path);
+    }
+
+    let mut sorted: Vec<usize> = prune_positions.into_iter().collect();
+    sorted.sort_unstable_by(|a, b| b.cmp(a));
+    for pos in sorted {
+        index.remove(pos);
+    }
+
+    let s = save_backup_index(&index).map_err(AppError::from)?;
+    write_atomic(&paths.backup_index_path, &s).map_err(AppError::from)?;
+
+    Ok(pruned_count)
+}
+
 pub fn expected_files_from_preview(preview: &WritePreview) -> Vec<FilePrecondition> {
     preview
         .files

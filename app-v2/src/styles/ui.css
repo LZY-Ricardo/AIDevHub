@@ -352,8 +352,9 @@
 }
 
 .ui-tableBackups {
-  width: auto;
+  width: 100%;
   min-width: 0;
+  table-layout: fixed;
 }
 
 .ui-tableBackups col.ui-colBackupCreatedAt {
@@ -362,6 +363,10 @@
 
 .ui-tableBackups col.ui-colBackupOp {
   width: 8rem;
+}
+
+.ui-tableBackups col.ui-colBackupTarget {
+  width: auto;
 }
 
 .ui-tableBackups col.ui-colBackupSummary {
