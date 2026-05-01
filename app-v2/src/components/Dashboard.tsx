@@ -217,34 +217,6 @@ export function Dashboard({
           )}
         </section>
 
-        <section
-          className="ui-dashboardPanel ui-dashboardPanelWide"
-          aria-label="资产总览"
-        >
-          <div className="ui-cardTitleRow">
-            <h2 className="ui-sectionTitle">
-              {dashboardContent.sections.assets.title}
-            </h2>
-          </div>
-          {dashboardContent.sections.assets.description ? (
-            <p className="ui-dashboardPanelIntro">
-              {dashboardContent.sections.assets.description}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="ui-dashboardPanel" aria-label="恢复中心">
-          <div className="ui-cardTitleRow">
-            <h2 className="ui-sectionTitle">
-              {dashboardContent.sections.recovery.title}
-            </h2>
-          </div>
-          {dashboardContent.sections.recovery.description ? (
-            <p className="ui-dashboardPanelIntro">
-              {dashboardContent.sections.recovery.description}
-            </p>
-          ) : null}
-        </section>
       </div>
     </div>
   );

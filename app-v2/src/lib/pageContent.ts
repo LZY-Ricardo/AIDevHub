@@ -30,14 +30,6 @@ export const dashboardContent = {
       title: "快速操作",
       description: "",
     },
-    assets: {
-      title: "资产总览",
-      description: "",
-    },
-    recovery: {
-      title: "恢复中心",
-      description: "",
-    },
     activity: {
       title: "最近动态",
     },
